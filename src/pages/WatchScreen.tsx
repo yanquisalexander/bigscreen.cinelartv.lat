@@ -7,6 +7,8 @@ import { useConfigStore } from '@/stores/configStore';
 import { getWatchData, updateProgress } from '@/features/content/api';
 import { useKeyHandler } from '@/hooks/useKeyHandler';
 import { formatTime, classNames, resolveImageUrl } from '@/utils/helpers';
+import { addContinueWatching } from '@/services/NativeBridge';
+import type { AndroidTvHomeItem } from '@/services/NativeBridge';
 import {
   LucideArrowLeft,
   LucidePlay,
@@ -198,7 +200,7 @@ export function WatchScreen() {
     };
   }, [streamUrl, watchData, navigate, contentId, nextEpisode]);
 
-  // --- Progress reporting al backend (cada 10s, sin relación con el render) ---
+  // --- Progress reporting al backend + NativeBridge (cada 10s, sin relación con el render) ---
   useEffect(() => {
     if (!tokens || !contentId || !watchData) return;
 
@@ -212,11 +214,31 @@ export function WatchScreen() {
           video.currentTime,
           video.duration,
         ).catch(() => { });
+
+        const cwItem: AndroidTvHomeItem = {
+          content_id: contentId,
+          episode_id: episodeId,
+          title: watchData.content.title,
+          description: watchData.episode?.title ?? watchData.content.description,
+          content_type: watchData.content.content_type,
+          cover: watchData.content.cover,
+          cover_resized: watchData.content.cover,
+          banner: watchData.content.banner,
+          banner_resized: watchData.content.banner,
+          progress: video.currentTime,
+          duration: video.duration,
+          image_url: resolveImageUrl(watchData.content.cover, clientEndpoint),
+          url: `/watch/${contentId}${episodeId ? `/${episodeId}` : ''}`,
+          episode_title: watchData.season?.title && watchData.episode?.title
+            ? `${watchData.season.title} - ${watchData.episode.title}`
+            : watchData.episode?.title,
+        };
+        addContinueWatching(cwItem);
       }
     }, 10000);
 
     return () => { if (progressTimerRef.current) clearInterval(progressTimerRef.current); };
-  }, [tokens, contentId, watchData]);
+  }, [tokens, contentId, watchData, clientEndpoint, episodeId]);
 
   // --- Tick de lógica a 1Hz: detección de segmento activo + next-episode ---
   // Antes esto corría dentro de "timeupdate" (hasta 4 veces por segundo) y

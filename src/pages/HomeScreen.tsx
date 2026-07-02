@@ -10,6 +10,8 @@ import { FocusableCard } from '@/components/tv/FocusableCard';
 import { FocusableRow } from '@/components/tv/FocusableRow';
 import { Focusable } from '@/components/tv/Focusable';
 import type { ContentItem, ExploreResponse } from '@/types/content';
+import { syncContinueWatching, syncRecommendations } from '@/services/NativeBridge';
+import type { AndroidTvHomeItem } from '@/services/NativeBridge';
 
 
 export function HomeScreen() {
@@ -36,6 +38,31 @@ export function HomeScreen() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!data) return;
+    const items: AndroidTvHomeItem[] = [];
+    for (const cat of data.content ?? []) {
+      for (const item of cat.content ?? []) {
+        items.push({
+          content_id: item.id,
+          title: item.title,
+          description: item.description,
+          content_type: item.content_type,
+          cover: item.cover,
+          cover_resized: item.cover_resized,
+          banner: item.banner,
+          banner_resized: item.banner_resized,
+          progress: item.progress,
+          year: item.year,
+          url: `/content/${item.id}`,
+          image_url: resolveImageUrl(item.cover_resized ?? item.banner_resized, clientEndpoint),
+        });
+      }
+    }
+    syncContinueWatching(items.filter((i) => i.progress != null && i.progress > 0));
+    syncRecommendations(items);
+  }, [data, clientEndpoint]);
 
   const handlePlay = (item: ContentItem) => {
     navigate(`/watch/${item.id}`);

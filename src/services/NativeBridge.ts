@@ -4,6 +4,13 @@ interface CinelarNative {
   getDeviceModel?: () => string;
   exitApp?: () => void;
   openUrl?: (url: string) => void;
+  syncContinueWatching?: (itemsJson: string) => boolean;
+  addContinueWatching?: (itemJson: string) => boolean;
+  clearContinueWatching?: () => boolean;
+  syncRecommendations?: (itemsJson: string) => boolean;
+  syncGenericRecommendations?: () => boolean;
+  onProfileChanged?: () => boolean;
+  onLogout?: () => boolean;
 }
 
 declare global {
@@ -37,3 +44,50 @@ export const openUrl = (url: string): void => {
     window.location.href = url;
   }
 };
+
+export interface AndroidTvHomeItem {
+  id?: string;
+  content_id?: string;
+  episode_id?: string;
+  title?: string;
+  description?: string;
+  banner?: string;
+  cover?: string;
+  banner_resized?: string;
+  cover_resized?: string;
+  thumbnail?: string;
+  thumbnail_resized?: string;
+  image_url?: string;
+  poster_url?: string;
+  logo_url?: string;
+  content_type?: string;
+  progress?: number;
+  duration?: number;
+  last_watched_at?: string;
+  url?: string;
+  path?: string;
+  year?: number | null;
+  season_title?: string;
+  episode_title?: string;
+}
+
+export const syncContinueWatching = (items: AndroidTvHomeItem[]): boolean =>
+  native.syncContinueWatching?.(JSON.stringify(items)) ?? false;
+
+export const addContinueWatching = (item: AndroidTvHomeItem): boolean =>
+  native.addContinueWatching?.(JSON.stringify(item)) ?? false;
+
+export const clearContinueWatching = (): boolean =>
+  native.clearContinueWatching?.() ?? false;
+
+export const syncRecommendations = (items: AndroidTvHomeItem[]): boolean =>
+  native.syncRecommendations?.(JSON.stringify(items)) ?? false;
+
+export const syncGenericRecommendations = (): boolean =>
+  native.syncGenericRecommendations?.() ?? false;
+
+export const notifyNativeProfileChanged = (): boolean =>
+  native.onProfileChanged?.() ?? false;
+
+export const notifyNativeLogout = (): boolean =>
+  native.onLogout?.() ?? false;

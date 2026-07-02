@@ -7,6 +7,7 @@ import { TVToast } from '@/components/ui/TVToast';
 import { useToastStore } from '@/stores/toastStore';
 import { checkCompat } from '@/services/compat';
 import { IncompatibleBrowserScreen } from '@/components/ui/IncompatibleBrowserScreen';
+import { useNativeBridgeSync } from '@/hooks/useNativeBridgeSync';
 
 // Initialize stores immediately at module load time
 useAuthStore.getState().initialize();
@@ -17,18 +18,18 @@ const compatResult = checkCompat();
 let betaToastShown = false;
 
 export default function App() {
-  if (!compatResult.compatible) {
-    return <IncompatibleBrowserScreen result={compatResult} />;
-  }
-
-  // Subscribe to auth state to re-render when ready
   const isReady = useAuthStore((s) => s.isReady);
+  useNativeBridgeSync();
 
   useEffect(() => {
     if (!isReady || betaToastShown) return;
     betaToastShown = true;
     useToastStore.getState().show('Gracias por probar la beta', 'info', 5000);
   }, [isReady]);
+
+  if (!compatResult.compatible) {
+    return <IncompatibleBrowserScreen result={compatResult} />;
+  }
 
   if (!isReady) {
     return (
