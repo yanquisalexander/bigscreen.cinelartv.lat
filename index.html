@@ -14,6 +14,15 @@
         document.head.appendChild(meta);
       })();
     </script>
+    <script>
+      if (typeof AbortController !== 'undefined' && typeof AbortSignal !== 'undefined' && !AbortSignal.timeout) {
+        AbortSignal.timeout = function(ms) {
+          var ctrl = new AbortController();
+          setTimeout(function() { ctrl.abort(); }, ms);
+          return ctrl.signal;
+        };
+      }
+    </script>
     <title>CinelarTV</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

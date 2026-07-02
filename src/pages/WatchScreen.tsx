@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { Focusable } from '@/components/tv/Focusable';
@@ -24,6 +24,10 @@ import { useToastStore } from "@/stores/toastStore";
 
 const ACCENT = '#FFFFFF';
 
+// Cada cuánto se re-evalúan segmentos / next-episode / progreso "lógico".
+// No afecta el suavizado visual de la seekbar, que corre por rAF aparte.
+const LOGIC_TICK_MS = 1000;
+
 type FlatEpisode = WatchEpisode & { seasonNumber: number };
 
 export function WatchScreen() {
@@ -35,16 +39,22 @@ export function WatchScreen() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [watchData, setWatchData] = useState<WatchData | null>(null);
-  const [playerState, setPlayerState] = useState<PlayerState>({
+
+  // IMPORTANTE: currentTime/duration/buffered YA NO viven acá. Antes cada
+  // "timeupdate" (cada 250ms) disparaba setPlayerState -> re-render de TODO
+  // el árbol (incluyendo el rail de episodios completo). Ahora esos valores
+  // se leen directo de videoRef en el propio DOM (Seekbar) o en el tick de
+  // 1Hz que solo maneja lógica (segmentos, next episode). Esto es lo que
+  // más pesa en WebViews de Android TV, donde el motor de layout/paint es
+  // mucho más limitado que en un browser de escritorio.
+  const [playerState, setPlayerState] = useState<Pick<PlayerState, 'isPlaying' | 'isBuffering' | 'isSeeking' | 'volume' | 'isMuted'>>({
     isPlaying: false,
-    currentTime: 0,
-    duration: 0,
-    buffered: 0,
     isBuffering: false,
     isSeeking: false,
     volume: 1,
     isMuted: false,
   });
+  const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
   const [skipSegment, setSkipSegment] = useState<Segment | null>(null);
 
@@ -55,6 +65,7 @@ export function WatchScreen() {
 
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const logicTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // --- Next episode state ---
   const [nextEpisode, setNextEpisode] = useState<FlatEpisode | null>(null);
@@ -77,6 +88,14 @@ export function WatchScreen() {
     }
     return result;
   }, [watchData?.seasons]);
+
+  // thumbUrl por episodio calculado una sola vez cuando cambia la lista,
+  // en vez de en cada render de EpisodesRow (evita recomputar resolveImageUrl
+  // por cada card en cada re-render).
+  const episodesWithThumb = useMemo(
+    () => allEpisodes.map((ep) => ({ ep, thumbUrl: resolveImageUrl(ep.thumbnail, clientEndpoint) })),
+    [allEpisodes, clientEndpoint],
+  );
 
   const currentEpisodeIndex = useMemo(() => {
     if (!episodeId || allEpisodes.length === 0) return -1;
@@ -118,14 +137,12 @@ export function WatchScreen() {
     setWatchData(null);
     setPlayerState({
       isPlaying: false,
-      currentTime: 0,
-      duration: 0,
-      buffered: 0,
       isBuffering: false,
       isSeeking: false,
       volume: 1,
       isMuted: false,
     });
+    setDuration(0);
     setSkipSegment(null);
     getWatchData(tokens.accessToken, contentId, episodeId)
       .then((data) => setWatchData(data))
@@ -135,7 +152,7 @@ export function WatchScreen() {
       });
   }, [tokens, contentId, episodeId, navigate]);
 
-  // --- Setup video ---
+  // --- Setup video (solo eventos de bajo volumen: play/pause/waiting/canplay/ended/duration) ---
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !streamUrl) return;
@@ -150,6 +167,7 @@ export function WatchScreen() {
     const onPause = () => setPlayerState((s) => ({ ...s, isPlaying: false }));
     const onWaiting = () => setPlayerState((s) => ({ ...s, isBuffering: true }));
     const onCanPlay = () => setPlayerState((s) => ({ ...s, isBuffering: false }));
+    const onDurationChange = () => setDuration(video.duration || 0);
     const onEnded = () => {
       // Auto-play next episode if available
       if (nextEpisode) {
@@ -159,46 +177,12 @@ export function WatchScreen() {
       }
     };
 
-    let lastTimeUpdate = 0;
-
-    const onTimeUpdate = () => {
-      const now = Date.now();
-      if (now - lastTimeUpdate < 250) return;
-      lastTimeUpdate = now;
-
-      const ct = video.currentTime;
-      const dur = video.duration || 0;
-
-      setPlayerState((s) => ({
-        ...s,
-        currentTime: ct,
-        duration: dur,
-      }));
-
-      // Detect skip segments
-      const active = allSegments.find((s) => {
-        const start = s.start ?? s.start_time ?? 0;
-        const end = s.end ?? s.end_time ?? 0;
-        return ct >= start && ct <= end && (s.type === 'intro' || s.segment_type === 'skip_intro' || s.type === 'resume' || s.segment_type === 'skip_resume');
-      });
-      setSkipSegment(active ?? null);
-    };
-
-    const onProgress = () => {
-      if (video.buffered.length > 0) {
-        setPlayerState((s) => ({
-          ...s,
-          buffered: video.buffered.end(video.buffered.length - 1),
-        }));
-      }
-    };
-
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
-    video.addEventListener('timeupdate', onTimeUpdate);
-    video.addEventListener('progress', onProgress);
     video.addEventListener('waiting', onWaiting);
     video.addEventListener('canplay', onCanPlay);
+    video.addEventListener('durationchange', onDurationChange);
+    video.addEventListener('loadedmetadata', onDurationChange);
     video.addEventListener('ended', onEnded);
 
     video.play().catch(() => { });
@@ -206,15 +190,15 @@ export function WatchScreen() {
     return () => {
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
-      video.removeEventListener('timeupdate', onTimeUpdate);
-      video.removeEventListener('progress', onProgress);
       video.removeEventListener('waiting', onWaiting);
       video.removeEventListener('canplay', onCanPlay);
+      video.removeEventListener('durationchange', onDurationChange);
+      video.removeEventListener('loadedmetadata', onDurationChange);
       video.removeEventListener('ended', onEnded);
     };
-  }, [streamUrl, watchData, navigate, contentId, nextEpisode, allSegments]);
+  }, [streamUrl, watchData, navigate, contentId, nextEpisode]);
 
-  // --- Progress reporting ---
+  // --- Progress reporting al backend (cada 10s, sin relación con el render) ---
   useEffect(() => {
     if (!tokens || !contentId || !watchData) return;
 
@@ -234,50 +218,75 @@ export function WatchScreen() {
     return () => { if (progressTimerRef.current) clearInterval(progressTimerRef.current); };
   }, [tokens, contentId, watchData]);
 
-  // --- Next episode detection (near end or next_episode segment) ---
+  // --- Tick de lógica a 1Hz: detección de segmento activo + next-episode ---
+  // Antes esto corría dentro de "timeupdate" (hasta 4 veces por segundo) y
+  // cada corrida terminaba en un setState que re-renderizaba el árbol
+  // completo. Un segundo de resolución es más que suficiente para decidir
+  // si mostrar "Omitir intro" o la tarjeta de siguiente episodio.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    logicTimerRef.current = setInterval(() => {
+      const ct = video.currentTime;
+      const dur = video.duration || 0;
+
+      // Segmento de skip activo
+      const active = allSegments.find((s) => {
+        const start = s.start ?? s.start_time ?? 0;
+        const end = s.end ?? s.end_time ?? 0;
+        return ct >= start && ct <= end && (s.type === 'intro' || s.segment_type === 'skip_intro' || s.type === 'resume' || s.segment_type === 'skip_resume');
+      });
+      setSkipSegment((prev) => {
+        if (prev?.id === active?.id) return prev;
+        return active ?? null;
+      });
+
+      // Next episode: por segmento explícito o cercanía al final
+      if (nextEpisode) {
+        const nextEpSegment = allSegments.find(
+          (seg) => seg.segment_type === 'next_episode' && seg.start_time !== null && ct >= (seg.start_time ?? 0),
+        );
+        const nearEnd = dur > 0 && (dur - ct) <= 30;
+        const shouldShow = !!(nextEpSegment || nearEnd);
+
+        if (shouldShow && !nextShowingRef.current) {
+          nextShowingRef.current = true;
+          setShowNextCard(true);
+          setNextCountdown(10);
+          if (nextTimerRef.current) clearInterval(nextTimerRef.current);
+          nextTimerRef.current = setInterval(() => {
+            setNextCountdown((prev) => {
+              if (prev <= 1) {
+                if (nextTimerRef.current) clearInterval(nextTimerRef.current);
+                nextShowingRef.current = false;
+                navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        } else if (!shouldShow && nextShowingRef.current) {
+          nextShowingRef.current = false;
+          setShowNextCard(false);
+          if (nextTimerRef.current) clearInterval(nextTimerRef.current);
+        }
+      }
+    }, LOGIC_TICK_MS);
+
+    return () => {
+      if (logicTimerRef.current) clearInterval(logicTimerRef.current);
+    };
+  }, [allSegments, nextEpisode, contentId, navigate]);
+
+  // Si desaparece el next episode (cambio de contenido), limpiar estado
   useEffect(() => {
     if (!nextEpisode) {
       if (nextTimerRef.current) clearInterval(nextTimerRef.current);
       nextShowingRef.current = false;
       setShowNextCard(false);
-      return;
     }
-
-    const ct = playerState.currentTime;
-    const dur = playerState.duration;
-
-    const nextEpSegment = allSegments.find(
-      (seg) => (seg.segment_type === 'next_episode') && seg.start_time !== null && ct >= (seg.start_time ?? 0),
-    );
-    const nearEnd = dur > 0 && (dur - ct) <= 30;
-    const shouldShow = !!(nextEpSegment || nearEnd) && nextEpisode;
-
-    if (shouldShow && !nextShowingRef.current) {
-      nextShowingRef.current = true;
-      setShowNextCard(true);
-      setNextCountdown(10);
-      if (nextTimerRef.current) clearInterval(nextTimerRef.current);
-      nextTimerRef.current = setInterval(() => {
-        setNextCountdown((prev) => {
-          if (prev <= 1) {
-            if (nextTimerRef.current) clearInterval(nextTimerRef.current);
-            nextShowingRef.current = false;
-            navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (!shouldShow && nextShowingRef.current) {
-      nextShowingRef.current = false;
-      setShowNextCard(false);
-      if (nextTimerRef.current) clearInterval(nextTimerRef.current);
-    }
-
-    return () => {
-      if (nextTimerRef.current) clearInterval(nextTimerRef.current);
-    };
-  }, [playerState.currentTime, playerState.duration, nextEpisode, allSegments, contentId, navigate]);
+  }, [nextEpisode]);
 
   // --- Cleanup next timer on unmount ---
   useEffect(() => {
@@ -415,13 +424,8 @@ export function WatchScreen() {
     );
   }
 
-  const duration = playerState.duration || 0;
-  const progress = duration > 0 ? (playerState.currentTime / duration) * 100 : 0;
-  const bufferedPct = duration > 0 ? (playerState.buffered / duration) * 100 : 0;
-
-  const segments = allSegments;
   const chapterMarks = duration > 0
-    ? segments
+    ? allSegments
       .map((s) => (((s.start ?? s.start_time ?? 0) / duration) * 100))
       .filter((p) => p > 0.5 && p < 99.5)
     : [];
@@ -484,7 +488,7 @@ export function WatchScreen() {
           {/* Transporte central: se desvanece suavemente cuando el foco está en la fila de episodios */}
           <div
             className={classNames(
-              'absolute inset-0 flex items-center justify-center pointer-events-auto transition-all duration-300',
+              'absolute inset-0 flex items-center justify-center pointer-events-auto transition-opacity transition-transform duration-300',
               railExpanded ? 'opacity-0 -translate-y-3 pointer-events-none' : 'opacity-100 translate-y-0',
             )}
           >
@@ -528,57 +532,23 @@ export function WatchScreen() {
               siempre en el DOM, solo cambia cuál es visible/interactiva. */}
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pt-[clamp(2.5rem,7vh,5rem)] pb-[clamp(1.25rem,3.5vh,2.25rem)] px-[clamp(2rem,4vw,3rem)] pointer-events-auto">
             <div className="relative h-[clamp(44px,6vh,52px)]">
-              {/* Vista seekbar (por defecto) */}
+              {/* Vista seekbar: se actualiza por DOM/rAF, fuera de React state */}
               <Focusable
                 onArrowPress={handleProgressArrow}
                 focusKey="watch-progress"
                 focusedClassName="scale-101"
                 className={classNames(
-                  'absolute inset-0 flex items-center gap-5 transition-all duration-300',
+                  'absolute inset-0 transition-opacity transition-transform duration-300',
                   railExpanded ? 'opacity-0 translate-y-3 pointer-events-none' : 'opacity-100 translate-y-0',
                 )}
               >
-                <span className="text-white text-sm font-mono w-14 text-right tabular-nums">
-                  {formatTime(playerState.currentTime)}
-                </span>
-
-                <div className="relative flex-1 h-2 rounded-full">
-                  <div className="absolute inset-0 bg-white/20 rounded-full" />
-                  <div
-                    className="absolute inset-y-0 left-0 bg-white/35 rounded-full transition-all"
-                    style={{ width: `${bufferedPct}%` }}
-                  />
-                  <div
-                    className="absolute inset-y-0 left-0 rounded-full transition-all"
-                    style={{ width: `${progress}%`, backgroundColor: ACCENT }}
-                  />
-
-                  {chapterMarks.map((pct, i) => (
-                    <div
-                      key={i}
-                      className="absolute top-1/2 -translate-y-1/2 w-[2px] h-3.5 bg-black/50 rounded-full"
-                      style={{ left: `${pct}%` }}
-                    />
-                  ))}
-
-                  <div
-                    className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white"
-                    style={{
-                      left: `calc(${progress}% - 8px)`,
-                      boxShadow: `0 0 0 5px ${ACCENT}55`,
-                    }}
-                  />
-                </div>
-
-                <span className="text-white/50 text-sm font-mono w-14 tabular-nums">
-                  {formatTime(duration)}
-                </span>
+                <Seekbar videoRef={videoRef} duration={duration} chapterMarks={chapterMarks} />
               </Focusable>
 
               {/* Vista expandida: título + descripción del episodio resaltado en la fila */}
               <div
                 className={classNames(
-                  'absolute inset-0 flex flex-col justify-center transition-all duration-300',
+                  'absolute inset-0 flex flex-col justify-center transition-opacity transition-transform duration-300',
                   railExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-3 pointer-events-none',
                 )}
               >
@@ -600,15 +570,14 @@ export function WatchScreen() {
 
             {/* Fila de episodios: siempre visible junto con los controles (estilo YouTube TV),
                 se agranda levemente cuando el foco entra en ella */}
-            {isTVShow && allEpisodes.length > 0 && (
+            {isTVShow && episodesWithThumb.length > 0 && (
               <EpisodesRow
-                episodes={allEpisodes}
+                episodes={episodesWithThumb}
                 currentIndex={currentEpisodeIndex}
                 expanded={railExpanded}
                 onSelect={navigateToEpisode}
                 onExpandChange={setRailExpanded}
                 onFocusedEpisodeChange={setFocusedRailEpisode}
-                clientEndpoint={clientEndpoint}
               />
             )}
           </div>
@@ -632,7 +601,11 @@ export function WatchScreen() {
         {/* --- NEXT EPISODE CARD --- */}
         {showNextCard && nextEpisode && (
           <div className="absolute bottom-[clamp(7rem,16vh,11rem)] right-[clamp(2rem,4vw,3rem)] z-25 pointer-events-auto">
-            <div className="bg-black/80 backdrop-blur-sm border border-white/10 rounded-2xl flex items-center gap-3 p-2.5 min-w-[280px]">
+            {/* bg-black/90 sólido en vez de backdrop-blur-sm: el backdrop-filter
+                es una de las operaciones más caras para las GPUs integradas de
+                Android TV / STBs y en varios WebViews de fabricante ni siquiera
+                está bien acelerado (cae a software y genera jank). */}
+            <div className="bg-black/90 border border-white/10 rounded-2xl flex items-center gap-3 p-2.5 min-w-[280px]">
               {nextEpisode.thumbnail ? (
                 <img
                   src={resolveImageUrl(nextEpisode.thumbnail, clientEndpoint) ?? undefined}
@@ -677,26 +650,110 @@ export function WatchScreen() {
   );
 }
 
+/* ─── Seekbar ───────────────────────────────────────────────────────────
+   Se actualiza directo por DOM en cada frame (requestAnimationFrame),
+   leyendo video.currentTime / video.buffered sin pasar por React state.
+   Esto es lo que más impacto tiene en WebView de Android TV: evita que el
+   componente padre (y con él, todo el rail de episodios) se re-renderice
+   varias veces por segundo solo para mover una barra de progreso. */
+
+function Seekbar({
+  videoRef,
+  duration,
+  chapterMarks,
+}: {
+  videoRef: React.RefObject<HTMLVideoElement>;
+  duration: number;
+  chapterMarks: number[];
+}) {
+  const fillRef = useRef<HTMLDivElement>(null);
+  const bufferedRef = useRef<HTMLDivElement>(null);
+  const thumbRef = useRef<HTMLDivElement>(null);
+  const currentTimeLabelRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    let rafId: number;
+
+    const update = () => {
+      const dur = video.duration || 0;
+      const ct = video.currentTime;
+      const pct = dur > 0 ? (ct / dur) * 100 : 0;
+
+      let bufferedEnd = 0;
+      if (video.buffered.length > 0) {
+        bufferedEnd = video.buffered.end(video.buffered.length - 1);
+      }
+      const bufferedPct = dur > 0 ? (bufferedEnd / dur) * 100 : 0;
+
+      if (fillRef.current) fillRef.current.style.width = `${pct}%`;
+      if (bufferedRef.current) bufferedRef.current.style.width = `${bufferedPct}%`;
+      if (thumbRef.current) thumbRef.current.style.left = `calc(${pct}% - 8px)`;
+      if (currentTimeLabelRef.current) currentTimeLabelRef.current.textContent = formatTime(ct);
+
+      rafId = requestAnimationFrame(update);
+    };
+
+    rafId = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(rafId);
+  }, [videoRef]);
+
+  return (
+    <div className="flex items-center gap-5 h-full">
+      <span ref={currentTimeLabelRef} className="text-white text-sm font-mono w-14 text-right tabular-nums">
+        0:00
+      </span>
+
+      <div className="relative flex-1 h-2 rounded-full">
+        <div className="absolute inset-0 bg-white/20 rounded-full" />
+        <div ref={bufferedRef} className="absolute inset-y-0 left-0 bg-white/35 rounded-full" style={{ width: '0%' }} />
+        <div ref={fillRef} className="absolute inset-y-0 left-0 rounded-full" style={{ width: '0%', backgroundColor: ACCENT }} />
+
+        {chapterMarks.map((pct, i) => (
+          <div
+            key={i}
+            className="absolute top-1/2 -translate-y-1/2 w-[2px] h-3.5 bg-black/50 rounded-full"
+            style={{ left: `${pct}%` }}
+          />
+        ))}
+
+        <div
+          ref={thumbRef}
+          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white"
+          style={{ left: '-8px', boxShadow: `0 0 0 5px ${ACCENT}55` }}
+        />
+      </div>
+
+      <span className="text-white/50 text-sm font-mono w-14 tabular-nums">
+        {formatTime(duration)}
+      </span>
+    </div>
+  );
+}
+
 /* ─── Episodes Row (carrusel horizontal siempre visible, estilo YouTube TV) ───
    Vive dentro del scrim inferior junto al resto de los controles: aparece y
-   desaparece con ellos (showControls), no requiere un botón para abrirla. */
+   desaparece con ellos (showControls), no requiere un botón para abrirla.
+   Memoizado: no debe re-renderizar cuando cambia playerState/currentTime. */
 
-function EpisodesRow({
+type EpisodeWithThumb = { ep: FlatEpisode; thumbUrl: string | null | undefined };
+
+const EpisodesRow = memo(function EpisodesRow({
   episodes,
   currentIndex,
   expanded,
   onSelect,
   onExpandChange,
   onFocusedEpisodeChange,
-  clientEndpoint,
 }: {
-  episodes: FlatEpisode[];
+  episodes: EpisodeWithThumb[];
   currentIndex: number;
   expanded: boolean;
   onSelect: (epId: string | number) => void;
   onExpandChange: (expanded: boolean) => void;
   onFocusedEpisodeChange: (ep: FlatEpisode | null) => void;
-  clientEndpoint: string;
 }) {
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const railViewportRef = useRef<HTMLDivElement>(null);
@@ -705,7 +762,7 @@ function EpisodesRow({
     focusKey: 'episodes-rail',
     trackChildren: true,
     saveLastFocusedChild: true,
-    preferredChildFocusKey: currentIndex >= 0 ? `rail-ep-item-${episodes[currentIndex]?.id}` : undefined,
+    preferredChildFocusKey: currentIndex >= 0 ? `rail-ep-item-${episodes[currentIndex]?.ep.id}` : undefined,
   });
 
   // Reportar hacia arriba si el foco está dentro de la fila: esto es lo que
@@ -728,10 +785,16 @@ function EpisodesRow({
     onFocusedEpisodeChange(ep);
   }, [onFocusedEpisodeChange]);
 
+  // registerNode estable por id: evita romper la memoización de RailEpisodeItem.
+  const registerNode = useCallback((id: string, node: HTMLDivElement | null) => {
+    if (node) itemRefs.current.set(id, node);
+    else itemRefs.current.delete(id);
+  }, []);
+
   // Centrar el episodio actual al montar (sin animación, ya arranca centrado)
   useEffect(() => {
     if (currentIndex < 0) return;
-    const ep = episodes[currentIndex];
+    const ep = episodes[currentIndex]?.ep;
     if (!ep) return;
     const viewport = railViewportRef.current;
     const el = itemRefs.current.get(String(ep.id));
@@ -744,20 +807,20 @@ function EpisodesRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const seasonCount = new Set(episodes.map((e) => e.seasonNumber)).size;
+  const seasonCount = useMemo(() => new Set(episodes.map((e) => e.ep.seasonNumber)).size, [episodes]);
 
   return (
     <FocusContext.Provider value={focusKey}>
       <div
         ref={rowRef as React.RefObject<HTMLDivElement>}
-        className={classNames('transition-all duration-300', expanded ? 'mt-[clamp(0.5rem,1.8vh,1rem)]' : 'mt-[clamp(1rem,3.5vh,2rem)]')}
+        className={classNames('transition-transform duration-300', expanded ? 'mt-[clamp(0.5rem,1.8vh,1rem)]' : 'mt-[clamp(1rem,3.5vh,2rem)]')}
       >
         <div
           ref={railViewportRef}
           className="flex gap-[clamp(0.75rem,1.8vw,1rem)] overflow-x-auto p-[clamp(0.5rem,1.4vw,0.75rem)] snap-x snap-mandatory hide-scrollbar scroll-smooth"
           style={{ scrollPaddingInline: 'clamp(2rem, 4vw, 3rem)' }}
         >
-          {episodes.map((ep, index) => (
+          {episodes.map(({ ep, thumbUrl }, index) => (
             <RailEpisodeItem
               key={ep.id}
               episode={ep}
@@ -765,28 +828,27 @@ function EpisodesRow({
               isActive={index === currentIndex}
               expanded={expanded}
               showSeasonEyebrow={seasonCount > 1}
-              thumbUrl={resolveImageUrl(ep.thumbnail, clientEndpoint)}
-              onSelect={() => onSelect(ep.id)}
-              onCenter={() => centerItem(ep)}
-              registerNode={(node) => {
-                if (node) itemRefs.current.set(String(ep.id), node);
-                else itemRefs.current.delete(String(ep.id));
-              }}
+              thumbUrl={thumbUrl}
+              onSelect={onSelect}
+              onCenter={centerItem}
+              registerNode={registerNode}
             />
           ))}
         </div>
       </div>
     </FocusContext.Provider>
   );
-}
+});
 
 /* ─── Tarjeta individual del carrusel de episodios ───
    Usa useFocusable directamente (en vez del wrapper Focusable) porque
    necesitamos el callback onFocus real de norigin-spatial-navigation
    para centrar el scroll cuando el foco llega vía mando (flechas),
-   no solo al hacer click/enter. */
+   no solo al hacer click/enter.
+   Memoizado: con onSelect/onCenter/registerNode estables, esta card no
+   vuelve a renderizar salvo que cambien sus propias props. */
 
-function RailEpisodeItem({
+const RailEpisodeItem = memo(function RailEpisodeItem({
   episode: ep,
   index,
   isActive,
@@ -803,14 +865,21 @@ function RailEpisodeItem({
   expanded: boolean;
   showSeasonEyebrow: boolean;
   thumbUrl: string | null | undefined;
-  onSelect: () => void;
-  onCenter: () => void;
-  registerNode: (node: HTMLDivElement | null) => void;
+  onSelect: (epId: string | number) => void;
+  onCenter: (ep: FlatEpisode) => void;
+  registerNode: (id: string, node: HTMLDivElement | null) => void;
 }) {
+  const handleSelect = useCallback(() => onSelect(ep.id), [onSelect, ep.id]);
+  const handleCenter = useCallback(() => onCenter(ep), [onCenter, ep]);
+  const handleRegisterNode = useCallback(
+    (node: HTMLDivElement | null) => registerNode(String(ep.id), node),
+    [registerNode, ep.id],
+  );
+
   const { ref, focused } = useFocusable({
     focusKey: `rail-ep-item-${ep.id}`,
-    onEnterPress: onSelect,
-    onFocus: onCenter,
+    onEnterPress: handleSelect,
+    onFocus: handleCenter,
   });
 
   const cardWidth = expanded ? 'clamp(180px, 13.5vw, 260px)' : 'clamp(156px, 11.5vw, 220px)';
@@ -819,17 +888,17 @@ function RailEpisodeItem({
   return (
     <div
       ref={ref as React.RefObject<HTMLDivElement>}
-      onClick={onSelect}
+      onClick={handleSelect}
       className={classNames(
-        'snap-center flex-shrink-0 transition-all duration-300 cursor-pointer',
+        'snap-center flex-shrink-0 transition-transform duration-300 cursor-pointer',
         focused && 'scale-105',
       )}
       style={{ width: cardWidth }}
     >
       <div
-        ref={registerNode}
+        ref={handleRegisterNode}
         className={classNames(
-          'relative bg-neutral-800 transition-all duration-300 rounded-2xl',
+          'relative bg-neutral-800 transition-transform duration-300 rounded-2xl',
           focused && 'ring-4',
         )}
         style={{
@@ -839,7 +908,7 @@ function RailEpisodeItem({
         }}
       >
         {thumbUrl ? (
-          <img src={thumbUrl} alt="" className="w-full h-full object-cover rounded-2xl" />
+          <img src={thumbUrl} alt="" className="w-full h-full object-cover rounded-2xl" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center rounded-2xl">
             <LucidePlay size={26} className="text-neutral-600" />
@@ -878,4 +947,4 @@ function RailEpisodeItem({
       </div>
     </div>
   );
-}
+});

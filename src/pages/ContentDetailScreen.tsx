@@ -11,7 +11,6 @@ import { Focusable } from '@/components/tv/Focusable';
 import { FocusableCard } from '@/components/tv/FocusableCard';
 import { FocusableRow } from '@/components/tv/FocusableRow';
 import type { ContentDetail, Season } from '@/types/content';
-import "@m3e/web/loading-indicator";
 import { M3eLoadingIndicator } from "@m3e/react/loading-indicator";
 
 // Teclas/códigos de "atrás" según plataforma (teclado, webOS, Tizen)
