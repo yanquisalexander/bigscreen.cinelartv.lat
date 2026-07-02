@@ -440,7 +440,7 @@ export function WatchScreen() {
       >
         <video
           ref={videoRef}
-          className="w-full h-full block"
+          className="absolute inset-0 w-full h-full"
           style={{ objectFit: 'contain', objectPosition: 'center' }}
           playsInline
         />
