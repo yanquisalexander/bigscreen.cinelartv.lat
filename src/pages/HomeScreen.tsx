@@ -10,9 +10,13 @@ import { FocusableCard } from '@/components/tv/FocusableCard';
 import { FocusableRow } from '@/components/tv/FocusableRow';
 import { Focusable } from '@/components/tv/Focusable';
 import type { ContentItem, ExploreResponse } from '@/types/content';
+import { useToastStore } from '@/stores/toastStore';
+
 
 export function HomeScreen() {
   const navigate = useNavigate();
+  const toast = useToastStore();
+
   const tokens = useAuthStore((s) => s.tokens);
   const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
   const [data, setData] = useState<ExploreResponse | null>(null);
@@ -34,6 +38,10 @@ export function HomeScreen() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    toast.show('Gracias por probar la beta de CinelarTV', 'info', 3000);
+  }, []);
 
   const handlePlay = (item: ContentItem) => {
     navigate(`/watch/${item.id}`);

@@ -148,7 +148,7 @@ export function ContentDetailScreen() {
   if (loading) {
     return (
       <div className="w-full h-dvh bg-bg flex items-center justify-center">
-        <M3eLoadingIndicator style={{"--m3e-loading-indicator-active-indicator-color": "#ddd"} as any} />
+        <M3eLoadingIndicator style={{ "--m3e-loading-indicator-active-indicator-color": "#ddd" } as any} />
       </div>
     );
   }
@@ -175,135 +175,135 @@ export function ContentDetailScreen() {
         }}
         className="w-full h-dvh overflow-y-auto hide-scrollbar bg-bg"
       >
-      <div className="relative w-full h-[50vh] min-h-[400px]">
-        {backdropUrl ? (
-          <img src={backdropUrl} alt={content.title} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-accent/30 to-bg" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/70 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent" />
-      </div>
-
-      <div className="px-24 -mt-32 relative z-10 pb-16">
-        <h1 className="text-4xl font-extrabold text-white mb-4">{content.title}</h1>
-
-        <div className="flex items-center gap-4 text-text-secondary text-lg mb-6">
-          {content.year && <span>{content.year}</span>}
-          {content.liked && (
-            <span className="text-accent-light">&hearts;</span>
+        <div className="relative w-full h-[50vh] min-h-[400px]">
+          {backdropUrl ? (
+            <img src={backdropUrl} alt={content.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-accent/30 to-bg" />
           )}
-          {content.content_type && (
-            <span className="px-2 py-0.5 border border-text-secondary rounded text-sm">
-              {content.content_type === 'TVSHOW' ? 'Serie' : 'Película'}
-            </span>
-          )}
+          <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent" />
         </div>
 
-        {categories.length > 0 && (
-          <div className="flex gap-2 mb-6">
-            {categories.map((cat) => (
-              <span key={cat.id} className="px-3 py-1 bg-surface rounded-full text-sm text-text-secondary">
-                {cat.name}
+        <div className="px-24 -mt-32 relative z-10 pb-16">
+          <h1 className="text-4xl font-extrabold text-white mb-4">{content.title}</h1>
+
+          <div className="flex items-center gap-4 text-text-secondary text-lg mb-6">
+            {content.year && <span>{content.year}</span>}
+            {content.liked && (
+              <span className="text-accent-light">&hearts;</span>
+            )}
+            {content.content_type && (
+              <span className="px-2 py-0.5 border border-text-secondary rounded text-sm">
+                {content.content_type === 'TVSHOW' ? 'Serie' : 'Película'}
               </span>
-            ))}
-          </div>
-        )}
-
-        {content.description && (
-          <p className="text-lg text-text-secondary max-w-3xl mb-8 leading-relaxed">
-            {content.description}
-          </p>
-        )}
-
-        <div className="flex gap-4 mb-12">
-          <FocusableButton
-            focusKey="detail-play"
-            onEnterPress={handlePlay}
-            onArrowPress={handlePlayArrow}
-            autoFocus
-            variant="primary"
-            size="lg"
-          >
-            Reproducir
-          </FocusableButton>
-          <FocusableButton
-            focusKey="detail-list"
-            onEnterPress={() => { }}
-            onArrowPress={handleListArrow}
-            variant="secondary"
-            size="lg"
-          >
-            + Mi Lista
-          </FocusableButton>
-        </div>
-
-        {seasons.length > 0 && (
-          <div className="mt-8">
-            <h2 className="text-2xl font-bold text-white mb-6 px-0">Temporadas</h2>
-            <div className="flex gap-3 mb-6">
-              {seasons.map((season: Season, i: number) => (
-                <Focusable
-                  key={season.id}
-                  focusKey={`detail-season-${season.id}`}
-                  onEnterPress={() => setSelectedSeason(i)}
-                  onArrowPress={(direction) => {
-                    if (direction === 'up') return focusContentTarget('detail-play');
-                    if (direction === 'down') return focusContentTarget(firstEpisodeFocusKey);
-                    if (direction === 'left' && i === 0) return focusSidebarFromLeftEdge(direction);
-                    return true;
-                  }}
-                  className={`px-5 py-2.5 rounded-full text-lg font-medium transition-colors ${selectedSeason === i
-                    ? 'bg-white text-black'
-                    : 'bg-surface text-text-secondary'
-                    }`}
-                >
-                  {season.title}
-                </Focusable>
-              ))}
-            </div>
-
-            {currentEpisodes.length > 0 && (
-              <FocusableRow
-                key={selectedSeason}
-                title="Episodios"
-                className="-mx-24"
-                focusKey={`episodes-season-${selectedSeason}`}
-                preferredChildFocusKey={firstEpisodeFocusKey}
-              >
-                {currentEpisodes.map((episode, episodeIdx) => {
-                  const epThumb = resolveImageUrl(
-                    episode.thumbnail ?? episode.thumbnail_resized,
-                    clientEndpoint,
-                  );
-                  const progress = episode.continue_watching
-                    ? Math.round(
-                      (episode.continue_watching.progress / episode.continue_watching.duration) * 100,
-                    )
-                    : undefined;
-
-                  return (
-                    <FocusableCard
-                      key={episode.id}
-                      focusKey={`detail-episode-${episode.id}`}
-                      title={episode.position ? `${episode.position}. ${episode.title}` : episode.title}
-                      image={epThumb}
-                      subtitle={episode.description}
-                      progress={progress}
-                      onArrowPress={(direction) => {
-                        if (direction === 'up') return focusContentTarget(selectedSeasonFocusKey ?? 'detail-play');
-                        if (direction === 'left' && episodeIdx === 0) return focusSidebarFromLeftEdge(direction);
-                        return true;
-                      }}
-                      onEnterPress={() => handlePlayEpisode(episode.id)}
-                    />
-                  );
-                })}
-              </FocusableRow>
             )}
           </div>
-        )}
-      </div>
+
+          {categories.length > 0 && (
+            <div className="flex gap-2 mb-6">
+              {categories.map((cat) => (
+                <span key={cat.id} className="px-3 py-1 bg-surface rounded-full text-sm text-text-secondary">
+                  {cat.name}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {content.description && (
+            <p className="text-lg text-text-secondary max-w-3xl mb-8 leading-relaxed">
+              {content.description}
+            </p>
+          )}
+
+          <div className="flex gap-4 mb-12">
+            <FocusableButton
+              focusKey="detail-play"
+              onEnterPress={handlePlay}
+              onArrowPress={handlePlayArrow}
+              autoFocus
+              variant="primary"
+              size="lg"
+            >
+              Reproducir
+            </FocusableButton>
+            <FocusableButton
+              focusKey="detail-list"
+              onEnterPress={() => { }}
+              onArrowPress={handleListArrow}
+              variant="secondary"
+              size="lg"
+            >
+              + Mi Lista
+            </FocusableButton>
+          </div>
+
+          {seasons.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-2xl font-bold text-white mb-6 px-0">Temporadas</h2>
+              <div className="flex gap-3 mb-6">
+                {seasons.map((season: Season, i: number) => (
+                  <Focusable
+                    key={season.id}
+                    focusKey={`detail-season-${season.id}`}
+                    onEnterPress={() => setSelectedSeason(i)}
+                    onArrowPress={(direction) => {
+                      if (direction === 'up') return focusContentTarget('detail-play');
+                      if (direction === 'down') return focusContentTarget(firstEpisodeFocusKey);
+                      if (direction === 'left' && i === 0) return focusSidebarFromLeftEdge(direction);
+                      return true;
+                    }}
+                    className={`px-5 py-2.5 rounded-full text-lg font-medium transition-colors ${selectedSeason === i
+                      ? 'bg-white text-black'
+                      : 'bg-surface text-text-secondary'
+                      }`}
+                  >
+                    {season.title}
+                  </Focusable>
+                ))}
+              </div>
+
+              {currentEpisodes.length > 0 && (
+                <FocusableRow
+                  key={selectedSeason}
+                  title="Episodios"
+                  className="-mx-24"
+                  focusKey={`episodes-season-${selectedSeason}`}
+                  preferredChildFocusKey={firstEpisodeFocusKey}
+                >
+                  {currentEpisodes.map((episode, episodeIdx) => {
+                    const epThumb = resolveImageUrl(
+                      episode.thumbnail ?? episode.thumbnail_resized,
+                      clientEndpoint,
+                    );
+                    const progress = episode.continue_watching
+                      ? Math.round(
+                        (episode.continue_watching.progress / episode.continue_watching.duration) * 100,
+                      )
+                      : undefined;
+
+                    return (
+                      <FocusableCard
+                        key={episode.id}
+                        focusKey={`detail-episode-${episode.id}`}
+                        title={`${episodeIdx + 1}. ${episode.title}`}
+                        image={epThumb}
+                        subtitle={episode.description}
+                        progress={progress}
+                        onArrowPress={(direction) => {
+                          if (direction === 'up') return focusContentTarget(selectedSeasonFocusKey ?? 'detail-play');
+                          if (direction === 'left' && episodeIdx === 0) return focusSidebarFromLeftEdge(direction);
+                          return true;
+                        }}
+                        onEnterPress={() => handlePlayEpisode(episode.id)}
+                      />
+                    );
+                  })}
+                </FocusableRow>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </FocusContext.Provider>
   );

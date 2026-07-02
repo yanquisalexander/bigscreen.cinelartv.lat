@@ -65,6 +65,37 @@ html, body, #root {
   animation: pulse 2s ease-in-out infinite;
 }
 
+/* Toast slide animation (YouTube TV style: top-right corner) */
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-slide-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+.animate-toast-in {
+  animation: toast-slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-toast-out {
+  animation: toast-slide-out 0.25s ease-in forwards;
+}
+
 /* No text selection for TV */
 .tv-no-select {
   user-select: none;
