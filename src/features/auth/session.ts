@@ -15,6 +15,14 @@ export async function selectProfile(
   }, accessToken);
 }
 
+export async function deassignProfile(
+  accessToken: string,
+): Promise<{ success: boolean }> {
+  return apiRequest('/session/deassign-profile.json', {
+    method: 'POST',
+  }, accessToken);
+}
+
 export async function refreshAccessToken(
   refreshToken: string,
 ): Promise<{ access_token: string; refresh_token?: string }> {

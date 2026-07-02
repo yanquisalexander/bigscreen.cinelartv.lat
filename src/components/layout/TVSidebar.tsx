@@ -3,6 +3,7 @@ import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spat
 import { Focusable } from '@/components/tv/Focusable';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
+import { deassignProfile } from '@/features/auth/session';
 import { classNames } from '@/utils/helpers';
 import { LucideSearch, LucideTelescope } from "lucide-react";
 
@@ -80,7 +81,11 @@ export function TVSidebar() {
 
         {profile && (
           <Focusable
-            onEnterPress={() => navigate('/select-profile')}
+            onEnterPress={() => {
+              const token = useAuthStore.getState().tokens?.accessToken;
+              if (token) deassignProfile(token).catch(() => {});
+              navigate('/select-profile');
+            }}
             onArrowPress={focusContent}
             focusKey="nav-profile"
             focusedClassName="bg-white !text-black [&_span]:text-black"
