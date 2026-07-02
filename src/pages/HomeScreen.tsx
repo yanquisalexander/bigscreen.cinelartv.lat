@@ -104,17 +104,17 @@ export function HomeScreen() {
           ref={ref as React.RefObject<HTMLDivElement>}
           className="w-full h-dvh overflow-y-auto hide-scrollbar bg-bg"
         >
-          <h1 className="fixed top-6 right-8 text-white text-2xl font-medium z-999">CinelarTV</h1>
+          <h1 className="fixed top-[clamp(1rem,3vh,1.5rem)] right-[clamp(1.5rem,4vw,2rem)] text-white text-[clamp(1.125rem,2vw,1.5rem)] font-medium z-999">CinelarTV</h1>
           {loading ? (
             <div className="w-full h-full flex flex-col">
-              <div className="w-full h-[70vh] min-h-[500px] bg-surface animate-pulse-slow" />
-              <div className="px-24 py-8 space-y-8">
+              <div className="w-full h-[clamp(360px,70vh,680px)] bg-surface animate-pulse-slow" />
+              <div className="px-[clamp(3rem,7.5vw,6rem)] py-[clamp(1.25rem,4vh,2rem)] space-y-[clamp(1.5rem,4vh,2rem)]">
                 {[1, 2, 3].map((i) => (
                   <div key={i}>
-                    <div className="h-6 w-48 bg-surface rounded mb-4 animate-pulse-slow" />
-                    <div className="flex gap-3">
+                    <div className="h-[clamp(1.125rem,2.4vh,1.5rem)] w-[clamp(10rem,15vw,12rem)] bg-surface rounded mb-[clamp(0.75rem,2vh,1rem)] animate-pulse-slow" />
+                    <div className="flex gap-[clamp(0.5rem,1vw,0.75rem)]">
                       {[1, 2, 3, 4, 5].map((j) => (
-                        <div key={j} className="w-[230px] h-[130px] bg-surface rounded-xl animate-pulse-slow" />
+                        <div key={j} className="w-[clamp(156px,18vw,230px)] h-[clamp(88px,10.2vw,130px)] bg-surface rounded-xl animate-pulse-slow" />
                       ))}
                     </div>
                   </div>
@@ -134,7 +134,7 @@ export function HomeScreen() {
                 />
               )}
 
-              <div className="-mt-20 relative z-10 pb-16">
+              <div className="-mt-[clamp(3rem,8vh,5rem)] relative z-10 pb-[clamp(3rem,8vh,4rem)]">
                 {data?.content?.map((category, catIdx) => (
                   <FocusableRow
                     key={catIdx}

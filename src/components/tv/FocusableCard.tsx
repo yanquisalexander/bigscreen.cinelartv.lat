@@ -11,8 +11,8 @@ interface FocusableCardProps {
   className?: string;
   focusKey?: string;
   autoFocus?: boolean;
-  cardWidth?: number;
-  cardHeight?: number;
+  cardWidth?: number | string;
+  cardHeight?: number | string;
 }
 
 export function FocusableCard({
@@ -25,8 +25,8 @@ export function FocusableCard({
   className,
   focusKey,
   autoFocus = false,
-  cardWidth = 230,
-  cardHeight = 130,
+  cardWidth = 'clamp(156px,18vw,230px)',
+  cardHeight = 'clamp(88px,10.2vw,130px)',
 }: FocusableCardProps) {
   return (
     <Focusable
@@ -59,10 +59,10 @@ export function FocusableCard({
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
-        <div className="absolute bottom-0 left-0 right-0 p-3">
-          <p className="text-white text-sm font-semibold truncate">{title}</p>
+        <div className="absolute bottom-0 left-0 right-0 p-[clamp(0.5rem,1.2vw,0.75rem)]">
+          <p className="text-white text-[clamp(0.75rem,1.1vw,0.875rem)] font-semibold truncate">{title}</p>
           {subtitle && (
-            <p className="text-text-secondary text-xs mt-0.5 truncate">{subtitle}</p>
+            <p className="text-text-secondary text-[clamp(0.6875rem,0.95vw,0.75rem)] mt-0.5 truncate">{subtitle}</p>
           )}
         </div>
 

@@ -80,7 +80,7 @@ export function HeroSection({ items, onPlay, onInfo, clientEndpoint, firstRowFoc
     <FocusContext.Provider value={focusKey}>
       <div
         ref={heroRef as React.RefObject<HTMLDivElement>}
-        className="relative w-full h-[70vh] min-h-[500px] overflow-hidden"
+        className="relative w-full h-[clamp(360px,70vh,680px)] overflow-hidden"
       >
         {items.map((item, i) => (
           <div
@@ -103,16 +103,16 @@ export function HeroSection({ items, onPlay, onInfo, clientEndpoint, firstRowFoc
         <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/30" />
 
-        <div className="absolute bottom-20 left-24 max-w-xl z-10">
-          <h2 className="text-4xl font-extrabold text-white leading-tight mb-4 drop-shadow-lg">
+        <div className="absolute bottom-[clamp(3rem,9vh,5rem)] left-[clamp(3rem,7.5vw,6rem)] max-w-[clamp(28rem,46vw,36rem)] z-10">
+          <h2 className="text-[clamp(2rem,3.2vw,2.5rem)] font-extrabold text-white leading-tight mb-[clamp(0.75rem,2vh,1rem)] drop-shadow-lg">
             {currentItem.title}
           </h2>
           {currentItem.description && (
-            <p className="text-lg text-text-secondary line-clamp-3 mb-6">
+            <p className="text-[clamp(1rem,1.45vw,1.125rem)] text-text-secondary line-clamp-3 mb-[clamp(1rem,3vh,1.5rem)]">
               {currentItem.description}
             </p>
           )}
-          <div className="flex gap-4">
+          <div className="flex gap-[clamp(0.75rem,1.5vw,1rem)]">
             <Focusable
               onEnterPress={() => onPlay(currentItem)}
               onArrowPress={(direction) => {
@@ -122,7 +122,7 @@ export function HeroSection({ items, onPlay, onInfo, clientEndpoint, firstRowFoc
               autoFocus
               focusKey="hero-play"
               focusedClassName="scale-105 shadow-lg shadow-black/40"
-              className="px-8 py-3 bg-white text-black text-base font-bold rounded-full transition-transform duration-200"
+              className="px-[clamp(1.5rem,3vw,2rem)] py-[clamp(0.625rem,1.4vh,0.75rem)] bg-white text-black text-[clamp(0.875rem,1.25vw,1rem)] font-bold rounded-full transition-transform duration-200"
             >
               Reproducir
             </Focusable>
@@ -131,7 +131,7 @@ export function HeroSection({ items, onPlay, onInfo, clientEndpoint, firstRowFoc
               onArrowPress={focusFirstRowFromHero}
               focusKey="hero-info"
               focusedClassName="scale-105 shadow-lg shadow-black/40"
-              className="px-6 py-3 glass text-white text-base font-medium rounded-full transition-transform duration-200"
+              className="px-[clamp(1.25rem,2.5vw,1.5rem)] py-[clamp(0.625rem,1.4vh,0.75rem)] glass text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium rounded-full transition-transform duration-200"
             >
               Más info
             </Focusable>
@@ -139,7 +139,7 @@ export function HeroSection({ items, onPlay, onInfo, clientEndpoint, firstRowFoc
         </div>
 
         {items.length > 1 && (
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+          <div className="absolute bottom-[clamp(1.25rem,4vh,2rem)] left-1/2 -translate-x-1/2 flex gap-2 z-10">
             {items.map((_, i) => (
               <button
                 key={i}
