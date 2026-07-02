@@ -193,13 +193,6 @@ export function WatchScreen() {
     };
   }, [streamUrl, watchData, navigate, contentId, nextEpisode, allSegments]);
 
-  // Auto-hide controls when video starts playing
-  useEffect(() => {
-    if (playerState.isPlaying && showControls) {
-      showControlsTemporarily();
-    }
-  }, [playerState.isPlaying, showControls, showControlsTemporarily]);
-
   // --- Progress reporting ---
   useEffect(() => {
     if (!tokens || !contentId || !watchData) return;
@@ -301,6 +294,13 @@ export function WatchScreen() {
       }
     }, 4000);
   }, []);
+
+  // Auto-hide controls when video starts playing
+  useEffect(() => {
+    if (playerState.isPlaying && showControls) {
+      showControlsTemporarily();
+    }
+  }, [playerState.isPlaying, showControls, showControlsTemporarily]);
 
   const cancelNextEpisode = useCallback(() => {
     nextShowingRef.current = false;
