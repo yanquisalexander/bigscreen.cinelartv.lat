@@ -23,8 +23,11 @@ export interface ContentItem {
 
 export interface Segment {
   type?: string;
+  segment_type?: string;
   start: number;
   end: number;
+  start_time?: number;
+  end_time?: number;
 }
 
 export interface Category {
@@ -97,11 +100,36 @@ export interface WatchContent {
   description?: string;
   content_type?: string;
   banner?: string;
+  cover?: string;
   segments?: Segment[];
+}
+
+export interface WatchEpisode {
+  id: string;
+  title: string;
+  description?: string;
+  thumbnail?: string;
+  thumbnail_resized?: string;
+  position: number | null;
+  premium?: boolean;
+  season_id?: string;
+  segments?: Segment[];
+}
+
+export interface WatchSeason {
+  id: string;
+  title: string;
+  description?: string;
+  content_id?: string;
+  position: number | null;
+  episodes: WatchEpisode[];
 }
 
 export interface WatchData {
   content: WatchContent;
+  episode?: WatchEpisode;
+  season?: WatchSeason;
+  seasons?: WatchSeason[];
   continue_watching?: ContinueWatching;
   sources: ContentSource[];
 }

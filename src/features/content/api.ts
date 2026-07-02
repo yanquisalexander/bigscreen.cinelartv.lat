@@ -23,7 +23,8 @@ export async function getWatchData(
 export async function updateProgress(
   accessToken: string,
   contentId: string | number,
-  position: number,
+  episodeId: string | number | undefined,
+  progress: number,
   duration: number,
   deviceSessionToken?: string,
 ): Promise<void> {
@@ -33,7 +34,7 @@ export async function updateProgress(
   }
   await apiRequest(`/watch/${contentId}/progress.json`, {
     method: 'PUT',
-    body: JSON.stringify({ position, duration }),
+    body: JSON.stringify({ progress, duration, episode_id: episodeId }),
     headers,
   }, accessToken);
 }

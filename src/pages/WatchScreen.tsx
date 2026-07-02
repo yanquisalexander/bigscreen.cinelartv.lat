@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { Focusable } from '@/components/tv/Focusable';
 import { useAuthStore } from '@/stores/authStore';
+import { useConfigStore } from '@/stores/configStore';
 import { getWatchData, updateProgress } from '@/features/content/api';
 import { useKeyHandler } from '@/hooks/useKeyHandler';
-import { formatTime, classNames } from '@/utils/helpers';
+import { formatTime, classNames, resolveImageUrl } from '@/utils/helpers';
 import {
   LucideArrowLeft,
   LucidePlay,
@@ -14,17 +15,21 @@ import {
   LucideRotateCw,
   LucideChevronsRight,
   LucideLoader2,
+  LucideX,
+  LucideList,
 } from 'lucide-react';
-import type { WatchData, Segment } from '@/types/content';
+import type { WatchData, Segment, WatchEpisode } from '@/types/content';
 import type { PlayerState } from '@/types/player';
 
-// Acento de marca — usado con moderación: fill de progreso, focus rings, pulso de skip.
 const ACCENT = '#7C5CFF';
+
+type FlatEpisode = WatchEpisode & { seasonNumber: number };
 
 export function WatchScreen() {
   const { contentId, episodeId } = useParams<{ contentId: string; episodeId: string }>();
   const navigate = useNavigate();
   const tokens = useAuthStore((s) => s.tokens);
+  const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [watchData, setWatchData] = useState<WatchData | null>(null);
@@ -40,11 +45,60 @@ export function WatchScreen() {
   });
   const [showControls, setShowControls] = useState(true);
   const [skipSegment, setSkipSegment] = useState<Segment | null>(null);
+  const [episodesPanelOpen, setEpisodesPanelOpen] = useState(false);
 
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // --- Next episode state ---
+  const [nextEpisode, setNextEpisode] = useState<FlatEpisode | null>(null);
+  const [showNextCard, setShowNextCard] = useState(false);
+  const [nextCountdown, setNextCountdown] = useState(10);
+  const nextTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const nextShowingRef = useRef(false);
+
   const streamUrl = watchData?.sources?.[0]?.url;
+
+  // --- Flatten episodes from seasons ---
+  const allEpisodes = useMemo<FlatEpisode[]>(() => {
+    if (!watchData?.seasons) return [];
+    const result: FlatEpisode[] = [];
+    for (const season of watchData.seasons) {
+      const seasonNum = season.position ?? 1;
+      for (const ep of season.episodes ?? []) {
+        result.push({ ...ep, seasonNumber: seasonNum });
+      }
+    }
+    return result;
+  }, [watchData?.seasons]);
+
+  const currentEpisodeIndex = useMemo(() => {
+    if (!episodeId || allEpisodes.length === 0) return -1;
+    return allEpisodes.findIndex((ep) => String(ep.id) === String(episodeId));
+  }, [allEpisodes, episodeId]);
+
+  // Season number for the current episode (from season_id lookup)
+  const currentSeasonNumber = useMemo(() => {
+    if (!watchData?.episode?.season_id || !watchData?.seasons) return null;
+    const idx = watchData.seasons.findIndex((s) => s.id === watchData.episode!.season_id);
+    return idx >= 0 ? (watchData.seasons[idx].position ?? idx + 1) : null;
+  }, [watchData]);
+
+  // --- Find next episode ---
+  useEffect(() => {
+    if (currentEpisodeIndex >= 0 && currentEpisodeIndex < allEpisodes.length - 1) {
+      setNextEpisode(allEpisodes[currentEpisodeIndex + 1]);
+    } else {
+      setNextEpisode(null);
+    }
+  }, [currentEpisodeIndex, allEpisodes]);
+
+  // --- Collect all segments (episode + content) ---
+  const allSegments = useMemo(() => {
+    const epSegs = watchData?.episode?.segments ?? [];
+    const contentSegs = watchData?.content?.segments ?? [];
+    return [...epSegs, ...contentSegs];
+  }, [watchData]);
 
   const { ref, focusKey } = useFocusable({
     focusKey: 'watch-root',
@@ -52,6 +106,7 @@ export function WatchScreen() {
     preferredChildFocusKey: 'watch-playpause',
   });
 
+  // --- Load watch data ---
   useEffect(() => {
     if (!tokens || !contentId) return;
     getWatchData(tokens.accessToken, contentId, episodeId)
@@ -59,6 +114,7 @@ export function WatchScreen() {
       .catch(() => navigate('/home', { replace: true }));
   }, [tokens, contentId, episodeId, navigate]);
 
+  // --- Setup video ---
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !streamUrl) return;
@@ -73,9 +129,15 @@ export function WatchScreen() {
     const onPause = () => setPlayerState((s) => ({ ...s, isPlaying: false }));
     const onWaiting = () => setPlayerState((s) => ({ ...s, isBuffering: true }));
     const onCanPlay = () => setPlayerState((s) => ({ ...s, isBuffering: false }));
-    const onEnded = () => navigate(-1);
+    const onEnded = () => {
+      // Auto-play next episode if available
+      if (nextEpisode) {
+        navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
+      } else {
+        navigate(-1);
+      }
+    };
 
-    const segments = watchData?.content?.segments ?? [];
     let lastTimeUpdate = 0;
 
     const onTimeUpdate = () => {
@@ -92,7 +154,12 @@ export function WatchScreen() {
         duration: dur,
       }));
 
-      const active = segments.find((s) => ct >= s.start && ct <= s.end);
+      // Detect skip segments
+      const active = allSegments.find((s) => {
+        const start = s.start ?? s.start_time ?? 0;
+        const end = s.end ?? s.end_time ?? 0;
+        return ct >= start && ct <= end && (s.type === 'intro' || s.segment_type === 'skip_intro' || s.type === 'resume' || s.segment_type === 'skip_resume');
+      });
       setSkipSegment(active ?? null);
     };
 
@@ -124,8 +191,9 @@ export function WatchScreen() {
       video.removeEventListener('canplay', onCanPlay);
       video.removeEventListener('ended', onEnded);
     };
-  }, [streamUrl, watchData, navigate]);
+  }, [streamUrl, watchData, navigate, contentId, nextEpisode, allSegments]);
 
+  // --- Progress reporting ---
   useEffect(() => {
     if (!tokens || !contentId || !watchData) return;
 
@@ -135,6 +203,7 @@ export function WatchScreen() {
         updateProgress(
           tokens.accessToken,
           contentId,
+          episodeId,
           video.currentTime,
           video.duration,
         ).catch(() => { });
@@ -143,6 +212,58 @@ export function WatchScreen() {
 
     return () => { if (progressTimerRef.current) clearInterval(progressTimerRef.current); };
   }, [tokens, contentId, watchData]);
+
+  // --- Next episode detection (near end or next_episode segment) ---
+  useEffect(() => {
+    if (!nextEpisode) {
+      if (nextTimerRef.current) clearInterval(nextTimerRef.current);
+      nextShowingRef.current = false;
+      setShowNextCard(false);
+      return;
+    }
+
+    const ct = playerState.currentTime;
+    const dur = playerState.duration;
+
+    const nextEpSegment = allSegments.find(
+      (seg) => (seg.segment_type === 'next_episode') && seg.start_time !== null && ct >= (seg.start_time ?? 0),
+    );
+    const nearEnd = dur > 0 && (dur - ct) <= 30;
+    const shouldShow = !!(nextEpSegment || nearEnd) && nextEpisode;
+
+    if (shouldShow && !nextShowingRef.current) {
+      nextShowingRef.current = true;
+      setShowNextCard(true);
+      setNextCountdown(10);
+      if (nextTimerRef.current) clearInterval(nextTimerRef.current);
+      nextTimerRef.current = setInterval(() => {
+        setNextCountdown((prev) => {
+          if (prev <= 1) {
+            if (nextTimerRef.current) clearInterval(nextTimerRef.current);
+            nextShowingRef.current = false;
+            navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (!shouldShow && nextShowingRef.current) {
+      nextShowingRef.current = false;
+      setShowNextCard(false);
+      if (nextTimerRef.current) clearInterval(nextTimerRef.current);
+    }
+
+    return () => {
+      if (nextTimerRef.current) clearInterval(nextTimerRef.current);
+    };
+  }, [playerState.currentTime, playerState.duration, nextEpisode, allSegments, contentId, navigate]);
+
+  // --- Cleanup next timer on unmount ---
+  useEffect(() => {
+    return () => {
+      if (nextTimerRef.current) clearInterval(nextTimerRef.current);
+    };
+  }, []);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
@@ -159,7 +280,8 @@ export function WatchScreen() {
 
   const handleSkip = useCallback(() => {
     if (!skipSegment || !videoRef.current) return;
-    videoRef.current.currentTime = skipSegment.end;
+    const end = skipSegment.end ?? skipSegment.end_time ?? 0;
+    videoRef.current.currentTime = end;
     setSkipSegment(null);
   }, [skipSegment]);
 
@@ -173,8 +295,35 @@ export function WatchScreen() {
     }, 4000);
   }, []);
 
+  const cancelNextEpisode = useCallback(() => {
+    nextShowingRef.current = false;
+    setShowNextCard(false);
+    if (nextTimerRef.current) clearInterval(nextTimerRef.current);
+  }, []);
+
+  const playNextEpisode = useCallback(() => {
+    if (!nextEpisode) return;
+    cancelNextEpisode();
+    navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
+  }, [nextEpisode, contentId, navigate, cancelNextEpisode]);
+
+  const navigateToEpisode = useCallback(
+    (epId: string | number) => {
+      setEpisodesPanelOpen(false);
+      if (String(epId) === String(episodeId)) return;
+      navigate(`/watch/${contentId}/${epId}`, { replace: true });
+    },
+    [episodeId, contentId, navigate],
+  );
+
   const { handleKeyDown } = useKeyHandler({
-    onBack: () => navigate(-1),
+    onBack: () => {
+      if (episodesPanelOpen) {
+        setEpisodesPanelOpen(false);
+        return;
+      }
+      navigate(-1);
+    },
     onPlayPause: togglePlay,
   });
 
@@ -187,15 +336,27 @@ export function WatchScreen() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [handleKeyDown, showControlsTemporarily]);
 
-  // El foco entra siempre en play/pause cuando aparecen los controles.
   useEffect(() => {
     if (showControls) setFocus('watch-playpause');
   }, [showControls]);
 
-  // Cuando aparece un segmento de skip, el foco salta ahí para que "OK" lo omita al toque.
   useEffect(() => {
     if (skipSegment) setFocus('watch-skip');
   }, [skipSegment]);
+
+  // Auto-focus skip button when it appears and controls are hidden
+  useEffect(() => {
+    if (skipSegment && !showControls) {
+      setFocus('watch-skip');
+    }
+  }, [skipSegment, showControls]);
+
+  // Auto-focus next episode card when it appears and controls are hidden
+  useEffect(() => {
+    if (showNextCard && !showControls) {
+      setFocus('watch-next-play');
+    }
+  }, [showNextCard, showControls]);
 
   const handleProgressArrow = (direction: string) => {
     if (direction === 'left') {
@@ -215,7 +376,7 @@ export function WatchScreen() {
     return (
       <div className="w-full h-full bg-black flex flex-col items-center justify-center gap-5">
         <LucideLoader2 size={48} className="animate-spin" style={{ color: ACCENT }} />
-        <p className="text-white/50 text-base tracking-wide">Preparando la reproducción…</p>
+        <p className="text-white/50 text-base tracking-wide">Preparando la reproduccion…</p>
       </div>
     );
   }
@@ -224,12 +385,18 @@ export function WatchScreen() {
   const progress = duration > 0 ? (playerState.currentTime / duration) * 100 : 0;
   const bufferedPct = duration > 0 ? (playerState.buffered / duration) * 100 : 0;
 
-  const segments = watchData.content.segments ?? [];
+  const segments = allSegments;
   const chapterMarks = duration > 0
-    ? segments.map((s) => ((s.start / duration) * 100)).filter((p) => p > 0.5 && p < 99.5)
+    ? segments
+      .map((s) => (((s.start ?? s.start_time ?? 0) / duration) * 100))
+      .filter((p) => p > 0.5 && p < 99.5)
     : [];
 
-  const skipLabel = skipSegment?.type === 'intro' ? 'intro' : 'resumen';
+  const skipLabel = (skipSegment?.type === 'intro' || skipSegment?.segment_type === 'skip_intro')
+    ? 'intro'
+    : 'resumen';
+
+  const isTVShow = watchData.content.content_type === 'TVSHOW';
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -243,7 +410,7 @@ export function WatchScreen() {
           playsInline
         />
 
-        {/* Viñeta persistente para que el texto nunca quede sobre video crudo */}
+        {/* Viñeta persistente */}
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60" />
 
         {playerState.isBuffering && (
@@ -274,6 +441,14 @@ export function WatchScreen() {
               <h1 className="text-white font-bold leading-tight" style={{ fontSize: 'clamp(1.5rem, 2.6vw, 2.2rem)' }}>
                 {watchData.content.title}
               </h1>
+              {watchData.episode && (
+                <p className="text-white/50 text-sm mt-1">
+                  {isTVShow && currentSeasonNumber
+                    ? `T${currentSeasonNumber} · `
+                    : ''}
+                  {watchData.episode.title}
+                </p>
+              )}
             </div>
           </div>
 
@@ -285,7 +460,6 @@ export function WatchScreen() {
                 focusKey="watch-rewind"
                 focusedClassName="bg-white/15 ring-4 scale-110"
                 className="w-16 h-16 rounded-full flex items-center justify-center text-white/85 transition-transform duration-150"
-                style={{ ['--tw-ring-color' as any]: ACCENT }}
               >
                 <LucideRotateCcw size={30} strokeWidth={1.9} />
               </Focusable>
@@ -294,8 +468,7 @@ export function WatchScreen() {
                 onEnterPress={togglePlay}
                 focusKey="watch-playpause"
                 focusedClassName="scale-110 ring-4"
-                className="w-24 h-24 rounded-full flex items-center justify-center text-black transition-transform duration-150"
-                style={{ backgroundColor: '#fff', ['--tw-ring-color' as any]: ACCENT }}
+                className="w-24 h-24 rounded-full flex items-center justify-center text-black transition-transform duration-150 bg-white"
               >
                 {playerState.isPlaying ? (
                   <LucidePause size={34} fill="currentColor" strokeWidth={0} />
@@ -309,7 +482,6 @@ export function WatchScreen() {
                 focusKey="watch-forward"
                 focusedClassName="bg-white/15 ring-4 scale-110"
                 className="w-16 h-16 rounded-full flex items-center justify-center text-white/85 transition-transform duration-150"
-                style={{ ['--tw-ring-color' as any]: ACCENT }}
               >
                 <LucideRotateCw size={30} strokeWidth={1.9} />
               </Focusable>
@@ -318,17 +490,17 @@ export function WatchScreen() {
 
           {/* Scrim inferior + scrubber */}
           <div className="bg-gradient-to-t from-black/90 via-black/50 to-transparent pt-20 pb-9 px-12 pointer-events-auto">
-            {skipSegment && (
+            {/* Botón lista de episodios (solo series) */}
+            {isTVShow && allEpisodes.length > 0 && (
               <div className="flex justify-end mb-6">
                 <Focusable
-                  onEnterPress={handleSkip}
-                  focusKey="watch-skip"
+                  onEnterPress={() => setEpisodesPanelOpen(true)}
+                  focusKey="watch-episodes-btn"
                   focusedClassName="scale-105 ring-4"
-                  className="flex items-center gap-2 rounded-full pl-6 pr-5 py-3.5 text-black text-base font-semibold transition-transform duration-150"
-                  style={{ backgroundColor: '#fff', ['--tw-ring-color' as any]: ACCENT }}
+                  className="flex items-center gap-2 rounded-full pl-5 pr-4 py-2.5 text-white/80 text-sm font-medium transition-transform duration-150 bg-white/10"
                 >
-                  Omitir {skipLabel}
-                  <LucideChevronsRight size={20} strokeWidth={2.5} />
+                  <LucideList size={16} />
+                  <span>Episodios</span>
                 </Focusable>
               </div>
             )}
@@ -363,10 +535,9 @@ export function WatchScreen() {
                 ))}
 
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full"
+                  className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white"
                   style={{
                     left: `calc(${progress}% - 8px)`,
-                    backgroundColor: '#fff',
                     boxShadow: `0 0 0 5px ${ACCENT}55`,
                   }}
                 />
@@ -377,6 +548,212 @@ export function WatchScreen() {
               </span>
             </Focusable>
           </div>
+        </div>
+
+        {/* --- SKIP INTRO/RESUME (siempre visible cuando hay segmento activo) --- */}
+        {skipSegment && (
+          <div className="absolute bottom-28 right-12 z-25 pointer-events-auto">
+            <Focusable
+              onEnterPress={handleSkip}
+              focusKey="watch-skip"
+              focusedClassName="scale-105 ring-4"
+              className="flex items-center gap-2 rounded-full pl-6 pr-5 py-3.5 text-black text-base font-semibold transition-transform duration-150 bg-white"
+            >
+              Omitir {skipLabel}
+              <LucideChevronsRight size={20} strokeWidth={2.5} />
+            </Focusable>
+          </div>
+        )}
+
+        {/* --- NEXT EPISODE CARD --- */}
+        {showNextCard && nextEpisode && (
+          <div className="absolute bottom-28 right-12 z-25 pointer-events-auto">
+            <div className="bg-black/80 backdrop-blur-sm border border-white/10 rounded-2xl flex items-center gap-3 p-2.5 min-w-[280px]">
+              {nextEpisode.thumbnail ? (
+                <img
+                  src={resolveImageUrl(nextEpisode.thumbnail, clientEndpoint) ?? undefined}
+                  alt={nextEpisode.title}
+                  className="w-[70px] h-[44px] rounded-lg object-cover bg-neutral-800 flex-shrink-0"
+                />
+              ) : (
+                <div className="w-[70px] h-[44px] rounded-lg bg-neutral-800 flex items-center justify-center flex-shrink-0">
+                  <LucidePlay size={18} className="text-neutral-500" />
+                </div>
+              )}
+
+              <div className="flex-1 min-w-0">
+                <p className="text-white/60 text-xs font-medium">Siguiente en {nextCountdown}s</p>
+                <p className="text-white text-sm font-semibold truncate">{nextEpisode.title}</p>
+              </div>
+
+              <div className="flex items-center gap-2.5 ml-2">
+                <Focusable
+                  onEnterPress={playNextEpisode}
+                  focusKey="watch-next-play"
+                  focusedClassName="scale-110 ring-4"
+                  className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-black transition-transform"
+                >
+                  <LucidePlay size={14} fill="currentColor" strokeWidth={0} className="ml-0.5" />
+                </Focusable>
+                <Focusable
+                  onEnterPress={cancelNextEpisode}
+                  focusKey="watch-next-cancel"
+                  focusedClassName="scale-110 ring-4"
+                  className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 transition-transform"
+                >
+                  <LucideX size={16} />
+                </Focusable>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- EPISODES PANEL --- */}
+        {episodesPanelOpen && (
+          <EpisodesPanel
+            episodes={allEpisodes}
+            currentIndex={currentEpisodeIndex}
+            onSelect={navigateToEpisode}
+            onClose={() => setEpisodesPanelOpen(false)}
+            clientEndpoint={clientEndpoint}
+          />
+        )}
+      </div>
+    </FocusContext.Provider>
+  );
+}
+
+/* ─── Episodes Panel (overlay lateral derecho) ─── */
+
+/* ─── Episodes Panel (overlay lateral derecho, estilo Google TV) ─── */
+
+/* ─── Episodes Panel (overlay lateral derecho, estilo Google TV) ─── */
+
+function EpisodesPanel({
+  episodes,
+  currentIndex,
+  onSelect,
+  onClose,
+  clientEndpoint,
+}: {
+  episodes: FlatEpisode[];
+  currentIndex: number;
+  onSelect: (epId: string | number) => void;
+  onClose: () => void;
+  clientEndpoint: string;
+}) {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const { ref: panelRef, focusKey } = useFocusable({
+    focusKey: 'episodes-panel',
+    trackChildren: true,
+    saveLastFocusedChild: true,
+    preferredChildFocusKey: currentIndex >= 0 ? `ep-item-${episodes[currentIndex]?.id}` : 'ep-close',
+  });
+
+  useEffect(() => {
+    if (currentIndex < 0 || !listRef.current) return;
+    const el = listRef.current.children[currentIndex] as HTMLElement | undefined;
+    if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [currentIndex]);
+
+  const seasonCount = new Set(episodes.map((e) => e.seasonNumber)).size;
+
+  return (
+    <FocusContext.Provider value={focusKey}>
+      <div
+        ref={(node) => {
+          (panelRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+          (listRef as React.MutableRefObject<HTMLDivElement | null>).current = node?.querySelector('[data-ep-list]') ?? null;
+        }}
+        className="absolute inset-y-0 right-0 w-[480px] z-50 bg-[#0d0d0d]/97 backdrop-blur-md rounded-l-[32px] flex flex-col"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 pt-9 pb-5">
+          <h2 className="text-white text-2xl font-bold tracking-tight">Episodios</h2>
+          <Focusable
+            onEnterPress={onClose}
+            focusKey="ep-close"
+            focusedClassName="bg-white text-black ring-4"
+            className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white/70 transition-transform duration-150"
+          >
+            <LucideX size={19} />
+          </Focusable>
+        </div>
+
+        {/* Episode list — tarjetas grandes tipo Google TV */}
+        <div
+          ref={listRef}
+          data-ep-list
+          className="flex-1 overflow-y-auto px-4 pb-6 hide-scrollbar"
+        >
+          {episodes.map((ep, index) => {
+            const isActive = index === currentIndex;
+            const thumbUrl = resolveImageUrl(ep.thumbnail, clientEndpoint);
+            const showSeasonEyebrow = seasonCount > 1;
+
+            return (
+              <Focusable
+                key={ep.id}
+                focusKey={`ep-item-${ep.id}`}
+                onEnterPress={() => onSelect(ep.id)}
+                focusedClassName="bg-white/10 scale-[1.02]"
+                className={classNames(
+                  'flex gap-4 px-3 py-3 mb-1 rounded-3xl transition-transform duration-150 cursor-pointer',
+                  isActive && 'bg-white/[0.04]',
+                )}
+              >
+                {/* Miniatura 16:9 */}
+                <div className="relative w-[168px] h-[94px] rounded-2xl overflow-hidden bg-neutral-800 flex-shrink-0">
+                  {thumbUrl ? (
+                    <img src={thumbUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <LucidePlay size={22} className="text-neutral-600" />
+                    </div>
+                  )}
+
+                  {isActive && (
+                    <div className="absolute inset-0 bg-black/55 flex items-center justify-center">
+                      <div className="flex items-end gap-[3px] h-4">
+                        <div className="w-[3px] h-2 rounded-full animate-pulse" style={{ backgroundColor: ACCENT }} />
+                        <div className="w-[3px] h-4 rounded-full animate-pulse [animation-delay:0.15s]" style={{ backgroundColor: ACCENT }} />
+                        <div className="w-[3px] h-3 rounded-full animate-pulse [animation-delay:0.3s]" style={{ backgroundColor: ACCENT }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0 py-0.5">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold text-white/45 mb-1 uppercase tracking-wide">
+                    {showSeasonEyebrow && <span>T{ep.seasonNumber}</span>}
+                    {showSeasonEyebrow && <span className="text-white/25">·</span>}
+                    <span>Ep {index + 1}</span>
+                    {isActive && (
+                      <>
+                        <span className="text-white/25">·</span>
+                        <span style={{ color: ACCENT }}>Reproduciendo</span>
+                      </>
+                    )}
+                  </div>
+
+                  <p className={classNames(
+                    'text-[15px] font-semibold leading-snug truncate',
+                    isActive ? 'text-white' : 'text-white/85',
+                  )}>
+                    {ep.title}
+                  </p>
+
+                  {ep.description && (
+                    <p className="text-white/45 text-[13px] leading-snug mt-1 line-clamp-2">
+                      {ep.description}
+                    </p>
+                  )}
+                </div>
+              </Focusable>
+            );
+          })}
         </div>
       </div>
     </FocusContext.Provider>
