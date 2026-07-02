@@ -26,7 +26,14 @@ export function TVSidebar() {
   });
   const focusContent = (direction: string) => {
     if (direction !== 'right') return true;
-    setFocus(location.pathname.startsWith('/content/') ? 'content-root' : 'home-root');
+    const path = location.pathname;
+    if (path.startsWith('/content/')) {
+      setFocus('content-root');
+    } else if (path.startsWith('/search')) {
+      setFocus('search-root');
+    } else {
+      setFocus('home-root');
+    }
     return false;
   };
 
