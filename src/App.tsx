@@ -5,14 +5,22 @@ import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
 import { TVToast } from '@/components/ui/TVToast';
 import { useToastStore } from '@/stores/toastStore';
+import { checkCompat } from '@/services/compat';
+import { IncompatibleBrowserScreen } from '@/components/ui/IncompatibleBrowserScreen';
 
 // Initialize stores immediately at module load time
 useAuthStore.getState().initialize();
 useConfigStore.getState().loadConfig();
 
+const compatResult = checkCompat();
+
 let betaToastShown = false;
 
 export default function App() {
+  if (!compatResult.compatible) {
+    return <IncompatibleBrowserScreen result={compatResult} />;
+  }
+
   // Subscribe to auth state to re-render when ready
   const isReady = useAuthStore((s) => s.isReady);
 

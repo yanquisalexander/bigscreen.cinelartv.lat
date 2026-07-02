@@ -10,14 +10,6 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
-  css: {
-    transformer: 'lightningcss',
-    lightningcss: {
-      targets: {
-        chrome: 91 << 16,
-      },
-    },
-  },
   build: {
     target: 'es2020',
     outDir: 'dist',
