@@ -225,9 +225,9 @@ export function WatchScreen() {
           cover_resized: resolveImageUrl(watchData.content.cover, clientEndpoint),
           banner: resolveImageUrl(watchData.content.banner, clientEndpoint),
           banner_resized: resolveImageUrl(watchData.content.banner, clientEndpoint),
-          progress: video.currentTime,
-          duration: video.duration,
-          image_url: resolveImageUrl(watchData.content.cover ?? watchData.content.banner, clientEndpoint),
+          progress: Math.round(video.currentTime * 1000),
+          duration: Math.round(video.duration * 1000),
+          image_url: resolveImageUrl(watchData.content.banner ?? watchData.content.cover, clientEndpoint),
           url: `/watch/${contentId}${episodeId ? `/${episodeId}` : ''}`,
           episode_title: watchData.season?.title && watchData.episode?.title
             ? `${watchData.season.title} - ${watchData.episode.title}`

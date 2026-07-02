@@ -56,7 +56,7 @@ export function HomeScreen() {
           progress: item.progress,
           year: item.year,
           url: `/content/${item.id}`,
-          image_url: resolveImageUrl(item.cover_resized ?? item.banner_resized ?? item.cover ?? item.banner, clientEndpoint),
+          image_url: resolveImageUrl(item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover, clientEndpoint),
         });
       }
     }
@@ -64,6 +64,7 @@ export function HomeScreen() {
       items
         .filter((i) => i.progress != null && i.progress > 0)
         .slice(0, 3)
+        .map((i) => ({ ...i, progress: undefined }))
     );
     syncRecommendations(items);
   }, [data, clientEndpoint]);
