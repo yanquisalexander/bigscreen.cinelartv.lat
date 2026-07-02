@@ -7,10 +7,14 @@ interface FocusableProps {
   focusKey?: string;
   onEnterPress?: () => void;
   onArrowPress?: (direction: string, details: unknown) => boolean;
+  onFocus?: () => void;
   className?: string;
   focusedClassName?: string;
   autoFocus?: boolean;
   trackChildren?: boolean;
+  saveLastFocusedChild?: boolean;
+  preferredChildFocusKey?: string;
+  focusable?: boolean;
   tabIndex?: number;
 }
 
@@ -19,17 +23,25 @@ export function Focusable({
   focusKey,
   onEnterPress,
   onArrowPress,
+  onFocus,
   className,
   focusedClassName,
   autoFocus = false,
   trackChildren = false,
+  saveLastFocusedChild = false,
+  preferredChildFocusKey,
+  focusable = true,
   tabIndex = 0,
 }: FocusableProps) {
   const { focusKey: resolvedKey, ref, focused, focusSelf } = useFocusable({
     focusKey,
+    focusable,
     onEnterPress: onEnterPress ? () => { onEnterPress(); } : undefined,
-    onArrowPress: onArrowPress as never,
+    onArrowPress: onArrowPress ? (direction, _props, details) => onArrowPress(direction, details) : undefined,
+    onFocus: onFocus ? () => { onFocus(); } : undefined,
     trackChildren,
+    saveLastFocusedChild,
+    preferredChildFocusKey,
   });
 
   useEffect(() => {

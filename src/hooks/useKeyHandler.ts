@@ -12,10 +12,6 @@ export function useKeyHandler(handlers: {
       e.preventDefault();
       handlersRef.current.onBack?.();
     }
-    if (e.key === 'MediaPlayPause' || e.key === 'PlayPause') {
-      e.preventDefault();
-      handlersRef.current.onPlayPause?.();
-    }
   }, []);
 
   return { handleKeyDown };

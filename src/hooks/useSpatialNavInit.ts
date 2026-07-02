@@ -10,7 +10,7 @@ export function useSpatialNavInit() {
 
     init({
       debug: false,
-      throttle: 0,
+      throttle: 80,
     });
 
     setKeyMap({

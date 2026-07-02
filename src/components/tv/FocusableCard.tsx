@@ -7,6 +7,7 @@ interface FocusableCardProps {
   subtitle?: string;
   progress?: number;
   onEnterPress: () => void;
+  onArrowPress?: (direction: string) => boolean;
   className?: string;
   focusKey?: string;
   autoFocus?: boolean;
@@ -20,6 +21,7 @@ export function FocusableCard({
   subtitle,
   progress,
   onEnterPress,
+  onArrowPress,
   className,
   focusKey,
   autoFocus = false,
@@ -29,6 +31,7 @@ export function FocusableCard({
   return (
     <Focusable
       onEnterPress={onEnterPress}
+      onArrowPress={onArrowPress}
       focusKey={focusKey}
       autoFocus={autoFocus}
       focusedClassName="scale-105 shadow-[0_8px_32px_rgba(0,0,0,0.6)]"

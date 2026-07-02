@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { getCurrentSession, refreshAccessToken } from '@/features/auth/session';
 import { useNavigate } from 'react-router-dom';
@@ -45,7 +45,7 @@ function SyncSession({ token }: { token: string }) {
   return null;
 }
 
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
+export function ProtectedRoute() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const selectedProfile = useAuthStore((s) => s.selectedProfile);
   const isReady = useAuthStore((s) => s.isReady);
@@ -64,11 +64,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   return (
     <>
       {token && <SyncSession token={token} />}
-      {children}
+      <Outlet />
     </>
   );
-}
-
-interface ProtectedRouteProps {
-  children: React.ReactNode;
 }
