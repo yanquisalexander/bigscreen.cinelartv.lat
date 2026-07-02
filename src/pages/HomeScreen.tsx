@@ -49,18 +49,22 @@ export function HomeScreen() {
           title: item.title,
           description: item.description,
           content_type: item.content_type,
-          cover: item.cover,
-          cover_resized: item.cover_resized,
-          banner: item.banner,
-          banner_resized: item.banner_resized,
+          cover: resolveImageUrl(item.cover, clientEndpoint),
+          cover_resized: resolveImageUrl(item.cover_resized, clientEndpoint),
+          banner: resolveImageUrl(item.banner, clientEndpoint),
+          banner_resized: resolveImageUrl(item.banner_resized, clientEndpoint),
           progress: item.progress,
           year: item.year,
           url: `/content/${item.id}`,
-          image_url: resolveImageUrl(item.cover_resized ?? item.banner_resized, clientEndpoint),
+          image_url: resolveImageUrl(item.cover_resized ?? item.banner_resized ?? item.cover ?? item.banner, clientEndpoint),
         });
       }
     }
-    syncContinueWatching(items.filter((i) => i.progress != null && i.progress > 0));
+    syncContinueWatching(
+      items
+        .filter((i) => i.progress != null && i.progress > 0)
+        .slice(0, 3)
+    );
     syncRecommendations(items);
   }, [data, clientEndpoint]);
 
