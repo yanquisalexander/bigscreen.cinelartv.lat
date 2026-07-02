@@ -25,8 +25,8 @@ export function FocusableCard({
   className,
   focusKey,
   autoFocus = false,
-  cardWidth = 280,
-  cardHeight = 160,
+  cardWidth = 230,
+  cardHeight = 130,
 }: FocusableCardProps) {
   return (
     <Focusable

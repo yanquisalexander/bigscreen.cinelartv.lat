@@ -59,7 +59,7 @@ export function FocusableRow({ title, children, className = '', focusKey, prefer
   return (
     <FocusContext.Provider value={resolvedFocusKey}>
       <div className={`mb-8 ${className}`}>
-        {title && <h2 className="text-xl font-bold text-text-primary mb-4 px-24">{title}</h2>}
+        {title && <h2 className="text-lg font-bold text-text-primary mb-4 px-24">{title}</h2>}
         <div
           ref={(node) => {
             (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = node;

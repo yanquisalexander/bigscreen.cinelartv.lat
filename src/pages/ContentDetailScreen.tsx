@@ -186,7 +186,7 @@ export function ContentDetailScreen() {
       </div>
 
       <div className="px-24 -mt-32 relative z-10 pb-16">
-        <h1 className="text-5xl font-extrabold text-white mb-4">{content.title}</h1>
+        <h1 className="text-4xl font-extrabold text-white mb-4">{content.title}</h1>
 
         <div className="flex items-center gap-4 text-text-secondary text-lg mb-6">
           {content.year && <span>{content.year}</span>}

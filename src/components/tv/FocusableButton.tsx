@@ -19,9 +19,9 @@ const variantStyles = {
 };
 
 const sizeStyles = {
-  sm: 'px-5 py-2.5 text-sm',
-  md: 'px-8 py-3.5 text-base',
-  lg: 'px-10 py-4 text-lg',
+  sm: 'px-4 py-2 text-xs',
+  md: 'px-6 py-2.5 text-sm',
+  lg: 'px-8 py-3 text-base',
 };
 
 export function FocusableButton({

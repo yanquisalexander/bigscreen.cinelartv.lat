@@ -193,6 +193,13 @@ export function WatchScreen() {
     };
   }, [streamUrl, watchData, navigate, contentId, nextEpisode, allSegments]);
 
+  // Auto-hide controls when video starts playing
+  useEffect(() => {
+    if (playerState.isPlaying && showControls) {
+      showControlsTemporarily();
+    }
+  }, [playerState.isPlaying, showControls, showControlsTemporarily]);
+
   // --- Progress reporting ---
   useEffect(() => {
     if (!tokens || !contentId || !watchData) return;

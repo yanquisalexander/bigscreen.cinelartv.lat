@@ -104,7 +104,7 @@ export function HeroSection({ items, onPlay, onInfo, clientEndpoint, firstRowFoc
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/30" />
 
         <div className="absolute bottom-20 left-24 max-w-xl z-10">
-          <h2 className="text-5xl font-extrabold text-white leading-tight mb-4 drop-shadow-lg">
+          <h2 className="text-4xl font-extrabold text-white leading-tight mb-4 drop-shadow-lg">
             {currentItem.title}
           </h2>
           {currentItem.description && (
@@ -122,7 +122,7 @@ export function HeroSection({ items, onPlay, onInfo, clientEndpoint, firstRowFoc
               autoFocus
               focusKey="hero-play"
               focusedClassName="scale-105 shadow-lg shadow-black/40"
-              className="px-10 py-4 bg-white text-black text-lg font-bold rounded-full transition-transform duration-200"
+              className="px-8 py-3 bg-white text-black text-base font-bold rounded-full transition-transform duration-200"
             >
               Reproducir
             </Focusable>
@@ -131,7 +131,7 @@ export function HeroSection({ items, onPlay, onInfo, clientEndpoint, firstRowFoc
               onArrowPress={focusFirstRowFromHero}
               focusKey="hero-info"
               focusedClassName="scale-105 shadow-lg shadow-black/40"
-              className="px-8 py-4 glass text-white text-lg font-medium rounded-full transition-transform duration-200"
+              className="px-6 py-3 glass text-white text-base font-medium rounded-full transition-transform duration-200"
             >
               Más info
             </Focusable>

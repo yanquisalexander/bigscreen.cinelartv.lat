@@ -102,7 +102,7 @@ export function HomeScreen() {
           ref={ref as React.RefObject<HTMLDivElement>}
           className="w-full h-dvh overflow-y-auto hide-scrollbar bg-bg"
         >
-          <h1 className="fixed top-6 right-8 text-white text-3xl font-medium z-999">CinelarTV</h1>
+          <h1 className="fixed top-6 right-8 text-white text-2xl font-medium z-999">CinelarTV</h1>
           {loading ? (
             <div className="w-full h-full flex flex-col">
               <div className="w-full h-[70vh] min-h-[500px] bg-surface animate-pulse-slow" />
@@ -112,7 +112,7 @@ export function HomeScreen() {
                     <div className="h-6 w-48 bg-surface rounded mb-4 animate-pulse-slow" />
                     <div className="flex gap-3">
                       {[1, 2, 3, 4, 5].map((j) => (
-                        <div key={j} className="w-[280px] h-[160px] bg-surface rounded-xl animate-pulse-slow" />
+                        <div key={j} className="w-[230px] h-[130px] bg-surface rounded-xl animate-pulse-slow" />
                       ))}
                     </div>
                   </div>
