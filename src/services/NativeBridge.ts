@@ -3,6 +3,7 @@ interface CinelarNative {
   getAppVersion?: () => string;
   getDeviceModel?: () => string;
   exitApp?: () => void;
+  openUrl?: (url: string) => void;
 }
 
 declare global {
@@ -26,3 +27,13 @@ export const exitApp = (): void => {
 
 export const isAndroidTV = (): boolean => getPlatform() === 'android-tv';
 export const isSmartTV = (): boolean => /SmartTV|Tizen|WebOS/i.test(navigator.userAgent);
+
+export const PLAY_STORE_WEBVIEW_URL = 'https://play.google.com/store/apps/details?id=com.google.android.webview';
+
+export const openUrl = (url: string): void => {
+  if (native.openUrl) {
+    native.openUrl(url);
+  } else {
+    window.location.href = url;
+  }
+};

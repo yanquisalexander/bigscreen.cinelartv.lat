@@ -1,10 +1,29 @@
+import { useRef, useEffect } from 'react';
 import type { CompatResult } from '@/services/compat';
+import { openUrl, PLAY_STORE_WEBVIEW_URL } from '@/services/NativeBridge';
 
 interface Props {
   result: CompatResult;
 }
 
 export function IncompatibleBrowserScreen({ result }: Props) {
+  const buttonRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    buttonRef.current?.focus();
+  }, []);
+
+  const handleAction = () => {
+    openUrl(PLAY_STORE_WEBVIEW_URL);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleAction();
+    }
+  };
+
   return (
     <div
       style={{
@@ -42,7 +61,7 @@ export function IncompatibleBrowserScreen({ result }: Props) {
         }}
       >
         Tu dispositivo necesita una versión más reciente de Android WebView para
-        ejecutar CinelarTV.
+        ejecutar CinelarT.
       </p>
       <div
         style={{
@@ -61,17 +80,41 @@ export function IncompatibleBrowserScreen({ result }: Props) {
         </p>
       </div>
       <div
+        ref={buttonRef}
+        tabIndex={0}
+        role="button"
+        aria-label="Abrir Google Play para actualizar WebView"
+        onClick={handleAction}
+        onKeyDown={handleKeyDown}
         style={{
-          marginTop: '40px',
-          fontSize: '18px',
-          color: '#999999',
-          lineHeight: '1.6',
+          marginTop: '48px',
+          padding: '16px 48px',
+          fontSize: '22px',
+          fontWeight: 'bold',
+          color: '#000000',
+          backgroundColor: '#ffffff',
+          borderRadius: '999px',
+          cursor: 'pointer',
+          outline: 'none',
+          border: '3px solid transparent',
+          transition: 'none',
+        }}
+        onFocus={(e) => {
+          (e.target as HTMLElement).style.borderColor = '#ffffff';
+          (e.target as HTMLElement).style.boxShadow = '0 0 0 4px rgba(255,255,255,0.3)';
+        }}
+        onBlur={(e) => {
+          (e.target as HTMLElement).style.borderColor = 'transparent';
+          (e.target as HTMLElement).style.boxShadow = 'none';
+        }}
+        onMouseEnter={(e) => {
+          (e.target as HTMLElement).style.backgroundColor = '#e0e0e0';
+        }}
+        onMouseLeave={(e) => {
+          (e.target as HTMLElement).style.backgroundColor = '#ffffff';
         }}
       >
-        <p style={{ margin: '0' }}>
-          Actualiza Android System WebView desde Google Play
-        </p>
-        <p style={{ margin: '0' }}>e intenta nuevamente.</p>
+        Actualizar WebView
       </div>
     </div>
   );
