@@ -29,8 +29,9 @@ for (const file of files) {
 
       while (j < css.length && (css[j] === ' ' || css[j] === '\t' || css[j] === '\n' || css[j] === '\r')) j++;
 
-      if (j < css.length && css[j] === '{') {
-        // anonymous @layer { ... }
+      if (j >= css.length) { out.push(css[i]); i++; continue; }
+
+      if (css[j] === '{') {
         j++;
         let depth = 1, content = '';
         while (j < css.length && depth > 0) {
@@ -47,14 +48,15 @@ for (const file of files) {
 
       while (j < css.length && css[j] !== '{' && css[j] !== ';') j++;
 
+      if (j >= css.length) { out.push(css[i]); i++; continue; }
+
       if (css[j] === ';') {
-        // @layer name; – order declaration, skip entirely
         j++;
         i = j;
         continue;
       }
 
-      if (j < css.length && css[j] === '{') {
+      if (css[j] === '{') {
         j++;
         let depth = 1, content = '';
         while (j < css.length && depth > 0) {
@@ -74,10 +76,19 @@ for (const file of files) {
     i++;
   }
 
-  const result = out.join('');
+  let result = out.join('');
+
+  // Second pass: safety net to clean any residual "layer X" text the parser missed
+  const before = result;
+  result = result.replace(/@?layer\s+(theme|base|components|utilities)\s*\{/g, '{');
+  result = result.replace(/@?layer\s+[\w-]+(?:\s*,\s*[\w-]+)*\s*;/g, '');
+
   if (result !== css) {
     writeFileSync(file, result);
     console.log(`  flattened @layer in ${file}`);
+    if (result !== before) {
+      console.log(`  (cleaned residual layer text)`);
+    }
   }
 }
 
