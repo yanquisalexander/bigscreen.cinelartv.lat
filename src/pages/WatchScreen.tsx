@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { WatchData, Segment, WatchEpisode } from '@/types/content';
 import type { PlayerState } from '@/types/player';
+import { M3eLoadingIndicator } from "@m3e/react/loading-indicator";
 
 const ACCENT = '#7C5CFF';
 
@@ -382,7 +383,7 @@ export function WatchScreen() {
   if (!watchData || !streamUrl) {
     return (
       <div className="w-full h-full bg-black flex flex-col items-center justify-center gap-5">
-        <LucideLoader2 size={48} className="animate-spin" style={{ color: ACCENT }} />
+        <M3eLoadingIndicator style={{ "--m3e-loading-indicator-active-indicator-color": "#ddd" } as any} />
         <p className="text-white/50 text-base tracking-wide">Preparando la reproduccion…</p>
       </div>
     );
