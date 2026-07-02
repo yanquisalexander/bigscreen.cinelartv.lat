@@ -19,9 +19,9 @@ const variantStyles = {
 };
 
 const sizeStyles = {
-  sm: 'px-4 py-2 text-xs',
-  md: 'px-6 py-2.5 text-sm',
-  lg: 'px-8 py-3 text-base',
+  sm: 'px-[clamp(0.875rem,1.6vw,1rem)] py-[clamp(0.375rem,1vh,0.5rem)] text-[clamp(0.6875rem,0.95vw,0.75rem)]',
+  md: 'px-[clamp(1.25rem,2.5vw,1.5rem)] py-[clamp(0.5rem,1.2vh,0.625rem)] text-[clamp(0.8125rem,1.1vw,0.875rem)]',
+  lg: 'px-[clamp(1.5rem,3vw,2rem)] py-[clamp(0.625rem,1.4vh,0.75rem)] text-[clamp(0.875rem,1.25vw,1rem)]',
 };
 
 export function FocusableButton({

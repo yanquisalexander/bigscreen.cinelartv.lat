@@ -77,8 +77,8 @@ export function ContentDetailScreen() {
         if (!focused) return;
         const rect = focused.getBoundingClientRect();
         const containerRect = el.getBoundingClientRect();
-        const topSafeArea = 96;
-        const bottomSafeArea = 48;
+        const topSafeArea = Math.min(96, window.innerHeight * 0.12);
+        const bottomSafeArea = Math.min(48, window.innerHeight * 0.07);
 
         if (rect.top < containerRect.top + topSafeArea) {
           el.scrollBy({
@@ -155,8 +155,8 @@ export function ContentDetailScreen() {
 
   if (!content) {
     return (
-      <div className="w-full h-dvh bg-bg flex flex-col items-center justify-center gap-4">
-        <p className="text-text-secondary text-xl">Contenido no encontrado</p>
+      <div className="w-full h-dvh bg-bg flex flex-col items-center justify-center gap-[clamp(0.75rem,2vh,1rem)]">
+        <p className="text-text-secondary text-[clamp(1rem,1.6vw,1.25rem)]">Contenido no encontrado</p>
         <FocusableButton onEnterPress={() => navigate('/home')} autoFocus>
           Volver al inicio
         </FocusableButton>
@@ -175,7 +175,7 @@ export function ContentDetailScreen() {
         }}
         className="w-full h-dvh overflow-y-auto hide-scrollbar bg-bg"
       >
-        <div className="relative w-full h-[50vh] min-h-[400px]">
+        <div className="relative w-full h-[clamp(320px,50vh,520px)]">
           {backdropUrl ? (
             <img src={backdropUrl} alt={content.title} className="w-full h-full object-cover" />
           ) : (
@@ -185,25 +185,25 @@ export function ContentDetailScreen() {
           <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent" />
         </div>
 
-        <div className="px-24 -mt-32 relative z-10 pb-16">
-          <h1 className="text-4xl font-extrabold text-white mb-4">{content.title}</h1>
+        <div className="px-[clamp(3rem,7.5vw,6rem)] -mt-[clamp(5rem,16vh,8rem)] relative z-10 pb-[clamp(3rem,8vh,4rem)]">
+          <h1 className="text-[clamp(2rem,3.2vw,2.5rem)] font-extrabold text-white mb-[clamp(0.75rem,2vh,1rem)]">{content.title}</h1>
 
-          <div className="flex items-center gap-4 text-text-secondary text-lg mb-6">
+          <div className="flex items-center gap-[clamp(0.75rem,1.5vw,1rem)] text-text-secondary text-[clamp(1rem,1.45vw,1.125rem)] mb-[clamp(1rem,3vh,1.5rem)]">
             {content.year && <span>{content.year}</span>}
             {content.liked && (
               <span className="text-accent-light">&hearts;</span>
             )}
             {content.content_type && (
-              <span className="px-2 py-0.5 border border-text-secondary rounded text-sm">
+              <span className="px-[clamp(0.375rem,0.8vw,0.5rem)] py-0.5 border border-text-secondary rounded text-[clamp(0.75rem,1.1vw,0.875rem)]">
                 {content.content_type === 'TVSHOW' ? 'Serie' : 'Película'}
               </span>
             )}
           </div>
 
           {categories.length > 0 && (
-            <div className="flex gap-2 mb-6">
+            <div className="flex gap-[clamp(0.375rem,0.8vw,0.5rem)] mb-[clamp(1rem,3vh,1.5rem)]">
               {categories.map((cat) => (
-                <span key={cat.id} className="px-3 py-1 bg-surface rounded-full text-sm text-text-secondary">
+                <span key={cat.id} className="px-[clamp(0.625rem,1.2vw,0.75rem)] py-[clamp(0.1875rem,0.7vh,0.25rem)] bg-surface rounded-full text-[clamp(0.75rem,1.1vw,0.875rem)] text-text-secondary">
                   {cat.name}
                 </span>
               ))}
@@ -211,12 +211,12 @@ export function ContentDetailScreen() {
           )}
 
           {content.description && (
-            <p className="text-lg text-text-secondary max-w-3xl mb-8 leading-relaxed">
+            <p className="text-[clamp(1rem,1.45vw,1.125rem)] text-text-secondary max-w-3xl mb-[clamp(1.5rem,4vh,2rem)] leading-relaxed">
               {content.description}
             </p>
           )}
 
-          <div className="flex gap-4 mb-12">
+          <div className="flex gap-[clamp(0.75rem,1.5vw,1rem)] mb-[clamp(2rem,6vh,3rem)]">
             <FocusableButton
               focusKey="detail-play"
               onEnterPress={handlePlay}
@@ -239,9 +239,9 @@ export function ContentDetailScreen() {
           </div>
 
           {seasons.length > 0 && (
-            <div className="mt-8">
-              <h2 className="text-2xl font-bold text-white mb-6 px-0">Temporadas</h2>
-              <div className="flex gap-3 mb-6">
+            <div className="mt-[clamp(1.5rem,4vh,2rem)]">
+              <h2 className="text-[clamp(1.25rem,2vw,1.5rem)] font-bold text-white mb-[clamp(1rem,3vh,1.5rem)] px-0">Temporadas</h2>
+              <div className="flex gap-[clamp(0.5rem,1vw,0.75rem)] mb-[clamp(1rem,3vh,1.5rem)]">
                 {seasons.map((season: Season, i: number) => (
                   <Focusable
                     key={season.id}
@@ -253,7 +253,7 @@ export function ContentDetailScreen() {
                       if (direction === 'left' && i === 0) return focusSidebarFromLeftEdge(direction);
                       return true;
                     }}
-                    className={`px-5 py-2.5 rounded-full text-lg font-medium transition-colors ${selectedSeason === i
+                    className={`px-[clamp(1rem,2vw,1.25rem)] py-[clamp(0.5rem,1.2vh,0.625rem)] rounded-full text-[clamp(0.9375rem,1.35vw,1.125rem)] font-medium transition-colors ${selectedSeason === i
                       ? 'bg-white text-black'
                       : 'bg-surface text-text-secondary'
                       }`}
@@ -267,7 +267,7 @@ export function ContentDetailScreen() {
                 <FocusableRow
                   key={selectedSeason}
                   title="Episodios"
-                  className="-mx-24"
+                  className="-mx-[clamp(3rem,7.5vw,6rem)]"
                   focusKey={`episodes-season-${selectedSeason}`}
                   preferredChildFocusKey={firstEpisodeFocusKey}
                 >

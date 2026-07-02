@@ -134,7 +134,7 @@ export function HomeScreen() {
                 />
               )}
 
-              <div className="-mt-[clamp(3rem,8vh,5rem)] relative z-10 pb-[clamp(3rem,8vh,4rem)]">
+              <div className="mt-[clamp(1.5rem,4vh,3rem)] relative z-10 pb-[clamp(3rem,8vh,4rem)]">
                 {data?.content?.map((category, catIdx) => (
                   <FocusableRow
                     key={catIdx}
