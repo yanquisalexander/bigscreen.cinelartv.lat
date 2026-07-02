@@ -1,7 +1,7 @@
 import type { RemoteConfig } from '@/types/config';
 import { DEFAULT_CONFIG } from '@/types/config';
 
-const REMOTE_CONFIG_URL = 'http://appboot.cinelartv.lat/remote_config.json';
+const REMOTE_CONFIG_URL = 'https://appboot.cinelartv.lat/remote_config.json';
 const STORAGE_KEY = 'cinelar_remote_config';
 
 class RemoteConfigService {
