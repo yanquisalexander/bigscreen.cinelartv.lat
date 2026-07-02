@@ -436,11 +436,11 @@ export function WatchScreen() {
     <FocusContext.Provider value={focusKey}>
       <div
         ref={ref as React.RefObject<HTMLDivElement>}
-        className="w-full h-full bg-black relative overflow-hidden select-none"
+        className="fixed inset-0 w-screen h-screen bg-black overflow-hidden select-none"
       >
         <video
           ref={videoRef}
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 w-full h-full block"
           style={{ objectFit: 'contain', objectPosition: 'center' }}
           playsInline
         />
@@ -458,15 +458,15 @@ export function WatchScreen() {
             igual que YouTube TV deja el video en pausa/de fondo detrás de la lista */}
         <div
           className={classNames(
-            'absolute inset-0 flex flex-col justify-between transition-opacity duration-300',
+            'absolute inset-0 transition-opacity duration-300',
             showControls ? 'opacity-100' : 'opacity-0 pointer-events-none',
           )}
         >
           {/* Scrim superior + navegación */}
-          <div className="bg-gradient-to-b from-black/85 via-black/40 to-transparent pt-8 pb-16 px-12 pointer-events-auto">
+          <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/85 via-black/40 to-transparent pt-[clamp(1.25rem,3.4vh,2rem)] pb-[clamp(2.5rem,7vh,4rem)] px-[clamp(2rem,4vw,3rem)] pointer-events-auto">
 
 
-            <div className="mt-7 max-w-3xl">
+            <div className="mt-[clamp(1rem,3vh,1.75rem)] max-w-3xl">
               <h1 className="text-white font-bold leading-tight" style={{ fontSize: 'clamp(1.5rem, 2.6vw, 2.2rem)' }}>
                 {watchData.content.title}
               </h1>
@@ -484,30 +484,30 @@ export function WatchScreen() {
           {/* Transporte central: se desvanece suavemente cuando el foco está en la fila de episodios */}
           <div
             className={classNames(
-              'flex-1 flex items-center justify-center pointer-events-auto transition-all duration-300',
+              'absolute inset-0 flex items-center justify-center pointer-events-auto transition-all duration-300',
               railExpanded ? 'opacity-0 -translate-y-3 pointer-events-none' : 'opacity-100 translate-y-0',
             )}
           >
-            <div className="flex items-center gap-8">
+            <div className="flex items-center gap-[clamp(1.25rem,3vw,2rem)]">
               <Focusable
                 onEnterPress={() => { seek(-10); showControlsTemporarily(); }}
                 focusKey="watch-rewind"
                 focusedClassName="bg-white/15 ring-4 scale-110"
-                className="w-16 h-16 rounded-full flex items-center justify-center text-white/85 transition-transform duration-150"
+                className="w-[clamp(3rem,6vw,4rem)] h-[clamp(3rem,6vw,4rem)] rounded-full flex items-center justify-center text-white/85 transition-transform duration-150"
               >
-                <LucideRotateCcw size={30} strokeWidth={1.9} />
+                <LucideRotateCcw size="45%" strokeWidth={1.9} />
               </Focusable>
 
               <Focusable
                 onEnterPress={togglePlay}
                 focusKey="watch-playpause"
                 focusedClassName="scale-110 ring-4"
-                className="w-24 h-24 rounded-full flex items-center justify-center text-black transition-transform duration-150 bg-white"
+                className="w-[clamp(4.25rem,8vw,6rem)] h-[clamp(4.25rem,8vw,6rem)] rounded-full flex items-center justify-center text-black transition-transform duration-150 bg-white"
               >
                 {playerState.isPlaying ? (
-                  <LucidePause size={34} fill="currentColor" strokeWidth={0} />
+                  <LucidePause size="38%" fill="currentColor" strokeWidth={0} />
                 ) : (
-                  <LucidePlay size={34} fill="currentColor" strokeWidth={0} className="ml-1" />
+                  <LucidePlay size="38%" fill="currentColor" strokeWidth={0} className="ml-1" />
                 )}
               </Focusable>
 
@@ -515,9 +515,9 @@ export function WatchScreen() {
                 onEnterPress={() => { seek(10); showControlsTemporarily(); }}
                 focusKey="watch-forward"
                 focusedClassName="bg-white/15 ring-4 scale-110"
-                className="w-16 h-16 rounded-full flex items-center justify-center text-white/85 transition-transform duration-150"
+                className="w-[clamp(3rem,6vw,4rem)] h-[clamp(3rem,6vw,4rem)] rounded-full flex items-center justify-center text-white/85 transition-transform duration-150"
               >
-                <LucideRotateCw size={30} strokeWidth={1.9} />
+                <LucideRotateCw size="45%" strokeWidth={1.9} />
               </Focusable>
             </div>
           </div>
@@ -526,8 +526,8 @@ export function WatchScreen() {
               apilan en el mismo lugar (position: relative/absolute) y hacen cross-fade con
               opacity + translate. Nada se recorta ni se desmonta: ambas vistas existen
               siempre en el DOM, solo cambia cuál es visible/interactiva. */}
-          <div className="bg-gradient-to-t from-black/90 via-black/50 to-transparent pt-20 pb-9 px-12 pointer-events-auto">
-            <div className="relative h-[52px]">
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pt-[clamp(2.5rem,7vh,5rem)] pb-[clamp(1.25rem,3.5vh,2.25rem)] px-[clamp(2rem,4vw,3rem)] pointer-events-auto">
+            <div className="relative h-[clamp(44px,6vh,52px)]">
               {/* Vista seekbar (por defecto) */}
               <Focusable
                 onArrowPress={handleProgressArrow}
@@ -616,7 +616,7 @@ export function WatchScreen() {
 
         {/* --- SKIP INTRO/RESUME (siempre visible cuando hay segmento activo) --- */}
         {skipSegment && (
-          <div className="absolute bottom-28 right-12 z-25 pointer-events-auto">
+          <div className="absolute bottom-[clamp(7rem,16vh,11rem)] right-[clamp(2rem,4vw,3rem)] z-25 pointer-events-auto">
             <Focusable
               onEnterPress={handleSkip}
               focusKey="watch-skip"
@@ -631,7 +631,7 @@ export function WatchScreen() {
 
         {/* --- NEXT EPISODE CARD --- */}
         {showNextCard && nextEpisode && (
-          <div className="absolute bottom-28 right-12 z-25 pointer-events-auto">
+          <div className="absolute bottom-[clamp(7rem,16vh,11rem)] right-[clamp(2rem,4vw,3rem)] z-25 pointer-events-auto">
             <div className="bg-black/80 backdrop-blur-sm border border-white/10 rounded-2xl flex items-center gap-3 p-2.5 min-w-[280px]">
               {nextEpisode.thumbnail ? (
                 <img
@@ -699,6 +699,7 @@ function EpisodesRow({
   clientEndpoint: string;
 }) {
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const railViewportRef = useRef<HTMLDivElement>(null);
 
   const { ref: rowRef, focusKey, hasFocusedChild } = useFocusable({
     focusKey: 'episodes-rail',
@@ -716,8 +717,14 @@ function EpisodesRow({
   }, [hasFocusedChild]);
 
   const centerItem = useCallback((ep: FlatEpisode) => {
+    const viewport = railViewportRef.current;
     const el = itemRefs.current.get(String(ep.id));
-    el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    if (viewport && el) {
+      viewport.scrollTo({
+        left: el.offsetLeft - (viewport.clientWidth - el.offsetWidth) / 2,
+        behavior: 'smooth',
+      });
+    }
     onFocusedEpisodeChange(ep);
   }, [onFocusedEpisodeChange]);
 
@@ -726,8 +733,14 @@ function EpisodesRow({
     if (currentIndex < 0) return;
     const ep = episodes[currentIndex];
     if (!ep) return;
+    const viewport = railViewportRef.current;
     const el = itemRefs.current.get(String(ep.id));
-    el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
+    if (viewport && el) {
+      viewport.scrollTo({
+        left: el.offsetLeft - (viewport.clientWidth - el.offsetWidth) / 2,
+        behavior: 'auto',
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -737,11 +750,12 @@ function EpisodesRow({
     <FocusContext.Provider value={focusKey}>
       <div
         ref={rowRef as React.RefObject<HTMLDivElement>}
-        className={classNames('transition-all duration-300', expanded ? 'mt-4' : 'mt-8')}
+        className={classNames('transition-all duration-300', expanded ? 'mt-[clamp(0.5rem,1.8vh,1rem)]' : 'mt-[clamp(1rem,3.5vh,2rem)]')}
       >
         <div
-          className="flex gap-4 overflow-x-auto p-3 snap-x snap-mandatory hide-scrollbar scroll-smooth"
-          style={{ scrollPaddingInline: '3rem' }}
+          ref={railViewportRef}
+          className="flex gap-[clamp(0.75rem,1.8vw,1rem)] overflow-x-auto p-[clamp(0.5rem,1.4vw,0.75rem)] snap-x snap-mandatory hide-scrollbar scroll-smooth"
+          style={{ scrollPaddingInline: 'clamp(2rem, 4vw, 3rem)' }}
         >
           {episodes.map((ep, index) => (
             <RailEpisodeItem
@@ -799,8 +813,8 @@ function RailEpisodeItem({
     onFocus: onCenter,
   });
 
-  const cardWidth = expanded ? 260 : 220;
-  const cardHeight = expanded ? 146 : 124;
+  const cardWidth = expanded ? 'clamp(180px, 13.5vw, 260px)' : 'clamp(156px, 11.5vw, 220px)';
+  const cardHeight = expanded ? 'clamp(101px, 7.6vw, 146px)' : 'clamp(88px, 6.5vw, 124px)';
 
   return (
     <div
