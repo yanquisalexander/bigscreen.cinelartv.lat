@@ -136,7 +136,7 @@ export function HomeScreen() {
           ref={ref as React.RefObject<HTMLDivElement>}
           className="w-full h-dvh overflow-y-auto hide-scrollbar bg-bg"
         >
-          <h1 className="fixed top-[clamp(1rem,3vh,1.5rem)] right-[clamp(1.5rem,4vw,2rem)] text-white text-[clamp(1.125rem,2vw,1.5rem)] font-medium z-999">CinelarTV</h1>
+          <h1 className="fixed top-[clamp(1rem,3vh,1.5rem)] right-[clamp(1.5rem,4vw,2rem)] text-white text-[clamp(1.5rem,2vw,2rem)] font-medium z-999">CinelarTV</h1>
           {loading ? (
             <div className="w-full h-full flex flex-col">
               <div className="w-full h-[clamp(360px,70vh,680px)] bg-surface animate-pulse-slow" />

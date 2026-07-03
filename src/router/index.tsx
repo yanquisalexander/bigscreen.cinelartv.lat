@@ -6,6 +6,7 @@ import { AuthScreen } from '@/pages/AuthScreen';
 import { ProfileSelectScreen } from '@/pages/ProfileSelectScreen';
 import { HomeScreen } from '@/pages/HomeScreen';
 import { SearchScreen } from '@/pages/SearchScreen';
+import { LiveTVScreen } from '@/pages/LiveTVScreen';
 import { ContentDetailScreen } from '@/pages/ContentDetailScreen';
 import { WatchScreen } from '@/pages/WatchScreen';
 import { IS_DEV } from "@/stores/configStore";
@@ -38,6 +39,10 @@ export const router = createRouterFunction([
           {
             path: '/search',
             element: <SearchScreen />,
+          },
+          {
+            path: '/live',
+            element: <LiveTVScreen />,
           },
           {
             path: '/content/:contentId',

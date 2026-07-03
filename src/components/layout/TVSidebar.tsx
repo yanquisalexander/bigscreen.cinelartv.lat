@@ -5,11 +5,12 @@ import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
 import { deassignProfile } from '@/features/auth/session';
 import { classNames } from '@/utils/helpers';
-import { LucideSearch, LucideTelescope } from "lucide-react";
+import { LucideSearch, LucideTelescope, LucideTv } from "lucide-react";
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Inicio', icon: LucideTelescope, path: '/home' },
   { key: 'search', label: 'Buscar', icon: LucideSearch, path: '/search' },
+  { key: 'live', label: 'TV en Vivo', icon: LucideTv, path: '/live' },
   //{ key: 'my-list', label: 'Mi Lista', icon: LucideTelescope, path: '/my-list' },
 ];
 
@@ -31,6 +32,8 @@ export function TVSidebar() {
       setFocus('content-root');
     } else if (path.startsWith('/search')) {
       setFocus('search-root');
+    } else if (path.startsWith('/live')) {
+      setFocus('livetv-root');
     } else {
       setFocus('home-root');
     }
