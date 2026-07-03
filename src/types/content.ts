@@ -1,3 +1,9 @@
+export interface TrailerSource {
+  url: string;
+  format: string;
+  quality: string;
+}
+
 export interface ContentItem {
   id: string;
   title: string;
@@ -10,7 +16,6 @@ export interface ContentItem {
   year?: number | null;
   liked?: boolean;
   progress?: number;
-  trailer_url?: string | null;
   available?: boolean;
   premium?: boolean;
   tmdb_id?: string | null;
@@ -19,6 +24,8 @@ export interface ContentItem {
   episodes_count?: number;
   segments?: Segment[];
   [key: string]: unknown;
+  trailer_sources?: TrailerSource[];
+  trailer_mime_type?: string;
 }
 
 export interface Segment {
@@ -79,6 +86,7 @@ export interface ContentDetail extends ContentItem {
   related_content?: ContentItem[];
   categories?: Category[];
   continue_watching?: ContentContinueWatching;
+  trailer_video_sources?: { quality?: string; url: string }[];
 }
 
 export interface ContentSource {

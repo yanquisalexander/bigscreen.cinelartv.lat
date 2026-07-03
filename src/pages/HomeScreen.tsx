@@ -26,7 +26,9 @@ export function HomeScreen() {
   const fetchData = useCallback(async () => {
     if (!tokens) return;
     try {
-      const explore = await getExplore(tokens.accessToken);
+      const explore = await getExplore(tokens.accessToken, {
+        include_trailers: true,
+      });
       setData(explore);
     } catch {
       // silently fail, show empty state
@@ -91,7 +93,7 @@ export function HomeScreen() {
 
   const focusHeroFromFirstRow = useCallback((direction: string) => {
     if (direction !== 'up' || bannerItems.length === 0) return true;
-    setFocus('hero-play');
+    setFocus('hero-view-more');
     return false;
   }, [bannerItems.length]);
 
