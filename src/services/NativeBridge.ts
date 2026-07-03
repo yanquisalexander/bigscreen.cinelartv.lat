@@ -2,6 +2,10 @@ interface CinelarNative {
   getPlatform?: () => string;
   getAppVersion?: () => string;
   getDeviceModel?: () => string;
+  getDeviceName?: () => string;
+  getModel?: () => string;
+  getNativeVersion?: () => string;
+  getNativeVersionName?: () => string;
   exitApp?: () => void;
   openUrl?: (url: string) => void;
   syncContinueWatching?: (itemsJson: string) => boolean;
@@ -11,6 +15,8 @@ interface CinelarNative {
   syncGenericRecommendations?: () => boolean;
   onProfileChanged?: () => boolean;
   onLogout?: () => boolean;
+  supportsLiveTV?: () => boolean;
+  playLiveChannel?: (channelJson: string) => boolean;
 }
 
 declare global {
@@ -24,6 +30,10 @@ const native: CinelarNative = typeof window !== 'undefined' ? (window.CinelarNat
 export const getPlatform = (): string => native.getPlatform?.() ?? 'web';
 export const getAppVersion = (): string => native.getAppVersion?.() ?? '0.0.0';
 export const getDeviceModel = (): string => native.getDeviceModel?.() ?? 'unknown';
+export const getDeviceName = (): string | undefined => native.getDeviceName?.();
+export const getModel = (): string => native.getModel?.() ?? 'unknown';
+export const getNativeVersion = (): string => native.getNativeVersion?.() ?? '0';
+export const getNativeVersionName = (): string => native.getNativeVersionName?.() ?? '0.0.0';
 export const exitApp = (): void => {
   if (native.exitApp) {
     native.exitApp();
@@ -91,3 +101,16 @@ export const notifyNativeProfileChanged = (): boolean =>
 
 export const notifyNativeLogout = (): boolean =>
   native.onLogout?.() ?? false;
+
+export interface LiveChannelInfo {
+  id: string;
+  name: string;
+  url: string;
+  logo?: string;
+}
+
+export const supportsLiveTV = (): boolean =>
+  (typeof window !== 'undefined' ? window.CinelarNative?.supportsLiveTV?.() : undefined) ?? false;
+
+export const playLiveChannel = (channel: LiveChannelInfo): boolean =>
+  (typeof window !== 'undefined' ? window.CinelarNative?.playLiveChannel?.(JSON.stringify(channel)) : undefined) ?? false;

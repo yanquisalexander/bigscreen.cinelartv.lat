@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useAuthStore } from '@/stores/authStore';
@@ -57,6 +57,7 @@ export function HomeScreen() {
           banner: resolveImageUrl(item.banner, clientEndpoint)!,
           banner_resized: resolveImageUrl(item.banner_resized, clientEndpoint)!,
           progress: item.progress,
+          duration: item.duration,
           year: item.year,
           url: `/content/${item.id}`,
           image_url: resolveImageUrl(item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover, clientEndpoint)!,
@@ -118,18 +119,22 @@ export function HomeScreen() {
   }, []);
 
   // Back key: expand sidebar or show exit dialog
+  const sidebarBackRef = useRef(false);
   useEffect(() => {
     const handleBack = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'XF86Back' || e.key === 'GoBack' || e.key === 'BrowserBack') {
         e.preventDefault();
         if (showExitDialog) {
           setShowExitDialog(false);
+          sidebarBackRef.current = false;
           return;
         }
-        if (isSidebarFocused()) {
+        if (isSidebarFocused() || sidebarBackRef.current) {
           setShowExitDialog(true);
+          sidebarBackRef.current = false;
         } else {
           setFocus('nav-home');
+          sidebarBackRef.current = true;
         }
       }
     };
@@ -224,7 +229,7 @@ export function HomeScreen() {
 }
 
 function ExitDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
-  const { ref } = useFocusable({
+  const { ref, focusKey } = useFocusable({
     focusKey: 'exit-dialog',
     trackChildren: true,
     preferredChildFocusKey: 'exit-cancel',
@@ -235,32 +240,40 @@ function ExitDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: 
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div
-        ref={ref as React.RefObject<HTMLDivElement>}
-        className="bg-[#1a1a1a] rounded-2xl p-8 w-[400px] shadow-2xl border border-white/10"
-      >
-        <h2 className="text-white text-xl font-bold mb-2">Salir de CinelarTV</h2>
-        <p className="text-white/50 text-sm mb-8">¿Quieres cerrar la aplicación?</p>
-        <div className="flex gap-3 justify-end">
-          <Focusable
-            onEnterPress={onCancel}
-            focusKey="exit-cancel"
-            focusedClassName="bg-white/15"
-            className="px-6 py-2.5 rounded-full text-white/70 text-sm font-medium transition-colors cursor-pointer"
-          >
-            Cancelar
-          </Focusable>
-          <Focusable
-            onEnterPress={onConfirm}
-            focusKey="exit-confirm"
-            focusedClassName="bg-white scale-105"
-            className="px-6 py-2.5 rounded-full bg-accent text-white text-sm font-semibold transition-all cursor-pointer"
-          >
-            Salir
-          </Focusable>
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-md">
+      <FocusContext.Provider value={focusKey}>
+        <div
+          ref={ref as React.RefObject<HTMLDivElement>}
+          className="bg-surface rounded-2xl w-[clamp(360px,50vw,520px)] shadow-2xl border border-white/10"
+        >
+          <div className="px-[clamp(2rem,4vw,3rem)] pt-[clamp(3rem,6vh,4rem)] pb-[clamp(1.5rem,3vh,2rem)]">
+            <h2 className="text-white text-[clamp(1.5rem,2.2vw,1.875rem)] font-semibold mb-[clamp(0.75rem,1.5vh,1rem)]">
+              Salir de CinelarTV
+            </h2>
+            <p className="text-text-secondary text-[clamp(1rem,1.4vw,1.25rem)]">
+              ¿Quieres cerrar la aplicación?
+            </p>
+          </div>
+          <div className="flex justify-end gap-[clamp(0.75rem,1.5vw,1rem)] px-[clamp(2rem,4vw,3rem)] pb-[clamp(2rem,4vh,3rem)]">
+            <Focusable
+              onEnterPress={onCancel}
+              focusKey="exit-cancel"
+              focusedClassName="!bg-white !text-black"
+              className="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium transition-all duration-200 cursor-pointer"
+            >
+              Cancelar
+            </Focusable>
+            <Focusable
+              onEnterPress={onConfirm}
+              focusKey="exit-confirm"
+              focusedClassName="!bg-white !text-black scale-105"
+              className="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium transition-all duration-200 cursor-pointer"
+            >
+              Salir
+            </Focusable>
+          </div>
         </div>
-      </div>
+      </FocusContext.Provider>
     </div>
   );
 }

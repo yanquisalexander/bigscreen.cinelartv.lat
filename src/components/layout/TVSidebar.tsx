@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
 import { deassignProfile } from '@/features/auth/session';
 import { classNames } from '@/utils/helpers';
-import { LucideSearch, LucideTelescope, LucideTv } from "lucide-react";
+import { LucideSearch, LucideTelescope, LucideTv, LucideSettings } from "lucide-react";
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Inicio', icon: LucideTelescope, path: '/home' },
@@ -25,18 +25,23 @@ export function TVSidebar() {
     saveLastFocusedChild: true,
     preferredChildFocusKey: 'nav-home',
   });
+
+  const focusKeyForPath = (path: string): string => {
+    if (path.startsWith('/content/')) return 'content-root';
+    if (path.startsWith('/search')) return 'search-root';
+    if (path.startsWith('/live')) return 'livetv-root';
+    if (path.startsWith('/settings')) return 'settings-root';
+    return 'home-root';
+  };
+
+  const navigateAndCollapse = (path: string) => {
+    navigate(path);
+    requestAnimationFrame(() => setFocus(focusKeyForPath(path)));
+  };
+
   const focusContent = (direction: string) => {
     if (direction !== 'right') return true;
-    const path = location.pathname;
-    if (path.startsWith('/content/')) {
-      setFocus('content-root');
-    } else if (path.startsWith('/search')) {
-      setFocus('search-root');
-    } else if (path.startsWith('/live')) {
-      setFocus('livetv-root');
-    } else {
-      setFocus('home-root');
-    }
+    setFocus(focusKeyForPath(location.pathname));
     return false;
   };
 
@@ -65,7 +70,7 @@ export function TVSidebar() {
             return (
               <Focusable
                 key={item.key}
-                onEnterPress={() => navigate(item.path)}
+                onEnterPress={() => navigateAndCollapse(item.path)}
                 onArrowPress={focusContent}
                 focusKey={`nav-${item.key}`}
                 focusedClassName="bg-white !text-black"
@@ -89,12 +94,34 @@ export function TVSidebar() {
           })}
         </nav>
 
+        <Focusable
+          onEnterPress={() => navigateAndCollapse('/settings')}
+          onArrowPress={focusContent}
+          focusKey="nav-settings"
+          focusedClassName="bg-white !text-black"
+          className={classNames(
+            'flex h-12 items-center gap-4 rounded-full px-3 text-base font-medium transition-colors mb-1',
+            hasFocusedChild ? 'justify-start' : 'justify-center',
+            'text-white/70',
+          )}
+        >
+          <LucideSettings className="text-2xl" />
+          <span
+            className={classNames(
+              'truncate whitespace-nowrap transition-opacity duration-150',
+              hasFocusedChild ? 'opacity-100' : 'w-0 opacity-0',
+            )}
+          >
+            Ajustes
+          </span>
+        </Focusable>
+
         {profile && (
           <Focusable
             onEnterPress={() => {
               const token = useAuthStore.getState().tokens?.accessToken;
               if (token) deassignProfile(token).catch(() => {});
-              navigate('/select-profile');
+              navigateAndCollapse('/select-profile');
             }}
             onArrowPress={focusContent}
             focusKey="nav-profile"
