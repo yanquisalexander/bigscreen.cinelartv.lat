@@ -183,7 +183,7 @@ export function HomeScreen() {
                         focusKey={`home-row-${catIdx}-item-${item.id}`}
                         title={item.title}
                         image={resolveImageUrl(
-                          item.cover_resized ?? item.banner_resized,
+                          item.banner_resized,
                           clientEndpoint,
                         )}
                         subtitle={item.content_type === 'TVSHOW' ? 'Serie' : undefined}
