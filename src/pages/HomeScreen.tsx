@@ -49,14 +49,14 @@ export function HomeScreen() {
           title: item.title,
           description: item.description,
           content_type: item.content_type,
-          cover: resolveImageUrl(item.cover, clientEndpoint),
-          cover_resized: resolveImageUrl(item.cover_resized, clientEndpoint),
-          banner: resolveImageUrl(item.banner, clientEndpoint),
-          banner_resized: resolveImageUrl(item.banner_resized, clientEndpoint),
+          cover: resolveImageUrl(item.cover, clientEndpoint)!,
+          cover_resized: resolveImageUrl(item.cover_resized, clientEndpoint)!,
+          banner: resolveImageUrl(item.banner, clientEndpoint)!,
+          banner_resized: resolveImageUrl(item.banner_resized, clientEndpoint)!,
           progress: item.progress,
           year: item.year,
           url: `/content/${item.id}`,
-          image_url: resolveImageUrl(item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover, clientEndpoint),
+          image_url: resolveImageUrl(item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover, clientEndpoint)!,
         });
       }
     }
@@ -183,7 +183,7 @@ export function HomeScreen() {
                         focusKey={`home-row-${catIdx}-item-${item.id}`}
                         title={item.title}
                         image={resolveImageUrl(
-                          item.banner,
+                          item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover,
                           clientEndpoint,
                         )}
                         subtitle={item.content_type === 'TVSHOW' ? 'Serie' : undefined}
