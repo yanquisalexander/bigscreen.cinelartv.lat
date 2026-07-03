@@ -102,15 +102,33 @@ export function ContentDetailScreen() {
     };
   }, [content]);
 
+  const canPlay = useMemo(() => {
+    if (!content) return false;
+    if (content.content_type !== 'TVSHOW') return true;
+    if (content.continue_watching?.episode_id) return true;
+    return (content.seasons?.[0]?.episodes?.length ?? 0) > 0;
+  }, [content]);
+
   const handlePlay = useCallback(() => {
-    if (!content) return;
+    if (!content || !canPlay) return;
+
     const episodeId = content.continue_watching?.episode_id;
     if (episodeId) {
       navigate(`/watch/${content.id}/${episodeId}`);
-    } else {
-      navigate(`/watch/${content.id}`);
+      return;
     }
-  }, [content, navigate]);
+
+    if (content.content_type !== 'TVSHOW') {
+      navigate(`/watch/${content.id}`);
+      return;
+    }
+
+    const firstSeason = content.seasons?.[0];
+    const firstEpisode = firstSeason?.episodes?.[0];
+    if (firstEpisode) {
+      navigate(`/watch/${content.id}/${firstEpisode.id}`);
+    }
+  }, [content, navigate, canPlay]);
 
   const handlePlayEpisode = useCallback(
     (episodeId: string | number) => {
@@ -216,16 +234,18 @@ export function ContentDetailScreen() {
           )}
 
           <div className="flex gap-[clamp(0.75rem,1.5vw,1rem)] mb-[clamp(2rem,6vh,3rem)]">
-            <FocusableButton
-              focusKey="detail-play"
-              onEnterPress={handlePlay}
-              onArrowPress={handlePlayArrow}
-              autoFocus
-              variant="primary"
-              size="lg"
-            >
-              Reproducir
-            </FocusableButton>
+            {canPlay && (
+              <FocusableButton
+                focusKey="detail-play"
+                onEnterPress={handlePlay}
+                onArrowPress={handlePlayArrow}
+                autoFocus
+                variant="primary"
+                size="lg"
+              >
+                {content.content_type === 'TVSHOW' && content.continue_watching ? 'Continuar viendo' : 'Reproducir'}
+              </FocusableButton>
+            )}
             <FocusableButton
               focusKey="detail-list"
               onEnterPress={() => { }}

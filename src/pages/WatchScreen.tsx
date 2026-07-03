@@ -147,7 +147,26 @@ export function WatchScreen() {
     setDuration(0);
     setSkipSegment(null);
     getWatchData(tokens.accessToken, contentId, episodeId)
-      .then((data) => setWatchData(data))
+      .then((data) => {
+        const isTVShow = data.content.content_type === 'TVSHOW';
+        if (isTVShow && !episodeId && !data.episode) {
+          const firstEpisode = data.seasons?.[0]?.episodes?.[0];
+          if (firstEpisode) {
+            navigate(`/watch/${contentId}/${firstEpisode.id}`, { replace: true });
+            return;
+          }
+        }
+        if (!episodeId && data.episode) {
+          navigate(`/watch/${contentId}/${data.episode.id}`, { replace: true });
+          return;
+        }
+        if (!data.sources?.length) {
+          useToastStore.getState().show('Este contenido no tiene episodios disponibles.', 'error', 4000);
+          navigate('/home', { replace: true });
+          return;
+        }
+        setWatchData(data);
+      })
       .catch(() => {
         useToastStore.getState().show('No se pudo cargar el contenido. Intenta de nuevo más tarde.', 'error', 4000);
         navigate('/home', { replace: true })
