@@ -19,6 +19,21 @@ type WindowWithCompat = Window &
 
 const compatWindow = window as WindowWithCompat;
 
+if (!AbortSignal.timeout) {
+  AbortSignal.timeout = (milliseconds: number) => {
+    const controller = new AbortController();
+    const timeoutError = typeof DOMException === 'function'
+      ? new DOMException('The operation timed out.', 'TimeoutError')
+      : Object.assign(new Error('The operation timed out.'), { name: 'TimeoutError' });
+
+    setTimeout(() => {
+      controller.abort(timeoutError);
+    }, milliseconds);
+
+    return controller.signal;
+  };
+}
+
 if (!compatWindow.queueMicrotask) {
   compatWindow.queueMicrotask = (callback) => {
     Promise.resolve()
