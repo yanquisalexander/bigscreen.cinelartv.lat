@@ -11,9 +11,10 @@ interface HeroSectionProps {
   clientEndpoint: string;
   firstRowFocusKey?: string;
   sidebarFocusKey?: string;
+  onImmersiveChange?: (immersive: boolean) => void;
 }
 
-export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, firstRowFocusKey, sidebarFocusKey }: HeroSectionProps) {
+export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, firstRowFocusKey, sidebarFocusKey, onImmersiveChange }: HeroSectionProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showTrailer, setShowTrailer] = useState(false);
   const [immersiveMode, setImmersiveMode] = useState(false);
@@ -40,12 +41,6 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
     },
     [items.length],
   );
-
-  const focusFirstRowFromHero = useCallback((direction: string) => {
-    if (direction !== 'down' || !firstRowFocusKey) return true;
-    setFocus(firstRowFocusKey);
-    return false;
-  }, [firstRowFocusKey]);
 
   const focusSidebarFromHero = useCallback((direction: string) => {
     if (direction !== 'left' || !sidebarFocusKey) return true;
@@ -117,7 +112,7 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
     }
   }, [showTrailer]);
 
-  // Modo inmersivo: 5s después de mostrar el trailer, ocultar descripción y reducir overlays
+  // Modo inmersivo: 3s después de mostrar el trailer, ocultar descripción y reducir overlays
   useEffect(() => {
     if (!showTrailer) {
       setImmersiveMode(false);
@@ -126,6 +121,11 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
     const timer = setTimeout(() => setImmersiveMode(true), 3_000);
     return () => { clearTimeout(timer); setImmersiveMode(false); };
   }, [showTrailer]);
+
+  // Notificar al padre cuando cambia el modo inmersivo
+  useEffect(() => {
+    onImmersiveChange?.(immersiveMode);
+  }, [immersiveMode, onImmersiveChange]);
 
   // Medir el espacio real de la descripción (altura + margin) para el translate del título
   useEffect(() => {
@@ -153,7 +153,7 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
     <FocusContext.Provider value={focusKey}>
       <div
         ref={heroRef as React.RefObject<HTMLDivElement>}
-        className="relative w-full h-[clamp(360px,70vh,680px)] overflow-hidden"
+        className={`relative w-full overflow-hidden transition-all duration-700 ease-in-out ${immersiveMode ? 'h-screen' : 'h-[clamp(360px,70vh,680px)]'}`}
       >
         {/* Capa 1: Banner images */}
         {items.map((item, i) => (
@@ -221,7 +221,21 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
                   goTo(currentIndex + 1);
                   return false;
                 }
-                return focusFirstRowFromHero(direction);
+                if (direction === 'down') {
+                  if (immersiveMode) {
+                    setShowTrailer(false);
+                    setTimeout(() => {
+                      if (firstRowFocusKey) setFocus(firstRowFocusKey);
+                    }, 700);
+                    return false;
+                  }
+                  if (firstRowFocusKey) {
+                    setFocus(firstRowFocusKey);
+                    return false;
+                  }
+                  return true;
+                }
+                return true;
               }}
               autoFocus
               focusKey="hero-view-more"

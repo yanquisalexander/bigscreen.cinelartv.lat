@@ -22,6 +22,7 @@ export function HomeScreen() {
   const [data, setData] = useState<ExploreResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [showExitDialog, setShowExitDialog] = useState(false);
+  const [heroImmersive, setHeroImmersive] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!tokens) return;
@@ -136,7 +137,7 @@ export function HomeScreen() {
       <FocusContext.Provider value={focusKey}>
         <div
           ref={ref as React.RefObject<HTMLDivElement>}
-          className="w-full h-dvh overflow-y-auto hide-scrollbar bg-bg"
+          className={`w-full h-dvh hide-scrollbar bg-bg transition-all duration-700 ${heroImmersive ? 'overflow-hidden' : 'overflow-y-auto'}`}
         >
           <h1 className="fixed top-[clamp(1rem,3vh,1.5rem)] right-[clamp(1.5rem,4vw,2rem)] text-white text-[clamp(1.5rem,2vw,2rem)] font-medium z-999">CinelarTV</h1>
           {loading ? (
@@ -165,10 +166,11 @@ export function HomeScreen() {
                   clientEndpoint={clientEndpoint}
                   firstRowFocusKey={firstRowFocusKey}
                   sidebarFocusKey="nav-home"
+                  onImmersiveChange={setHeroImmersive}
                 />
               )}
 
-              <div className="mt-[clamp(1.5rem,4vh,3rem)] relative z-10 pb-[clamp(3rem,8vh,4rem)]">
+              <div className={`mt-[clamp(1.5rem,4vh,3rem)] relative z-10 pb-[clamp(3rem,8vh,4rem)] transition-all duration-700 ${heroImmersive ? 'opacity-0 pointer-events-none' : ''}`}>
                 {data?.content?.map((category, catIdx) => (
                   <FocusableRow
                     key={catIdx}
