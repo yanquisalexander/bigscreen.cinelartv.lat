@@ -16,6 +16,7 @@ interface HeroSectionProps {
 export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, firstRowFocusKey, sidebarFocusKey }: HeroSectionProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showTrailer, setShowTrailer] = useState(false);
+  const [immersiveMode, setImmersiveMode] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -91,7 +92,10 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
     }
 
     if (hasFocusedChild) {
-      setShowTrailer(true);
+      const timer = setTimeout(() => {
+        setShowTrailer(true);
+      }, 2000);
+      return () => clearTimeout(timer);
     } else {
       setShowTrailer(false);
     }
@@ -109,6 +113,16 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
       video.pause();
       video.currentTime = 0;
     }
+  }, [showTrailer]);
+
+  // Modo inmersivo: 5s después de mostrar el trailer, ocultar descripción y reducir overlays
+  useEffect(() => {
+    if (!showTrailer) {
+      setImmersiveMode(false);
+      return;
+    }
+    const timer = setTimeout(() => setImmersiveMode(true), 5000);
+    return () => { clearTimeout(timer); setImmersiveMode(false); };
   }, [showTrailer]);
 
   if (!currentItem) return null;
@@ -156,16 +170,16 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
         )}
 
         {/* Capa 3: Gradientes siempre visibles */}
-        <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/30 pointer-events-none" />
+        <div className={`absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent pointer-events-none transition-opacity duration-700 ${immersiveMode ? 'opacity-20' : ''}`} />
+        <div className={`absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/30 pointer-events-none transition-opacity duration-700 ${immersiveMode ? 'opacity-40' : ''}`} />
 
         {/* Capa 4: Contenido (título, descripción, botón) */}
         <div className="absolute bottom-[clamp(3rem,9vh,5rem)] left-[clamp(3rem,7.5vw,6rem)] max-w-[clamp(28rem,46vw,36rem)] z-10">
-          <h2 className="text-[clamp(2rem,3.2vw,2.5rem)] font-extrabold text-white leading-tight mb-[clamp(0.75rem,2vh,1rem)] drop-shadow-lg">
+          <h2 className={`text-[clamp(2rem,3.2vw,2.5rem)] font-extrabold text-white leading-tight mb-[clamp(0.75rem,2vh,1rem)] drop-shadow-lg transition-all duration-700 ${immersiveMode ? 'translate-y-[clamp(2.5rem,4vh,3.5rem)]' : ''}`}>
             {currentItem.title}
           </h2>
           {currentItem.description && (
-            <p className="text-[clamp(1rem,1.45vw,1.125rem)] text-text-secondary line-clamp-3 mb-[clamp(1rem,3vh,1.5rem)]">
+            <p className={`text-[clamp(1rem,1.45vw,1.125rem)] text-text-secondary line-clamp-3 mb-[clamp(1rem,3vh,1.5rem)] transition-all duration-700 ${immersiveMode ? 'opacity-0 translate-y-4 pointer-events-none' : ''}`}>
               {currentItem.description}
             </p>
           )}
