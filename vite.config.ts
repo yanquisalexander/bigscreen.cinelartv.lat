@@ -106,13 +106,17 @@ function flattenCascadeLayers(css: string): string {
   return result
 }
 
+function stripRegisteredProperties(css: string): string {
+  return css.replace(/@property\s+--[^{]+{[^}]*}/g, '')
+}
+
 function legacyCssPlugin(): Plugin {
   return {
     name: 'cinelar-legacy-css',
     generateBundle(_, bundle) {
       for (const asset of Object.values(bundle)) {
         if (asset.type === 'asset' && asset.fileName.endsWith('.css') && typeof asset.source === 'string') {
-          asset.source = flattenCascadeLayers(asset.source)
+          asset.source = stripRegisteredProperties(flattenCascadeLayers(asset.source))
         }
       }
     },
