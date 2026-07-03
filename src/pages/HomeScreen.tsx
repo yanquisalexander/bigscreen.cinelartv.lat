@@ -170,7 +170,7 @@ export function HomeScreen() {
                 />
               )}
 
-              <div className={`mt-[clamp(1.5rem,4vh,3rem)] relative z-10 pb-[clamp(3rem,8vh,4rem)] transition-all duration-700 ${heroImmersive ? 'opacity-0 pointer-events-none' : ''}`}>
+              <div className={`mt-[clamp(1.5rem,4vh,3rem)] relative z-10 pb-[clamp(3rem,8vh,4rem)] transition-all duration-700 will-change-opacity ${heroImmersive ? 'opacity-0 pointer-events-none' : ''}`}>
                 {data?.content?.map((category, catIdx) => (
                   <FocusableRow
                     key={catIdx}

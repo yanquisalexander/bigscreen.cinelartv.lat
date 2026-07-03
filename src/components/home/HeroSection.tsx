@@ -154,12 +154,13 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
       <div
         ref={heroRef as React.RefObject<HTMLDivElement>}
         className={`relative w-full overflow-hidden transition-all duration-700 ease-in-out ${immersiveMode ? 'h-screen' : 'h-[clamp(360px,70vh,680px)]'}`}
+        style={{ willChange: 'height' }}
       >
         {/* Capa 1: Banner images */}
         {items.map((item, i) => (
           <div
             key={item.id}
-            className="absolute inset-0 transition-opacity duration-1000 ease-in-out"
+            className="absolute inset-0 transition-opacity duration-1000 ease-in-out will-change-opacity"
             style={{ opacity: i === currentIndex && !showTrailer ? 1 : 0 }}
           >
             {item.banner || item.cover ? (
@@ -177,7 +178,7 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
         {/* Capa 2: Trailer video */}
         {hasTrailer && (
           <div
-            className="absolute inset-0 transition-opacity duration-1000 ease-in-out"
+            className="absolute inset-0 transition-opacity duration-1000 ease-in-out will-change-opacity"
             style={{ opacity: showTrailer ? 1 : 0 }}
           >
             <video
@@ -192,19 +193,19 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
         )}
 
         {/* Capa 3: Gradientes siempre visibles */}
-        <div className={`absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent pointer-events-none transition-opacity duration-700 ${immersiveMode ? 'opacity-20' : ''}`} />
-        <div className={`absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/30 pointer-events-none transition-opacity duration-700 ${immersiveMode ? 'opacity-40' : ''}`} />
+        <div className={`absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent pointer-events-none transition-opacity duration-700 will-change-opacity ${immersiveMode ? 'opacity-20' : ''}`} />
+        <div className={`absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/30 pointer-events-none transition-opacity duration-700 will-change-opacity ${immersiveMode ? 'opacity-40' : ''}`} />
 
         {/* Capa 4: Contenido (título, descripción, botón) */}
         <div className="absolute bottom-[clamp(3rem,9vh,5rem)] left-[clamp(3rem,7.5vw,6rem)] max-w-[clamp(28rem,46vw,36rem)] z-10">
           <h2
-            className="text-[clamp(2rem,3.2vw,2.5rem)] font-extrabold text-white leading-tight mb-[clamp(0.75rem,2vh,1rem)] drop-shadow-lg transition-all duration-700"
+            className="text-[clamp(2rem,3.2vw,2.5rem)] font-extrabold text-white leading-tight mb-[clamp(0.75rem,2vh,1rem)] drop-shadow-lg transition-all duration-700 will-change-transform"
             style={{ transform: immersiveMode && descSpace > 0 ? `translateY(${descSpace}px)` : undefined }}
           >
             {currentItem.title}
           </h2>
           {currentItem.description && (
-            <p ref={descRef} className={`text-[clamp(1rem,1.45vw,1.125rem)] text-text-secondary line-clamp-3 mb-[clamp(1rem,3vh,1.5rem)] transition-all duration-700 ${immersiveMode ? 'opacity-0 translate-y-4 pointer-events-none' : ''}`}>
+            <p ref={descRef} className={`text-[clamp(1rem,1.45vw,1.125rem)] text-text-secondary line-clamp-3 mb-[clamp(1rem,3vh,1.5rem)] transition-all duration-700 will-change-transform will-change-opacity ${immersiveMode ? 'opacity-0 translate-y-4 pointer-events-none' : ''}`}>
               {currentItem.description}
             </p>
           )}
