@@ -17,8 +17,10 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showTrailer, setShowTrailer] = useState(false);
   const [immersiveMode, setImmersiveMode] = useState(false);
+  const [descSpace, setDescSpace] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const descRef = useRef<HTMLParagraphElement>(null);
 
   const { ref: heroRef, focusKey, hasFocusedChild } = useFocusable({
     focusKey: 'hero-section',
@@ -108,7 +110,7 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
 
     if (showTrailer) {
       video.currentTime = 0;
-      video.play().catch(() => {});
+      video.play().catch(() => { });
     } else {
       video.pause();
       video.currentTime = 0;
@@ -121,9 +123,29 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
       setImmersiveMode(false);
       return;
     }
-    const timer = setTimeout(() => setImmersiveMode(true), 5000);
+    const timer = setTimeout(() => setImmersiveMode(true), 3_000);
     return () => { clearTimeout(timer); setImmersiveMode(false); };
   }, [showTrailer]);
+
+  // Medir el espacio real de la descripción (altura + margin) para el translate del título
+  useEffect(() => {
+    const el = descRef.current;
+    if (!el || !currentItem?.description) {
+      setDescSpace(0);
+      return;
+    }
+
+    const measure = () => {
+      const style = getComputedStyle(el);
+      const mb = parseFloat(style.marginBottom) || 0;
+      setDescSpace(el.offsetHeight + mb);
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [currentItem?.id, currentItem?.description]);
 
   if (!currentItem) return null;
 
@@ -175,11 +197,14 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
 
         {/* Capa 4: Contenido (título, descripción, botón) */}
         <div className="absolute bottom-[clamp(3rem,9vh,5rem)] left-[clamp(3rem,7.5vw,6rem)] max-w-[clamp(28rem,46vw,36rem)] z-10">
-          <h2 className={`text-[clamp(2rem,3.2vw,2.5rem)] font-extrabold text-white leading-tight mb-[clamp(0.75rem,2vh,1rem)] drop-shadow-lg transition-all duration-700 ${immersiveMode ? 'translate-y-[clamp(2.5rem,4vh,3.5rem)]' : ''}`}>
+          <h2
+            className="text-[clamp(2rem,3.2vw,2.5rem)] font-extrabold text-white leading-tight mb-[clamp(0.75rem,2vh,1rem)] drop-shadow-lg transition-all duration-700"
+            style={{ transform: immersiveMode && descSpace > 0 ? `translateY(${descSpace}px)` : undefined }}
+          >
             {currentItem.title}
           </h2>
           {currentItem.description && (
-            <p className={`text-[clamp(1rem,1.45vw,1.125rem)] text-text-secondary line-clamp-3 mb-[clamp(1rem,3vh,1.5rem)] transition-all duration-700 ${immersiveMode ? 'opacity-0 translate-y-4 pointer-events-none' : ''}`}>
+            <p ref={descRef} className={`text-[clamp(1rem,1.45vw,1.125rem)] text-text-secondary line-clamp-3 mb-[clamp(1rem,3vh,1.5rem)] transition-all duration-700 ${immersiveMode ? 'opacity-0 translate-y-4 pointer-events-none' : ''}`}>
               {currentItem.description}
             </p>
           )}
