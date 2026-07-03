@@ -1,3 +1,8 @@
+import 'core-js/stable';
+import 'whatwg-fetch';
+import 'abortcontroller-polyfill/dist/abortcontroller-polyfill-only';
+import ResizeObserverPolyfill from 'resize-observer-polyfill';
+
 type IdleDeadline = {
   didTimeout: boolean;
   timeRemaining: () => number;
@@ -13,61 +18,6 @@ type WindowWithCompat = Window &
   };
 
 const compatWindow = window as WindowWithCompat;
-
-if (!String.prototype.padStart) {
-  Object.defineProperty(String.prototype, 'padStart', {
-    value(targetLength: number, padString = ' ') {
-      const source = String(this);
-      const length = targetLength >> 0;
-      if (source.length >= length) return source;
-      const filler = String(padString || ' ');
-      const repeated = filler.repeat(Math.ceil((length - source.length) / filler.length));
-      return repeated.slice(0, length - source.length) + source;
-    },
-  });
-}
-
-if (!Array.prototype.includes) {
-  Object.defineProperty(Array.prototype, 'includes', {
-    value(searchElement: unknown, fromIndex = 0) {
-      const list = Object(this) as ArrayLike<unknown>;
-      const length = list.length >>> 0;
-      if (length === 0) return false;
-      let index = Math.max(fromIndex >= 0 ? fromIndex : length + fromIndex, 0);
-      while (index < length) {
-        const value = list[index];
-        if (value === searchElement || (value !== value && searchElement !== searchElement)) return true;
-        index += 1;
-      }
-      return false;
-    },
-  });
-}
-
-if (!Object.fromEntries) {
-  Object.fromEntries = function fromEntries(entries: Iterable<readonly [PropertyKey, unknown]>) {
-    const result: Record<PropertyKey, unknown> = {};
-    for (const [key, value] of entries) {
-      result[key] = value;
-    }
-    return result;
-  };
-}
-
-if (!Promise.prototype.finally) {
-  Promise.prototype.finally = function promiseFinally<TResult>(
-    this: Promise<TResult>,
-    onFinally?: (() => void) | null,
-  ) {
-    const promise = this.constructor as PromiseConstructor;
-    return this.then(
-      (value) => promise.resolve(onFinally?.()).then(() => value),
-      (reason) => promise.resolve(onFinally?.()).then(() => {
-        throw reason;
-      }),
-    );
-  };
-}
 
 if (!compatWindow.queueMicrotask) {
   compatWindow.queueMicrotask = (callback) => {
@@ -96,27 +46,7 @@ if (!compatWindow.cancelIdleCallback) {
 }
 
 if (!compatWindow.ResizeObserver) {
-  compatWindow.ResizeObserver = class ResizeObserverFallback {
-    private readonly callback: ResizeObserverCallback;
-    private readonly observed = new Set<Element>();
-
-    constructor(callback: ResizeObserverCallback) {
-      this.callback = callback;
-    }
-
-    observe(target: Element) {
-      this.observed.add(target);
-      this.callback([], this as unknown as ResizeObserver);
-    }
-
-    unobserve(target: Element) {
-      this.observed.delete(target);
-    }
-
-    disconnect() {
-      this.observed.clear();
-    }
-  } as unknown as typeof ResizeObserver;
+  compatWindow.ResizeObserver = ResizeObserverPolyfill as unknown as typeof ResizeObserver;
 }
 
 function detectFlexGap() {
