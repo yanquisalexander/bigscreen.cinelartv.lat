@@ -80,6 +80,11 @@ export function HomeScreen() {
     navigate(`/content/${item.id}`);
   };
 
+  const progressPercent = (item: ContentItem) => {
+    if (!item.progress || !item.duration) return 0;
+    return Math.min(100, Math.round((item.progress / item.duration) * 100));
+  };
+
   const bannerItems = data?.banner_content ?? [];
   const firstRowFirstItemId = data?.content?.[0]?.content?.[0]?.id;
   const firstRowFocusKey = firstRowFirstItemId != null ? `home-row-0-item-${firstRowFirstItemId}` : undefined;
@@ -191,7 +196,7 @@ export function HomeScreen() {
                           clientEndpoint,
                         )}
                         subtitle={item.content_type === 'TVSHOW' ? 'Serie' : undefined}
-                        progress={item.progress}
+                        progress={progressPercent(item)}
                         onArrowPress={(direction) => {
                           if (catIdx === 0 && direction === 'up') return focusHeroFromFirstRow(direction);
                           if (itemIdx === 0 && direction === 'left') return focusSidebarFromRowStart(direction);

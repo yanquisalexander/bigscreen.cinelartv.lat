@@ -16,6 +16,7 @@ export interface ContentItem {
   year?: number | null;
   liked?: boolean;
   progress?: number;
+  duration?: number;
   available?: boolean;
   premium?: boolean;
   tmdb_id?: string | null;
