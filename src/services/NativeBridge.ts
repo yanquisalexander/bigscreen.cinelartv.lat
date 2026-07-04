@@ -136,12 +136,9 @@ let nativePlayerFinishedCallback: (() => void) | null = null;
 
 export const setOnNativePlayerFinished = (callback: (() => void) | null): void => {
   nativePlayerFinishedCallback = callback;
-  if (typeof window !== 'undefined') {
-    window.CinelarNative = {
-      ...window.CinelarNative,
-      onNativePlayerFinished: () => {
-        nativePlayerFinishedCallback?.();
-      },
+  if (typeof window !== 'undefined' && window.CinelarNative) {
+    window.CinelarNative.onNativePlayerFinished = () => {
+      nativePlayerFinishedCallback?.();
     };
   }
 };
