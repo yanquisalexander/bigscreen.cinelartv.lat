@@ -7,7 +7,7 @@ import { useConfigStore } from '@/stores/configStore';
 import { getWatchData, updateProgress } from '@/features/content/api';
 import { useKeyHandler } from '@/hooks/useKeyHandler';
 import { formatTime, classNames, resolveImageUrl } from '@/utils/helpers';
-import { addContinueWatching } from '@/services/NativeBridge';
+import { addContinueWatching, prefersNative as prefersNativePlayer, launchNativePlayer, setOnNativePlayerFinished } from '@/services/NativeBridge';
 import type { AndroidTvHomeItem } from '@/services/NativeBridge';
 import {
   LucideArrowLeft,
@@ -77,6 +77,33 @@ export function WatchScreen() {
   const nextShowingRef = useRef(false);
 
   const streamUrl = watchData?.sources?.[0]?.url;
+
+  // --- Native player delegation ---
+  const useNative = useMemo(() => prefersNativePlayer(), []);
+
+  useEffect(() => {
+    if (!useNative || !contentId || !tokens) return;
+    launchNativePlayer({
+      contentId,
+      episodeId,
+      accessToken: tokens.accessToken,
+      clientEndpoint,
+    });
+    setOnNativePlayerFinished(() => {
+      navigate('/home', { replace: true });
+    });
+    return () => setOnNativePlayerFinished(null);
+  }, [useNative, contentId, episodeId, tokens, clientEndpoint, navigate]);
+
+  // When prefersNative, show only a loading spinner while native player is active
+  if (useNative) {
+    return (
+      <div className="w-full h-full bg-black flex flex-col items-center justify-center gap-5">
+        <M3eLoadingIndicator style={{ "--m3e-loading-indicator-active-indicator-color": "#ddd" } as any} />
+        <p className="text-white/50 text-base tracking-wide">Abriendo reproductor nativo…</p>
+      </div>
+    );
+  }
 
   // --- Flatten episodes from seasons ---
   const allEpisodes = useMemo<FlatEpisode[]>(() => {

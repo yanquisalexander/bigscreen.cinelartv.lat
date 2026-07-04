@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { init, setKeyMap } from '@noriginmedia/norigin-spatial-navigation';
+import { init, setKeyMap, } from '@noriginmedia/norigin-spatial-navigation';
 
 let initialized = false;
 

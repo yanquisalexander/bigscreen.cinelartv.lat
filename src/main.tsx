@@ -21,6 +21,10 @@ if (import.meta.env.DEV) {
       window.open(info.url, '_blank');
       return true;
     }),
+    prefersNative: (native.prefersNative as (() => boolean) | undefined) ?? (() => false),
+    launchNativePlayer: (native.launchNativePlayer as ((json: string) => void) | undefined) ?? ((json: string) => {
+      console.log('[Mock] launchNativePlayer:', JSON.parse(json));
+    }),
   };
 }
 

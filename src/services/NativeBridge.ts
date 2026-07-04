@@ -17,6 +17,9 @@ interface CinelarNative {
   onLogout?: () => boolean;
   supportsLiveTV?: () => boolean;
   playLiveChannel?: (channelJson: string) => boolean;
+  prefersNative?: () => boolean;
+  launchNativePlayer?: (json: string) => void;
+  onNativePlayerFinished?: () => void;
 }
 
 declare global {
@@ -114,3 +117,31 @@ export const supportsLiveTV = (): boolean =>
 
 export const playLiveChannel = (channel: LiveChannelInfo): boolean =>
   (typeof window !== 'undefined' ? window.CinelarNative?.playLiveChannel?.(JSON.stringify(channel)) : undefined) ?? false;
+
+export const prefersNative = (): boolean =>
+  (typeof window !== 'undefined' ? window.CinelarNative?.prefersNative?.() : undefined) ?? false;
+
+interface NativePlayerData {
+  contentId: string;
+  episodeId?: string;
+  accessToken: string;
+  clientEndpoint: string;
+}
+
+export const launchNativePlayer = (data: NativePlayerData): void => {
+  window.CinelarNative?.launchNativePlayer?.(JSON.stringify(data));
+};
+
+let nativePlayerFinishedCallback: (() => void) | null = null;
+
+export const setOnNativePlayerFinished = (callback: (() => void) | null): void => {
+  nativePlayerFinishedCallback = callback;
+  if (typeof window !== 'undefined') {
+    window.CinelarNative = {
+      ...window.CinelarNative,
+      onNativePlayerFinished: () => {
+        nativePlayerFinishedCallback?.();
+      },
+    };
+  }
+};
