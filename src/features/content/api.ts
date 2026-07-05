@@ -1,5 +1,6 @@
 import type { ContentDetail, WatchData } from '@/types/content';
 import { apiRequest } from '@/api/client';
+import { prebufferStream, cancelPrebuffer } from './prebuffer';
 
 // --- Prefetch cache for getWatchData ---
 // Key: "contentId:episodeId" | "contentId:" (for movies)
@@ -53,7 +54,16 @@ export function prefetchWatchData(
   const key = watchDataCacheKey(contentId, episodeId);
   if (watchDataCache.has(key)) return;
 
-  const promise = getWatchData(accessToken, contentId, episodeId).catch((err) => {
+  const promise = getWatchData(accessToken, contentId, episodeId)
+    .then((data) => {
+      // Once we have the stream URL, start pre-buffering the video
+      const streamUrl = data.sources?.[0]?.url;
+      if (streamUrl) {
+        prebufferStream(streamUrl, contentId, episodeId);
+      }
+      return data;
+    })
+    .catch((err) => {
     // On error, remove from cache so the next call retries
     watchDataCache.delete(key);
     throw err;
@@ -86,6 +96,7 @@ export function consumeWatchData(
 /** Drop any cached data (e.g. on logout). */
 export function clearWatchDataCache(): void {
   watchDataCache.clear();
+  cancelPrebuffer();
 }
 
 export async function updateProgress(
