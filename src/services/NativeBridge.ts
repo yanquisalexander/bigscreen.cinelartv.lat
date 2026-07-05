@@ -20,6 +20,8 @@ interface CinelarNative {
   prefersNative?: () => boolean;
   launchNativePlayer?: (json: string) => void;
   onNativePlayerFinished?: () => void;
+  hasNativeUpdates?: () => boolean;
+  performNativeUpdate?: () => void;
 }
 
 declare global {
@@ -141,4 +143,11 @@ export const setOnNativePlayerFinished = (callback: (() => void) | null): void =
       nativePlayerFinishedCallback?.();
     };
   }
+};
+
+export const hasNativeUpdates = (): boolean =>
+  (typeof window !== 'undefined' ? window.CinelarNative?.hasNativeUpdates?.() : undefined) ?? false;
+
+export const performNativeUpdate = (): void => {
+  window.CinelarNative?.performNativeUpdate?.();
 };

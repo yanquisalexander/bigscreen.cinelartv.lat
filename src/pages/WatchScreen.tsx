@@ -4,7 +4,7 @@ import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spat
 import { Focusable } from '@/components/tv/Focusable';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
-import { getWatchData, updateProgress } from '@/features/content/api';
+import { consumeWatchData, updateProgress } from '@/features/content/api';
 import { useKeyHandler } from '@/hooks/useKeyHandler';
 import { formatTime, classNames, resolveImageUrl } from '@/utils/helpers';
 import { addContinueWatching, prefersNative as prefersNativePlayer, launchNativePlayer, setOnNativePlayerFinished } from '@/services/NativeBridge';
@@ -173,7 +173,7 @@ export function WatchScreen() {
     });
     setDuration(0);
     setSkipSegment(null);
-    getWatchData(tokens.accessToken, contentId, episodeId)
+    consumeWatchData(tokens.accessToken, contentId, episodeId)
       .then((data) => {
         const isTVShow = data.content.content_type === 'TVSHOW';
         if (isTVShow && !episodeId && !data.episode) {

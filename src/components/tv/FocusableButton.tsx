@@ -10,6 +10,7 @@ interface FocusableButtonProps {
   autoFocus?: boolean;
   focusKey?: string;
   onArrowPress?: (direction: string) => boolean;
+  onFocus?: () => void;
 }
 
 const variantStyles = {
@@ -33,11 +34,13 @@ export function FocusableButton({
   autoFocus = false,
   focusKey,
   onArrowPress,
+  onFocus,
 }: FocusableButtonProps) {
   return (
     <Focusable
       onEnterPress={onEnterPress}
       onArrowPress={onArrowPress}
+      onFocus={onFocus}
       autoFocus={autoFocus}
       focusKey={focusKey}
       focusedClassName="scale-105 shadow-lg shadow-black/40"

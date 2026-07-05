@@ -4,7 +4,7 @@ import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spat
 import { useSpatialNavInit } from '@/hooks/useSpatialNavInit';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
-import { getContentById } from '@/features/content/api';
+import { getContentById, prefetchWatchData } from '@/features/content/api';
 import { resolveImageUrl } from '@/utils/helpers';
 import { FocusableButton } from '@/components/tv/FocusableButton';
 import { Focusable } from '@/components/tv/Focusable';
@@ -27,6 +27,7 @@ export function ContentDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedSeason, setSelectedSeason] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seasons = content?.seasons ?? [];
   const categories = content?.categories ?? [];
   const currentEpisodes = seasons[selectedSeason]?.episodes ?? [];
@@ -62,6 +63,13 @@ export function ContentDetailScreen() {
     window.addEventListener('keydown', handleBack);
     return () => window.removeEventListener('keydown', handleBack);
   }, [navigate]);
+
+  // Cleanup pending prefetch timer on unmount
+  useEffect(() => {
+    return () => {
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -130,6 +138,18 @@ export function ContentDetailScreen() {
     }
   }, [content, navigate, canPlay]);
 
+  const handlePlayEpisodeFocus = useCallback(
+    (episodeId: string | number) => {
+      if (!tokens || !contentId) return;
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+      prefetchTimerRef.current = setTimeout(() => {
+        prefetchTimerRef.current = null;
+        prefetchWatchData(tokens.accessToken, contentId, episodeId);
+      }, 4000);
+    },
+    [tokens, contentId],
+  );
+
   const handlePlayEpisode = useCallback(
     (episodeId: string | number) => {
       navigate(`/watch/${contentId}/${episodeId}`);
@@ -148,6 +168,20 @@ export function ContentDetailScreen() {
     setFocus(focusKey);
     return false;
   }, []);
+
+  // Debounced prefetch for Play button (4s hold)
+  const handlePlayFocus = useCallback(() => {
+    if (!content || !tokens) return;
+    const episodeId = content.continue_watching?.episode_id
+      ?? (content.content_type === 'TVSHOW'
+        ? content.seasons?.[0]?.episodes?.[0]?.id
+        : undefined);
+    if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    prefetchTimerRef.current = setTimeout(() => {
+      prefetchTimerRef.current = null;
+      prefetchWatchData(tokens.accessToken, content.id, episodeId);
+    }, 4000);
+  }, [content, tokens]);
 
   const handlePlayArrow = useCallback((direction: string) => {
     if (direction === 'left') return focusSidebarFromLeftEdge(direction);
@@ -238,6 +272,7 @@ export function ContentDetailScreen() {
               <FocusableButton
                 focusKey="detail-play"
                 onEnterPress={handlePlay}
+                onFocus={handlePlayFocus}
                 onArrowPress={handlePlayArrow}
                 autoFocus
                 variant="primary"
@@ -315,6 +350,7 @@ export function ContentDetailScreen() {
                           return true;
                         }}
                         onEnterPress={() => handlePlayEpisode(episode.id)}
+                        onFocus={() => handlePlayEpisodeFocus(episode.id)}
                       />
                     );
                   })}
