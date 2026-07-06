@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { Focusable } from '@/components/tv/Focusable';
@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
 import { consumeWatchData, updateProgress } from '@/features/content/api';
 import { useKeyHandler } from '@/hooks/useKeyHandler';
-import { formatTime, classNames, resolveImageUrl } from '@/utils/helpers';
+import { classNames, resolveImageUrl } from '@/utils/helpers';
 import { addContinueWatching, prefersNative as prefersNativePlayer, launchNativePlayer, setOnNativePlayerFinished } from '@/services/NativeBridge';
 import type { AndroidTvHomeItem } from '@/services/NativeBridge';
 import {
@@ -20,14 +20,15 @@ import type { WatchData, Segment, WatchEpisode } from '@/types/content';
 import type { PlayerState } from '@/types/player';
 import { M3eLoadingIndicator } from "@m3e/react/loading-indicator";
 import { useToastStore } from "@/stores/toastStore";
+import { Seekbar } from '@/components/tv/Seekbar';
+import { EpisodesRow } from '@/components/tv/EpisodesRow';
+import type { FlatEpisode } from '@/components/tv/RailEpisodeItem';
 
 const ACCENT = '#FFFFFF';
 
 // Cada cuánto se re-evalúan segmentos / next-episode / progreso "lógico".
 // No afecta el suavizado visual de la seekbar, que corre por rAF aparte.
 const LOGIC_TICK_MS = 1000;
-
-type FlatEpisode = WatchEpisode & { seasonNumber: number };
 
 export function WatchScreen() {
   const { contentId, episodeId } = useParams<{ contentId: string; episodeId: string }>();
@@ -76,7 +77,7 @@ export function WatchScreen() {
   const streamUrl = watchData?.sources?.[0]?.url;
 
   // --- Native player delegation ---
-  const useNative = false//useMemo(() => prefersNativePlayer(), []);
+  const useNative = useMemo(() => prefersNativePlayer(), []);
 
   useEffect(() => {
     if (!useNative || !contentId || !tokens) return;
@@ -426,13 +427,17 @@ export function WatchScreen() {
     onPlayPause: togglePlay,
   });
 
+  // FIX: antes se chequeaba document.activeElement?.closest('[data-episode-rail]')
+  // para decidir si las flechas eran seek o navegación del rail. Pero
+  // norigin-spatial-navigation maneja el foco de forma virtual y no mueve el
+  // foco real del DOM, así que ese chequeo nunca era verdadero y las flechas
+  // siempre terminaban haciendo seek, incluso con foco dentro del rail.
+  // Ahora usamos railExpanded (ya calculado a partir de hasFocusedChild del
+  // rail) como fuente de verdad.
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       const isSeekKey = e.key === 'ArrowLeft' || e.key === 'ArrowRight';
-      if (!isSeekKey) return;
-
-      const inRail = document.activeElement?.closest?.('[data-episode-rail]');
-      if (inRail) return;
+      if (!isSeekKey || railExpanded) return;
 
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -445,7 +450,7 @@ export function WatchScreen() {
     };
     window.addEventListener('keydown', handleKey, true);
     return () => window.removeEventListener('keydown', handleKey, true);
-  }, [showControlsTemporarily]);
+  }, [showControlsTemporarily, railExpanded]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -704,312 +709,3 @@ export function WatchScreen() {
     </FocusContext.Provider>
   );
 }
-
-/* ─── Seekbar ───────────────────────────────────────────────────────────
-   Se actualiza directo por DOM en cada frame (requestAnimationFrame),
-   leyendo video.currentTime / video.buffered sin pasar por React state.
-   Esto es lo que más impacto tiene en WebView de Android TV: evita que el
-   componente padre (y con él, todo el rail de episodios) se re-renderice
-   varias veces por segundo solo para mover una barra de progreso. */
-
-function Seekbar({
-  videoRef,
-  duration,
-  chapterMarks,
-}: {
-  videoRef: React.RefObject<HTMLVideoElement>;
-  duration: number;
-  chapterMarks: number[];
-}) {
-  const fillRef = useRef<HTMLDivElement>(null);
-  const bufferedRef = useRef<HTMLDivElement>(null);
-  const thumbRef = useRef<HTMLDivElement>(null);
-  const currentTimeLabelRef = useRef<HTMLSpanElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    let rafId: number;
-
-    const update = () => {
-      const dur = video.duration || 0;
-      const ct = video.currentTime;
-      const pct = dur > 0 ? (ct / dur) * 100 : 0;
-
-      let bufferedEnd = 0;
-      if (video.buffered.length > 0) {
-        bufferedEnd = video.buffered.end(video.buffered.length - 1);
-      }
-      const bufferedPct = dur > 0 ? (bufferedEnd / dur) * 100 : 0;
-
-      if (fillRef.current) fillRef.current.style.width = `${pct}%`;
-      if (bufferedRef.current) bufferedRef.current.style.width = `${bufferedPct}%`;
-      if (thumbRef.current) thumbRef.current.style.left = `${pct}%`;
-      if (currentTimeLabelRef.current) currentTimeLabelRef.current.textContent = formatTime(ct);
-
-      rafId = requestAnimationFrame(update);
-    };
-
-    rafId = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(rafId);
-  }, [videoRef]);
-
-  return (
-    <div className="seekbar-group flex items-center gap-4 h-full">
-      <span ref={currentTimeLabelRef} className="text-white/90 text-sm font-medium w-14 text-right tabular-nums">
-        0:00
-      </span>
-
-      <div
-        ref={trackRef}
-        className="seekbar-track relative flex-1 h-10 flex items-center cursor-pointer group"
-      >
-        <div className="relative z-0 h-[4px] w-full rounded-full bg-white/[0.16] transition-all duration-200 ease-out group-hover:h-[6px]">
-          <div ref={bufferedRef} className="absolute inset-y-0 left-0 bg-white/[0.12] rounded-full" style={{ width: '0%' }} />
-          <div ref={fillRef} className="absolute inset-y-0 left-0 rounded-full" style={{ width: '0%', backgroundColor: ACCENT, boxShadow: `0 0 10px ${ACCENT}55` }} />
-
-          {chapterMarks.map((pct, i) => (
-            <div
-              key={i}
-              className="absolute top-1/2 -translate-y-1/2 w-[2px] h-3 bg-black/50 rounded-full"
-              style={{ left: `${pct}%` }}
-            />
-          ))}
-        </div>
-
-        <div
-          ref={thumbRef}
-          className="absolute top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 w-[14px] h-[14px] rounded-full border-2 border-white bg-white opacity-0 transition-all duration-200 ease-out group-hover:opacity-100"
-          style={{ left: '-7px' }}
-        />
-      </div>
-
-      <span className="text-white/40 text-sm font-medium w-14 tabular-nums">
-        {formatTime(duration)}
-      </span>
-    </div>
-  );
-}
-
-/* ─── Episodes Row (carrusel horizontal siempre visible, estilo YouTube TV) ───
-   Vive dentro del scrim inferior junto al resto de los controles: aparece y
-   desaparece con ellos (showControls), no requiere un botón para abrirla.
-   Memoizado: no debe re-renderizar cuando cambia playerState/currentTime. */
-
-type EpisodeWithThumb = { ep: FlatEpisode; thumbUrl: string | null | undefined };
-
-const EpisodesRow = memo(function EpisodesRow({
-  episodes,
-  currentIndex,
-  expanded,
-  onSelect,
-  onExpandChange,
-  onFocusedEpisodeChange,
-}: {
-  episodes: EpisodeWithThumb[];
-  currentIndex: number;
-  expanded: boolean;
-  onSelect: (epId: string | number) => void;
-  onExpandChange: (expanded: boolean) => void;
-  onFocusedEpisodeChange: (ep: FlatEpisode | null) => void;
-}) {
-  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const railViewportRef = useRef<HTMLDivElement>(null);
-
-  const { ref: rowRef, focusKey, hasFocusedChild } = useFocusable({
-    focusKey: 'episodes-rail',
-    trackChildren: true,
-    saveLastFocusedChild: true,
-    preferredChildFocusKey: currentIndex >= 0 ? `rail-ep-item-${episodes[currentIndex]?.ep.id}` : undefined,
-  });
-
-  // Reportar hacia arriba si el foco está dentro de la fila: esto es lo que
-  // dispara el cross-fade seekbar <-> título/descripción en el padre.
-  useEffect(() => {
-    onExpandChange(hasFocusedChild);
-    if (!hasFocusedChild) onFocusedEpisodeChange(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasFocusedChild]);
-
-  const centerItem = useCallback((ep: FlatEpisode) => {
-    const viewport = railViewportRef.current;
-    const el = itemRefs.current.get(String(ep.id));
-    if (viewport && el) {
-      const viewportRect = viewport.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      const scrollTarget = viewport.scrollLeft + (elRect.left - viewportRect.left) - (viewportRect.width - elRect.width) / 2;
-      viewport.scrollTo({ left: scrollTarget, behavior: 'smooth' });
-    }
-    onFocusedEpisodeChange(ep);
-  }, [onFocusedEpisodeChange]);
-
-  // registerNode estable por id: evita romper la memoización de RailEpisodeItem.
-  const registerNode = useCallback((id: string, node: HTMLDivElement | null) => {
-    if (node) itemRefs.current.set(id, node);
-    else itemRefs.current.delete(id);
-  }, []);
-
-  // Centrar el episodio actual al montar (sin animación, ya arranca centrado)
-  useEffect(() => {
-    if (currentIndex < 0) return;
-    const ep = episodes[currentIndex]?.ep;
-    if (!ep) return;
-    const viewport = railViewportRef.current;
-    const el = itemRefs.current.get(String(ep.id));
-    if (viewport && el) {
-      const viewportRect = viewport.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      const scrollTarget = viewport.scrollLeft + (elRect.left - viewportRect.left) - (viewportRect.width - elRect.width) / 2;
-      viewport.scrollTo({ left: scrollTarget, behavior: 'auto' });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const seasonCount = useMemo(() => new Set(episodes.map((e) => e.ep.seasonNumber)).size, [episodes]);
-
-  return (
-    <FocusContext.Provider value={focusKey}>
-      <div
-        ref={rowRef as React.RefObject<HTMLDivElement>}
-        data-episode-rail
-        className={classNames('w-full transition-transform duration-300', expanded ? 'mt-[clamp(0.5rem,1.8vh,1rem)]' : 'mt-[clamp(1rem,3.5vh,2rem)]')}
-      >
-        <div
-          ref={railViewportRef}
-          className="w-full relative flex gap-[clamp(0.625rem,1.5vw,0.875rem)] overflow-x-auto p-[clamp(0.5rem,1.4vw,0.75rem)] snap-x snap-proximity hide-scrollbar scroll-smooth"
-          style={{ scrollPaddingInline: 'clamp(2rem, 4vw, 3rem)' }}
-        >
-          {episodes.map(({ ep, thumbUrl }, index) => (
-            <RailEpisodeItem
-              key={ep.id}
-              episode={ep}
-              index={index}
-              isActive={index === currentIndex}
-              expanded={expanded}
-              showSeasonEyebrow={seasonCount > 1}
-              thumbUrl={thumbUrl}
-              onSelect={onSelect}
-              onCenter={centerItem}
-              registerNode={registerNode}
-            />
-          ))}
-        </div>
-      </div>
-    </FocusContext.Provider>
-  );
-});
-
-/* ─── Tarjeta individual del carrusel de episodios ───
-   Usa useFocusable directamente (en vez del wrapper Focusable) porque
-   necesitamos el callback onFocus real de norigin-spatial-navigation
-   para centrar el scroll cuando el foco llega vía mando (flechas),
-   no solo al hacer click/enter.
-   Memoizado: con onSelect/onCenter/registerNode estables, esta card no
-   vuelve a renderizar salvo que cambien sus propias props. */
-
-const RailEpisodeItem = memo(function RailEpisodeItem({
-  episode: ep,
-  index,
-  isActive,
-  expanded,
-  showSeasonEyebrow,
-  thumbUrl,
-  onSelect,
-  onCenter,
-  registerNode,
-}: {
-  episode: FlatEpisode;
-  index: number;
-  isActive: boolean;
-  expanded: boolean;
-  showSeasonEyebrow: boolean;
-  thumbUrl: string | null | undefined;
-  onSelect: (epId: string | number) => void;
-  onCenter: (ep: FlatEpisode) => void;
-  registerNode: (id: string, node: HTMLDivElement | null) => void;
-}) {
-  const handleSelect = useCallback(() => onSelect(ep.id), [onSelect, ep.id]);
-  const handleCenter = useCallback(() => onCenter(ep), [onCenter, ep]);
-  const handleRegisterNode = useCallback(
-    (node: HTMLDivElement | null) => registerNode(String(ep.id), node),
-    [registerNode, ep.id],
-  );
-
-  const { ref, focused } = useFocusable({
-    focusKey: `rail-ep-item-${ep.id}`,
-    onEnterPress: handleSelect,
-    onFocus: handleCenter,
-  });
-
-  const cardWidth = expanded ? 'clamp(180px, 13.5vw, 260px)' : 'clamp(156px, 11.5vw, 220px)';
-  const cardHeight = expanded ? 'clamp(101px, 7.6vw, 146px)' : 'clamp(88px, 6.5vw, 124px)';
-
-  return (
-    <div
-      ref={ref as React.RefObject<HTMLDivElement>}
-      onClick={handleSelect}
-      className={classNames(
-        'snap-center flex-shrink-0 transition-all duration-300 cursor-pointer',
-        focused && 'scale-105',
-      )}
-      style={{ width: cardWidth }}
-    >
-      <div
-        ref={handleRegisterNode}
-        className={classNames(
-          'relative bg-neutral-900 transition-all duration-300 rounded-xl overflow-hidden',
-          focused && 'ring-2 ring-white/80 shadow-lg shadow-black/40',
-        )}
-        style={{
-          width: cardWidth,
-          height: cardHeight,
-        }}
-      >
-        {thumbUrl ? (
-          <img src={thumbUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-neutral-800">
-            <LucidePlay size={22} className="text-neutral-600" />
-          </div>
-        )}
-
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
-        {/* Active indicator */}
-        {isActive && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <div className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
-              <div className="flex items-end gap-[2px] h-3.5">
-                <div className="w-[2.5px] h-2 rounded-full animate-pulse" style={{ backgroundColor: '#000' }} />
-                <div className="w-[2.5px] h-3.5 rounded-full animate-pulse [animation-delay:0.15s]" style={{ backgroundColor: '#000' }} />
-                <div className="w-[2.5px] h-2.5 rounded-full animate-pulse [animation-delay:0.3s]" style={{ backgroundColor: '#000' }} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Episode number badge */}
-        <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded-md text-[10px] font-semibold text-white/80 tabular-nums">
-          {showSeasonEyebrow ? `T${ep.seasonNumber} · ` : ''}E{index + 1}
-        </div>
-      </div>
-
-      <div className="mt-2 px-0.5">
-        <p className={classNames(
-          'text-[13px] font-medium leading-snug truncate transition-colors duration-200',
-          isActive ? 'text-white' : focused ? 'text-white/90' : 'text-white/65',
-        )}>
-          {ep.title}
-        </p>
-        {isActive && (
-          <p className="text-[11px] font-medium mt-0.5" style={{ color: ACCENT }}>
-            Reproduciendo
-          </p>
-        )}
-      </div>
-    </div>
-  );
-});
