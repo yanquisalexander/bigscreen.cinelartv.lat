@@ -4,6 +4,7 @@ import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spat
 import { Focusable } from '@/components/tv/Focusable';
 import { LucideTv, LucideRefreshCw } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import { getApiConfig } from '@/api/client';
 import { supportsLiveTV, playLiveChannel, type LiveChannelInfo } from '@/services/NativeBridge';
 import { getLiveTvChannels, type LiveTvChannel } from '@/api/live';
 
@@ -62,15 +63,18 @@ export function LiveTVScreen() {
 
   const handlePlayChannel = useCallback(
     (channel: LiveTvChannel) => {
+      const { CLIENT_ENDPOINT } = getApiConfig();
       const info: LiveChannelInfo = {
         id: channel.id,
         name: channel.name,
         url: channel.stream_url,
         logo: channel.logo_url,
+        accessToken: tokens?.accessToken,
+        clientEndpoint: CLIENT_ENDPOINT,
       };
       playLiveChannel(info);
     },
-    [],
+    [tokens],
   );
 
   const { ref, focusKey } = useFocusable({

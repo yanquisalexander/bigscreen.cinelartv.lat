@@ -112,6 +112,8 @@ export interface LiveChannelInfo {
   name: string;
   url: string;
   logo?: string;
+  accessToken?: string;
+  clientEndpoint?: string;
 }
 
 export const supportsLiveTV = (): boolean =>
