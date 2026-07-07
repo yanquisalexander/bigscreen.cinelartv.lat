@@ -2,7 +2,7 @@ import type { ExploreResponse } from '@/types/content';
 import { apiRequest } from '@/api/client';
 
 export async function getExplore(
-  accessToken: string,
+  accessToken?: string,
   queryParams?: Record<string, unknown>
 ): Promise<ExploreResponse> {
   const searchParams = queryParams

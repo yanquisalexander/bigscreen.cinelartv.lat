@@ -18,6 +18,7 @@ export function AuthScreen() {
   const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
   const setSession = useAuthStore((s) => s.setSession);
+  const enterGuestMode = useAuthStore((s) => s.enterGuestMode);
   const config = useConfigStore((s) => s.config);
 
   const [userCode, setUserCode] = useState('');
@@ -106,6 +107,12 @@ export function AuthScreen() {
     startDeviceCodeFlow();
   };
 
+  const handleGuestMode = () => {
+    pollingRef.current = false;
+    enterGuestMode();
+    navigate('/home', { replace: true });
+  };
+
   return (
     <div className="w-full h-full flex bg-bg">
       {/* Left column: brand + steps */}
@@ -150,7 +157,7 @@ export function AuthScreen() {
       <div className="w-px h-[70%] self-center bg-white/10" />
 
       {/* Right column: QR + code / loading / error */}
-      <div className="flex-1 h-full flex items-center justify-center">
+      <div className="flex-1 h-full flex flex-col items-center justify-center">
         {loading ? (
           <div className="flex flex-col items-center gap-[clamp(1rem,3vh,1.5rem)]">
             <div className="w-[clamp(10rem,17vw,14rem)] h-[clamp(10rem,17vw,14rem)] rounded-2xl bg-surface animate-pulse-slow" />
@@ -183,6 +190,16 @@ export function AuthScreen() {
             <p className="text-text-tertiary text-[clamp(0.75rem,1.1vw,0.875rem)]">Código de activación</p>
           </div>
         )}
+
+        <FocusableButton
+          onEnterPress={handleGuestMode}
+          variant="ghost"
+          size="lg"
+          focusKey="guest-mode"
+          className="mt-auto mb-[clamp(2rem,5vh,3rem)]"
+        >
+          Echaré un vistazo primero
+        </FocusableButton>
       </div>
     </div>
   );

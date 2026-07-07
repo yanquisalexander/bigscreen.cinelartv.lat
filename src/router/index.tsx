@@ -10,6 +10,7 @@ import { LiveTVScreen } from '@/pages/LiveTVScreen';
 import { SettingsScreen } from '@/pages/SettingsScreen';
 import { ContentDetailScreen } from '@/pages/ContentDetailScreen';
 import { WatchScreen } from '@/pages/WatchScreen';
+import { BlockedScreen } from '@/pages/BlockedScreen';
 import { IS_DEV } from "@/stores/configStore";
 
 const createRouterFunction = IS_DEV ? createBrowserRouter : createHashRouter;
@@ -22,6 +23,10 @@ export const router = createRouterFunction([
   {
     path: '/auth',
     element: <AuthScreen />,
+  },
+  {
+    path: '/blocked',
+    element: <BlockedScreen />,
   },
   {
     element: <ProtectedRoute />,

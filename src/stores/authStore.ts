@@ -6,6 +6,7 @@ const TOKEN_KEY = 'cinelar_access_token';
 const REFRESH_KEY = 'cinelar_refresh_token';
 const SESSION_KEY = 'cinelar_session';
 const PROFILE_KEY = 'cinelar_profile_id';
+const GUEST_KEY = 'cinelar_guest';
 
 function loadTokens(): TokenPair | null {
   try {
@@ -30,6 +31,7 @@ function clearTokens() {
   localStorage.removeItem(REFRESH_KEY);
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(PROFILE_KEY);
+  localStorage.removeItem(GUEST_KEY);
 }
 
 function loadSession(): CurrentSessionResponse | null {
@@ -59,10 +61,13 @@ interface AuthState {
   session: CurrentSessionResponse | null;
   selectedProfile: Profile | null;
   isAuthenticated: boolean;
+  isGuest: boolean;
   isReady: boolean;
 
   login: (tokens: TokenPair) => void;
   logout: () => void;
+  enterGuestMode: () => void;
+  exitGuestMode: () => void;
   setSession: (session: CurrentSessionResponse) => void;
   setProfile: (profile: Profile) => void;
   updateTokens: (tokens: TokenPair) => void;
@@ -74,12 +79,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   session: null,
   selectedProfile: null,
   isAuthenticated: false,
+  isGuest: false,
   isReady: false,
 
   initialize: () => {
     const tokens = loadTokens();
     const session = loadSession();
     const profileId = loadProfileId();
+    const isGuest = localStorage.getItem(GUEST_KEY) === '1';
 
     if (tokens && session) {
       const profiles = session.current_user?.profiles ?? [];
@@ -89,16 +96,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         session,
         selectedProfile: profile ?? session.current_user?.current_profile ?? null,
         isAuthenticated: true,
+        isGuest: false,
         isReady: true,
       });
     } else {
-      set({ isReady: true });
+      set({ isGuest, isReady: true });
     }
   },
 
   login: (tokens: TokenPair) => {
+    localStorage.removeItem(GUEST_KEY);
     saveTokens(tokens);
-    set({ tokens, isAuthenticated: true });
+    set({ tokens, isAuthenticated: true, isGuest: false });
   },
 
   logout: () => {
@@ -108,7 +117,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       session: null,
       selectedProfile: null,
       isAuthenticated: false,
+      isGuest: false,
     });
+  },
+
+  enterGuestMode: () => {
+    localStorage.setItem(GUEST_KEY, '1');
+    set({ isGuest: true, isReady: true });
+  },
+
+  exitGuestMode: () => {
+    localStorage.removeItem(GUEST_KEY);
+    set({ isGuest: false });
   },
 
   setSession: (session: CurrentSessionResponse) => {

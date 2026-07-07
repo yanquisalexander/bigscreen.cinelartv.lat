@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
 import { deassignProfile } from '@/features/auth/session';
 import { classNames } from '@/utils/helpers';
-import { LucideSearch, LucideTelescope, LucideTv, LucideSettings } from "lucide-react";
+import { LucideSearch, LucideTelescope, LucideTv, LucideSettings, LucideLogIn } from "lucide-react";
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Inicio', icon: LucideTelescope, path: '/home' },
@@ -18,6 +18,8 @@ export function TVSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const profile = useAuthStore((s) => s.selectedProfile);
+  const isGuest = useAuthStore((s) => s.isGuest);
+  const exitGuestMode = useAuthStore((s) => s.exitGuestMode);
   const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
   const { ref, focusKey, hasFocusedChild } = useFocusable({
     focusKey: 'sidebar',
@@ -116,7 +118,32 @@ export function TVSidebar() {
           </span>
         </Focusable>
 
-        {profile && (
+        {isGuest ? (
+          <Focusable
+            onEnterPress={() => {
+              exitGuestMode();
+              navigateAndCollapse('/auth');
+            }}
+            onArrowPress={focusContent}
+            focusKey="nav-login"
+            focusedClassName="bg-white !text-black"
+            className={classNames(
+              'flex h-12 items-center gap-4 rounded-full px-3 text-base font-medium mb-1',
+              hasFocusedChild ? 'justify-start' : 'justify-center',
+              'text-white/70',
+            )}
+          >
+            <LucideLogIn className="text-2xl" />
+            <span
+              className={classNames(
+                'truncate whitespace-nowrap',
+                hasFocusedChild ? 'opacity-100' : 'w-0 opacity-0',
+              )}
+            >
+              Iniciar sesión
+            </span>
+          </Focusable>
+        ) : profile && (
           <Focusable
             onEnterPress={() => {
               const token = useAuthStore.getState().tokens?.accessToken;

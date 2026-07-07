@@ -25,9 +25,8 @@ export function HomeScreen() {
   const [heroImmersive, setHeroImmersive] = useState(false);
 
   const fetchData = useCallback(async () => {
-    if (!tokens) return;
     try {
-      const explore = await getExplore(tokens.accessToken, {
+      const explore = await getExplore(tokens?.accessToken, {
         include_trailers: true,
       });
       setData(explore);

@@ -4,6 +4,15 @@ import { useAuthStore } from '@/stores/authStore';
 import { getCurrentSession, refreshAccessToken } from '@/features/auth/session';
 import { useNavigate } from 'react-router-dom';
 
+const GUEST_ALLOWED_PATHS = ['/home', '/search', '/live'];
+const GUEST_BLOCKED_PREFIXES = ['/watch', '/select-profile', '/settings'];
+
+function isGuestAllowed(pathname: string): boolean {
+  if (GUEST_ALLOWED_PATHS.includes(pathname)) return true;
+  if (pathname.startsWith('/content/')) return true;
+  return !GUEST_BLOCKED_PREFIXES.some((p) => pathname.startsWith(p));
+}
+
 function SyncSession({ token }: { token: string }) {
   const setSession = useAuthStore((s) => s.setSession);
   const logout = useAuthStore((s) => s.logout);
@@ -47,12 +56,23 @@ function SyncSession({ token }: { token: string }) {
 
 export function ProtectedRoute() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isGuest = useAuthStore((s) => s.isGuest);
   const selectedProfile = useAuthStore((s) => s.selectedProfile);
   const isReady = useAuthStore((s) => s.isReady);
   const token = useAuthStore((s) => s.tokens?.accessToken);
   const location = useLocation();
 
   if (!isReady) return null;
+
+  // Guest mode
+  if (isGuest) {
+    if (!isGuestAllowed(location.pathname)) {
+      return <Navigate to="/auth" replace />;
+    }
+    return <Outlet />;
+  }
+
+  // Authenticated mode
   if (!isAuthenticated) return <Navigate to="/auth" replace />;
 
   const onProfileSelect = location.pathname === '/select-profile';
