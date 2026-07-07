@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusContext, setFocus, useFocusable, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
 import { Focusable } from '@/components/tv/Focusable';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
@@ -77,7 +77,7 @@ export function WatchScreen() {
   const streamUrl = watchData?.sources?.[0]?.url;
 
   // --- Native player delegation ---
-  const useNative = useMemo(() => prefersNativePlayer(), []);
+  const useNative = false//useMemo(() => prefersNativePlayer(), []);
 
   useEffect(() => {
     if (!useNative || !contentId || !tokens) return;
@@ -437,7 +437,10 @@ export function WatchScreen() {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       const isSeekKey = e.key === 'ArrowLeft' || e.key === 'ArrowRight';
-      if (!isSeekKey || railExpanded) return;
+      if (!isSeekKey) return;
+
+      const focusKey = getCurrentFocusKey();
+      if (focusKey === 'episodes-rail' || focusKey.startsWith('rail-ep-item-')) return;
 
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -450,14 +453,15 @@ export function WatchScreen() {
     };
     window.addEventListener('keydown', handleKey, true);
     return () => window.removeEventListener('keydown', handleKey, true);
-  }, [showControlsTemporarily, railExpanded]);
+  }, [showControlsTemporarily]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       const isBackKey = e.key === 'Escape' || e.key === 'Backspace' || e.key === 'XF86Back' || e.key === 'GoBack' || e.key === 'BrowserBack';
-      const isArrowKey = e.key.startsWith('Arrow');
+      const isActionKey = e.key === ' ' || e.key === 'Enter';
+      const isNavArrow = e.key === 'ArrowUp' || e.key === 'ArrowDown';
       handleKeyDown(e);
-      if (!isBackKey && !isArrowKey) {
+      if (isActionKey || isNavArrow || (!isBackKey && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) {
         showControlsTemporarily();
       }
     };
