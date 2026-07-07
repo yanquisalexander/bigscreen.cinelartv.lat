@@ -77,7 +77,7 @@ export function WatchScreen() {
   const streamUrl = watchData?.sources?.[0]?.url;
 
   // --- Native player delegation ---
-  const useNative = false//useMemo(() => prefersNativePlayer(), []);
+  const useNative = useMemo(() => prefersNativePlayer(), []);
 
   useEffect(() => {
     if (!useNative || !contentId || !tokens) return;
