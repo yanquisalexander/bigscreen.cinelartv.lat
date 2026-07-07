@@ -196,6 +196,7 @@ export function AuthScreen() {
           variant="ghost"
           size="lg"
           focusKey="guest-mode"
+          focusedClassName="!bg-white/10 !border-white/40 scale-105"
           className="mt-[clamp(1.5rem,4vh,2.5rem)]"
         >
           Echaré un vistazo primero

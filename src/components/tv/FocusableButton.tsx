@@ -7,6 +7,7 @@ interface FocusableButtonProps {
   variant?: 'primary' | 'secondary' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  focusedClassName?: string;
   autoFocus?: boolean;
   focusKey?: string;
   onArrowPress?: (direction: string) => boolean;
@@ -31,6 +32,7 @@ export function FocusableButton({
   variant = 'primary',
   size = 'md',
   className,
+  focusedClassName = 'scale-105 shadow-lg shadow-black/40',
   autoFocus = false,
   focusKey,
   onArrowPress,
@@ -43,7 +45,7 @@ export function FocusableButton({
       onFocus={onFocus}
       autoFocus={autoFocus}
       focusKey={focusKey}
-      focusedClassName="scale-105 shadow-lg shadow-black/40"
+      focusedClassName={focusedClassName}
       className={classNames(
         'inline-flex items-center justify-center rounded-full font-semibold',
         'transition-all duration-200 ease-out',
