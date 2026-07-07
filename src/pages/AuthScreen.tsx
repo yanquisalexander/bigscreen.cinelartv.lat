@@ -196,7 +196,7 @@ export function AuthScreen() {
           variant="ghost"
           size="lg"
           focusKey="guest-mode"
-          className="mt-auto mb-[clamp(2rem,5vh,3rem)]"
+          className="mt-[clamp(1.5rem,4vh,2.5rem)]"
         >
           Echaré un vistazo primero
         </FocusableButton>
