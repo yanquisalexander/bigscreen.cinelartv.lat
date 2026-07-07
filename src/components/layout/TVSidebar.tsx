@@ -75,7 +75,7 @@ export function TVSidebar() {
                 focusKey={`nav-${item.key}`}
                 focusedClassName="bg-white !text-black"
                 className={classNames(
-                  'flex h-12 items-center gap-4 rounded-full px-3 text-base font-medium transition-colors',
+                  'flex h-12 items-center gap-4 rounded-full px-3 text-base font-medium',
                   hasFocusedChild ? 'justify-start' : 'justify-center',
                   isActive ? 'text-white' : 'text-white/70',
                 )}
@@ -83,7 +83,7 @@ export function TVSidebar() {
                 <item.icon className="text-2xl" />
                 <span
                   className={classNames(
-                    'truncate whitespace-nowrap transition-opacity duration-150',
+                    'truncate whitespace-nowrap',
                     hasFocusedChild ? 'opacity-100' : 'w-0 opacity-0',
                   )}
                 >
@@ -100,7 +100,7 @@ export function TVSidebar() {
           focusKey="nav-settings"
           focusedClassName="bg-white !text-black"
           className={classNames(
-            'flex h-12 items-center gap-4 rounded-full px-3 text-base font-medium transition-colors mb-1',
+            'flex h-12 items-center gap-4 rounded-full px-3 text-base font-medium mb-1',
             hasFocusedChild ? 'justify-start' : 'justify-center',
             'text-white/70',
           )}
@@ -108,7 +108,7 @@ export function TVSidebar() {
           <LucideSettings className="text-2xl" />
           <span
             className={classNames(
-              'truncate whitespace-nowrap transition-opacity duration-150',
+              'truncate whitespace-nowrap',
               hasFocusedChild ? 'opacity-100' : 'w-0 opacity-0',
             )}
           >
@@ -120,7 +120,7 @@ export function TVSidebar() {
           <Focusable
             onEnterPress={() => {
               const token = useAuthStore.getState().tokens?.accessToken;
-              if (token) deassignProfile(token).catch(() => {});
+              if (token) deassignProfile(token).catch(() => { });
               navigateAndCollapse('/select-profile');
             }}
             onArrowPress={focusContent}
@@ -150,7 +150,7 @@ export function TVSidebar() {
             </div>
             <span
               className={classNames(
-                'truncate whitespace-nowrap text-white transition-opacity duration-150',
+                'truncate whitespace-nowrap text-white',
                 hasFocusedChild ? 'opacity-100' : 'w-0 opacity-0',
               )}
             >
