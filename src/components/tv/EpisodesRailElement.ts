@@ -191,6 +191,9 @@ class EpisodesRailElement extends HTMLElement {
         focusable: true,
         trackChildren: false,
         saveLastFocusedChild: false,
+        isFocusBoundary: false,
+        autoRestoreFocus: true,
+        forceFocus: false,
         onEnterPress: () => {
           this.dispatchEvent(
             new CustomEvent('episode-selected', {
