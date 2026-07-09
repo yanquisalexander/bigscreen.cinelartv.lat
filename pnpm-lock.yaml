@@ -41,6 +41,9 @@ importers:
       resize-observer-polyfill:
         specifier: ^1.5.1
         version: 1.5.1
+      shaka-player:
+        specifier: ^5.1.13
+        version: 5.1.13
       whatwg-fetch:
         specifier: ^3.6.20
         version: 3.6.20
@@ -718,6 +721,10 @@ packages:
   set-cookie-parser@2.7.2:
     resolution: {integrity: sha512-oeM1lpU/UvhTxw+g3cIfxXHyJRc/uidd3yK1P242gzHds0udQBYzs3y8j4gCCW+ZJ7ad0yctld8RYO+bdurlvw==}
 
+  shaka-player@5.1.13:
+    resolution: {integrity: sha512-bi1lWymlIgSbCuSwLu4v3Y+hNCX7PEk6LLcuo9dZ04gcbJnyR3FdPgHNGxaBJg4mrLKttlxOuXJWllM8DA/meg==}
+    engines: {node: '>=18'}
+
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
@@ -1333,6 +1340,8 @@ snapshots:
   scheduler@0.27.0: {}
 
   set-cookie-parser@2.7.2: {}
+
+  shaka-player@5.1.13: {}
 
   source-map-js@1.2.1: {}
 

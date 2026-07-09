@@ -5,7 +5,7 @@ import { getCurrentSession, refreshAccessToken } from '@/features/auth/session';
 import { useNavigate } from 'react-router-dom';
 
 const GUEST_ALLOWED_PATHS = ['/home', '/search', '/live'];
-const GUEST_BLOCKED_PREFIXES = ['/watch', '/select-profile', '/settings'];
+const GUEST_BLOCKED_PREFIXES = ['/watch', '/select-profile'];
 
 function isGuestAllowed(pathname: string): boolean {
   if (GUEST_ALLOWED_PATHS.includes(pathname)) return true;

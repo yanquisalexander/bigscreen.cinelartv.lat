@@ -4,6 +4,8 @@ import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spat
 import { Focusable } from '@/components/tv/Focusable';
 import { LucideSettings, LucideChevronRight } from 'lucide-react';
 import { getPlatform, getAppVersion, getDeviceModel, getDeviceName, getModel, getNativeVersion, getNativeVersionName } from '@/services/NativeBridge';
+import { Toggle } from '@/components/tv/Toggle';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -58,9 +60,12 @@ export function SettingsScreen() {
   const appVersion = getAppVersion();
   const deviceName = getDeviceName();
   const deviceModel = getDeviceModel();
- const model = getModel();
+  const model = getModel();
   const nativeVersion = getNativeVersion();
   const nativeVersionName = getNativeVersionName();
+
+  const prefersModernPlayback = useSettingsStore((s) => s.prefersModernPlayback);
+  const setPrefersModernPlayback = useSettingsStore((s) => s.setPrefersModernPlayback);
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -91,6 +96,17 @@ export function SettingsScreen() {
               <InfoRow label="Nombre" value={deviceName ?? '—'} />
               <InfoRow label="Modelo" value={model} />
               <InfoRow label="Dispositivo" value={deviceModel} />
+            </section>
+
+            <section className="bg-surface rounded-2xl px-[clamp(1rem,2vw,1.5rem)] py-[clamp(0.5rem,1vh,0.75rem)]">
+              <SectionTitle>Reproducción</SectionTitle>
+              <Toggle
+                focusKey="settings-modern-playback"
+                label="Prefers modern playback"
+                description="Usa siempre el reproductor web e ignora el reproductor nativo del dispositivo."
+                checked={prefersModernPlayback}
+                onChange={setPrefersModernPlayback}
+              />
             </section>
 
             <div className="flex gap-[clamp(0.5rem,1vw,0.75rem)]">

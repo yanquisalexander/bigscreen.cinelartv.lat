@@ -8,6 +8,8 @@ import { consumeWatchData, updateProgress } from '@/features/content/api';
 import { useKeyHandler } from '@/hooks/useKeyHandler';
 import { classNames, resolveImageUrl } from '@/utils/helpers';
 import { addContinueWatching, prefersNative as prefersNativePlayer, launchNativePlayer, setOnNativePlayerFinished } from '@/services/NativeBridge';
+import { usePlayerEngine } from '@/services/player/usePlayerEngine';
+import { useSettingsStore } from '@/stores/settingsStore';
 import type { AndroidTvHomeItem } from '@/services/NativeBridge';
 import {
   LucidePlay,
@@ -16,8 +18,7 @@ import {
   LucideLoader2,
   LucideX,
 } from 'lucide-react';
-import type { WatchData, Segment, WatchEpisode } from '@/types/content';
-import type { PlayerState } from '@/types/player';
+import type { WatchData, Segment } from '@/types/content';
 import { M3eLoadingIndicator } from "@m3e/react/loading-indicator";
 import { useToastStore } from "@/stores/toastStore";
 import { Seekbar } from '@/components/tv/Seekbar';
@@ -37,24 +38,8 @@ export function WatchScreen() {
   const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
   const toast = useToastStore();
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const { attachVideo, videoRef, load, play, pause, seek, setOnEnded, isPlaying, isBuffering, duration } = usePlayerEngine();
   const [watchData, setWatchData] = useState<WatchData | null>(null);
-
-  // IMPORTANTE: currentTime/duration/buffered YA NO viven acá. Antes cada
-  // "timeupdate" (cada 250ms) disparaba setPlayerState -> re-render de TODO
-  // el árbol (incluyendo el rail de episodios completo). Ahora esos valores
-  // se leen directo de videoRef en el propio DOM (Seekbar) o en el tick de
-  // 1Hz que solo maneja lógica (segmentos, next episode). Esto es lo que
-  // más pesa en WebViews de Android TV, donde el motor de layout/paint es
-  // mucho más limitado que en un browser de escritorio.
-  const [playerState, setPlayerState] = useState<Pick<PlayerState, 'isPlaying' | 'isBuffering' | 'isSeeking' | 'volume' | 'isMuted'>>({
-    isPlaying: false,
-    isBuffering: false,
-    isSeeking: false,
-    volume: 1,
-    isMuted: false,
-  });
-  const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
   const [skipSegment, setSkipSegment] = useState<Segment | null>(null);
 
@@ -77,7 +62,13 @@ export function WatchScreen() {
   const streamUrl = watchData?.sources?.[0]?.url;
 
   // --- Native player delegation ---
-  const useNative = useMemo(() => prefersNativePlayer(), []);
+  // "Prefers modern playback" override: when enabled, always use the web player
+  // and ignore the native player preference reported by the device.
+  const prefersModernPlayback = useSettingsStore((s) => s.prefersModernPlayback);
+  const useNative = useMemo(
+    () => !prefersModernPlayback && prefersNativePlayer(),
+    [prefersModernPlayback],
+  );
 
   useEffect(() => {
     if (!useNative || !contentId || !tokens) return;
@@ -158,18 +149,21 @@ export function WatchScreen() {
     preferredChildFocusKey: 'watch-playpause',
   });
 
+  // --- Sincronizar handler de "ended" con el Engine ---
+  useEffect(() => {
+    setOnEnded(() => {
+      if (nextEpisode) {
+        navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
+      } else {
+        navigate(-1);
+      }
+    });
+  }, [setOnEnded, nextEpisode, contentId, navigate]);
+
   // --- Load watch data ---
   useEffect(() => {
     if (!tokens || !contentId) return;
     setWatchData(null);
-    setPlayerState({
-      isPlaying: false,
-      isBuffering: false,
-      isSeeking: false,
-      volume: 1,
-      isMuted: false,
-    });
-    setDuration(0);
     setSkipSegment(null);
     consumeWatchData(tokens.accessToken, contentId, episodeId)
       .then((data) => {
@@ -198,51 +192,20 @@ export function WatchScreen() {
       });
   }, [tokens, contentId, episodeId, navigate]);
 
-  // --- Setup video (solo eventos de bajo volumen: play/pause/waiting/canplay/ended/duration) ---
+  // --- Cargar el stream en el Engine cuando el <video> ya está montado ---
+  // Debe correr en un efecto (no dentro del .then de la carga de datos)
+  // porque el elemento <video> solo se monta tras el setWatchData, y el
+  // engine se crea vía callback ref en ese commit.
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !streamUrl) return;
-
-    video.src = streamUrl;
-
-    if (watchData?.continue_watching?.progress) {
-      video.currentTime = watchData.continue_watching.progress;
-    }
-
-    const onPlay = () => setPlayerState((s) => ({ ...s, isPlaying: true }));
-    const onPause = () => setPlayerState((s) => ({ ...s, isPlaying: false }));
-    const onWaiting = () => setPlayerState((s) => ({ ...s, isBuffering: true }));
-    const onCanPlay = () => setPlayerState((s) => ({ ...s, isBuffering: false }));
-    const onDurationChange = () => setDuration(video.duration || 0);
-    const onEnded = () => {
-      // Auto-play next episode if available
-      if (nextEpisode) {
-        navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
-      } else {
-        navigate(-1);
-      }
-    };
-
-    video.addEventListener('play', onPlay);
-    video.addEventListener('pause', onPause);
-    video.addEventListener('waiting', onWaiting);
-    video.addEventListener('canplay', onCanPlay);
-    video.addEventListener('durationchange', onDurationChange);
-    video.addEventListener('loadedmetadata', onDurationChange);
-    video.addEventListener('ended', onEnded);
-
-    video.play().catch(() => { });
-
-    return () => {
-      video.removeEventListener('play', onPlay);
-      video.removeEventListener('pause', onPause);
-      video.removeEventListener('waiting', onWaiting);
-      video.removeEventListener('canplay', onCanPlay);
-      video.removeEventListener('durationchange', onDurationChange);
-      video.removeEventListener('loadedmetadata', onDurationChange);
-      video.removeEventListener('ended', onEnded);
-    };
-  }, [streamUrl, watchData, navigate, contentId, nextEpisode]);
+    if (!streamUrl) return;
+    let cancelled = false;
+    const resume = watchData?.continue_watching?.progress ?? 0;
+    load(streamUrl, resume).then(() => {
+      if (cancelled) return;
+      play();
+    });
+    return () => { cancelled = true; };
+  }, [streamUrl, load, play, watchData]);
 
   // --- Progress reporting al backend + NativeBridge (cada 10s, sin relación con el render) ---
   useEffect(() => {
@@ -362,18 +325,16 @@ export function WatchScreen() {
   }, []);
 
   const togglePlay = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (video.paused) video.play();
-    else video.pause();
-  }, []);
+    if (isPlaying) pause();
+    else play();
+  }, [isPlaying, play, pause]);
 
   const handleSkip = useCallback(() => {
-    if (!skipSegment || !videoRef.current) return;
+    if (!skipSegment) return;
     const end = skipSegment.end ?? skipSegment.end_time ?? 0;
-    videoRef.current.currentTime = end;
+    seek(end);
     setSkipSegment(null);
-  }, [skipSegment]);
+  }, [skipSegment, seek]);
 
   const showControlsTemporarily = useCallback(() => {
     setShowControls(true);
@@ -387,10 +348,10 @@ export function WatchScreen() {
 
   // Auto-hide controls when video starts playing
   useEffect(() => {
-    if (playerState.isPlaying && showControls) {
+    if (isPlaying && showControls) {
       showControlsTemporarily();
     }
-  }, [playerState.isPlaying, showControls, showControlsTemporarily]);
+  }, [isPlaying, showControls, showControlsTemporarily]);
 
   const cancelNextEpisode = useCallback(() => {
     nextShowingRef.current = false;
@@ -519,16 +480,17 @@ export function WatchScreen() {
         className="fixed inset-0 w-screen h-screen bg-black overflow-hidden select-none"
       >
         <video
-          ref={videoRef}
+          ref={attachVideo}
           className="absolute inset-0 w-full h-full block"
           style={{ objectFit: 'contain', objectPosition: 'center' }}
+          autoPlay
           playsInline
         />
 
         {/* Viñeta persistente */}
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60" />
 
-        {playerState.isBuffering && (
+        {isBuffering && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <LucideLoader2 size={56} className="animate-spin" style={{ color: ACCENT }} />
           </div>
@@ -574,7 +536,7 @@ export function WatchScreen() {
               focusedClassName="scale-110 ring-4"
               className="w-[clamp(4.25rem,8vw,6rem)] h-[clamp(4.25rem,8vw,6rem)] rounded-2xl flex items-center justify-center text-black transition-all duration-200 ease-out bg-white/[0.92] backdrop-blur-sm border border-white/20 shadow-lg shadow-black/30 hover:bg-white"
             >
-              {playerState.isPlaying ? (
+              {isPlaying ? (
                 <LucidePause size="38%" fill="currentColor" strokeWidth={0} />
               ) : (
                 <LucidePlay size="38%" fill="currentColor" strokeWidth={0} className="ml-1" />
