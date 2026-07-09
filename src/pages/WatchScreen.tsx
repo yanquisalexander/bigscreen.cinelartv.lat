@@ -11,6 +11,7 @@ import { addContinueWatching, prefersNative as prefersNativePlayer, launchNative
 import { usePlayerEngine } from '@/services/player/usePlayerEngine';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { AndroidTvHomeItem } from '@/services/NativeBridge';
+import '@/components/tv/EpisodesRailElement';
 import {
   LucidePlay,
   LucidePause,
@@ -22,10 +23,82 @@ import type { WatchData, Segment } from '@/types/content';
 import { M3eLoadingIndicator } from "@m3e/react/loading-indicator";
 import { useToastStore } from "@/stores/toastStore";
 import { Seekbar } from '@/components/tv/Seekbar';
-import { EpisodesRow } from '@/components/tv/EpisodesRow';
 import type { FlatEpisode } from '@/components/tv/RailEpisodeItem';
+import type { EpisodeWithThumb } from '@/components/tv/EpisodesRailElement';
 
 const ACCENT = '#FFFFFF';
+
+/* Thin React wrapper that bridges norigin-spatial-navigation with the
+   vanilla-JS <tv-player-episodes-rail> Web Component.
+   React only re-renders this wrapper when hasFocusedChild changes (rare).
+   All heavy DOM work (episode cards, scroll, animations) happens inside
+   the Web Component, completely outside React's reconciliation. */
+function EpisodesRailNorigin({
+  episodes,
+  currentIndex,
+  expanded,
+  onSelect,
+  onExpandChange,
+  onFocusedEpisodeChange,
+}: {
+  episodes: EpisodeWithThumb[];
+  currentIndex: number;
+  expanded: boolean;
+  onSelect: (epId: string | number) => void;
+  onExpandChange: (expanded: boolean) => void;
+  onFocusedEpisodeChange: (ep: FlatEpisode | null) => void;
+}) {
+  const railRef = useRef<any>(null);
+
+  const { ref: noriginRef, focusKey, hasFocusedChild } = useFocusable({
+    focusKey: 'episodes-rail',
+    trackChildren: true,
+    saveLastFocusedChild: true,
+    preferredChildFocusKey: currentIndex >= 0 ? `rail-ep-item-${episodes[currentIndex]?.ep.id}` : undefined,
+  });
+
+  useEffect(() => {
+    onExpandChange(hasFocusedChild);
+    if (!hasFocusedChild) onFocusedEpisodeChange(null);
+  }, [hasFocusedChild]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync episodes data (only when list changes)
+  useEffect(() => {
+    if (railRef.current) railRef.current.episodes = episodes;
+  }, [episodes]);
+
+  // Sync attributes (targeted DOM updates, no React render)
+  useEffect(() => {
+    if (railRef.current) {
+      railRef.current.setAttribute('current-index', String(currentIndex));
+      railRef.current.setAttribute('expanded', String(expanded));
+    }
+  }, [currentIndex, expanded]);
+
+  // Listen for events from the Web Component
+  useEffect(() => {
+    const el = railRef.current;
+    if (!el) return;
+    const handleSelect = (e: Event) => onSelect((e as CustomEvent).detail.epId);
+    const handleFocus = (e: Event) => {
+      onFocusedEpisodeChange((e as CustomEvent).detail.ep);
+    };
+    el.addEventListener('episode-selected', handleSelect);
+    el.addEventListener('episode-focused', handleFocus);
+    return () => {
+      el.removeEventListener('episode-selected', handleSelect);
+      el.removeEventListener('episode-focused', handleFocus);
+    };
+  }, [onSelect, onFocusedEpisodeChange]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <FocusContext.Provider value={focusKey}>
+      <div ref={noriginRef as React.RefObject<HTMLDivElement>} data-episode-rail>
+        <tv-player-episodes-rail ref={railRef} />
+      </div>
+    </FocusContext.Provider>
+  );
+}
 
 // Cada cuánto se re-evalúan segmentos / next-episode / progreso "lógico".
 // No afecta el suavizado visual de la seekbar, que corre por rAF aparte.
@@ -55,7 +128,7 @@ export function WatchScreen() {
   // --- Next episode state ---
   const [nextEpisode, setNextEpisode] = useState<FlatEpisode | null>(null);
   const [showNextCard, setShowNextCard] = useState(false);
-  const [nextCountdown, setNextCountdown] = useState(10);
+  const nextCountdownRef = useRef<HTMLSpanElement>(null);
   const nextTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const nextShowingRef = useRef(false);
 
@@ -120,7 +193,6 @@ export function WatchScreen() {
     return allEpisodes.findIndex((ep) => String(ep.id) === String(episodeId));
   }, [allEpisodes, episodeId]);
 
-  // Season number for the current episode (from season_id lookup)
   const currentSeasonNumber = useMemo(() => {
     if (!watchData?.episode?.season_id || !watchData?.seasons) return null;
     const idx = watchData.seasons.findIndex((s) => s.id === watchData.episode!.season_id);
@@ -282,18 +354,20 @@ export function WatchScreen() {
         if (shouldShow && !nextShowingRef.current) {
           nextShowingRef.current = true;
           setShowNextCard(true);
-          setNextCountdown(10);
+          
+          let countdown = 10;
+          if (nextCountdownRef.current) nextCountdownRef.current.innerText = `${countdown}s`;
+          
           if (nextTimerRef.current) clearInterval(nextTimerRef.current);
           nextTimerRef.current = setInterval(() => {
-            setNextCountdown((prev) => {
-              if (prev <= 1) {
-                if (nextTimerRef.current) clearInterval(nextTimerRef.current);
-                nextShowingRef.current = false;
-                navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
-                return 0;
-              }
-              return prev - 1;
-            });
+            countdown--;
+            if (nextCountdownRef.current) nextCountdownRef.current.innerText = `${countdown}s`;
+            
+            if (countdown <= 0) {
+              if (nextTimerRef.current) clearInterval(nextTimerRef.current);
+              nextShowingRef.current = false;
+              navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
+            }
           }, 1000);
         } else if (!shouldShow && nextShowingRef.current) {
           nextShowingRef.current = false;
@@ -454,12 +528,6 @@ export function WatchScreen() {
 
   const ready = !!(watchData && streamUrl);
 
-  const chapterMarks = duration > 0
-    ? allSegments
-      .map((s) => (((s.start ?? s.start_time ?? 0) / duration) * 100))
-      .filter((p) => p > 0.5 && p < 99.5)
-    : [];
-
   const skipLabel = (skipSegment?.type === 'intro' || skipSegment?.segment_type === 'skip_intro')
     ? 'intro'
     : 'resumen';
@@ -558,17 +626,18 @@ export function WatchScreen() {
               railExpanded ? 'h-[clamp(80px,12vh,110px)]' : 'h-[clamp(44px,6vh,52px)]',
             )}>
               {/* Vista seekbar: se actualiza por DOM/rAF, fuera de React state */}
-              <Focusable
-                onEnterPress={togglePlay}
-                focusKey="watch-progress"
-                focusedClassName="scale-101"
-                className={classNames(
-                  'absolute inset-0 transition-opacity transition-transform duration-300',
-                  railExpanded ? 'opacity-0 translate-y-3 pointer-events-none' : 'opacity-100 translate-y-0',
-                )}
-              >
-                <Seekbar videoRef={videoRef} duration={duration} chapterMarks={chapterMarks} />
-              </Focusable>
+               <Focusable
+                 onEnterPress={togglePlay}
+                 focusKey="watch-progress"
+                 focusedClassName="scale-101"
+                 className={classNames(
+                   'absolute inset-0 transition-opacity transition-transform duration-300',
+                   railExpanded ? 'opacity-0 translate-y-3 pointer-events-none' : 'opacity-100 translate-y-0',
+                 )}
+               >
+                 <Seekbar videoRef={videoRef} duration={duration} />
+               </Focusable>
+
 
               {/* Vista expandida: título + descripción del episodio resaltado en la fila */}
               <div
@@ -593,18 +662,19 @@ export function WatchScreen() {
               </div>
             </div>
 
-            {/* Fila de episodios: siempre visible junto con los controles (estilo YouTube TV),
-                se agranda levemente cuando el foco entra en ella */}
-            {isTVShow && episodesWithThumb.length > 0 && (
-              <EpisodesRow
-                episodes={episodesWithThumb}
-                currentIndex={currentEpisodeIndex}
-                expanded={railExpanded}
-                onSelect={navigateToEpisode}
-                onExpandChange={setRailExpanded}
-                onFocusedEpisodeChange={setFocusedRailEpisode}
-              />
-            )}
+               {/* Fila de episodios: siempre visible junto con los controles (estilo YouTube TV),
+                   se agranda levemente cuando el foco entra en ella */}
+               {isTVShow && episodesWithThumb.length > 0 && (
+                 <EpisodesRailNorigin
+                   episodes={episodesWithThumb}
+                   currentIndex={currentEpisodeIndex}
+                   expanded={railExpanded}
+                   onSelect={navigateToEpisode}
+                   onExpandChange={setRailExpanded}
+                   onFocusedEpisodeChange={setFocusedRailEpisode}
+                 />
+               )}
+
           </div>
         </div>
 
@@ -648,10 +718,11 @@ export function WatchScreen() {
                 </span>
               </div>
 
-              <div className="flex items-center gap-2 ml-1">
-                <span className="text-white/70 text-xs font-semibold tabular-nums bg-white/[0.08] px-2 py-1 rounded-lg">
-                  {nextCountdown}s
-                </span>
+                  <div className="flex items-center gap-2 ml-1">
+                    <span ref={nextCountdownRef} className="text-white/70 text-xs font-semibold tabular-nums bg-white/[0.08] px-2 py-1 rounded-lg">
+                      10s
+                    </span>
+
 
                 <Focusable
                   onEnterPress={playNextEpisode}

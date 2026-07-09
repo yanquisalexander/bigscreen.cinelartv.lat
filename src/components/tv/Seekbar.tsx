@@ -13,11 +13,11 @@ const ACCENT = '#FFFFFF';
 export function Seekbar({
     videoRef,
     duration,
-    chapterMarks,
+    chapterMarks = [],
 }: {
     videoRef: React.RefObject<HTMLVideoElement>;
     duration: number;
-    chapterMarks: number[];
+    chapterMarks?: number[];
 }) {
     const fillRef = useRef<HTMLDivElement>(null);
     const bufferedRef = useRef<HTMLDivElement>(null);
