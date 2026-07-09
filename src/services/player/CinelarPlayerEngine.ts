@@ -120,6 +120,98 @@ export class CinelarPlayerEngine {
     if (this.videoElement) this.videoElement.currentTime = time;
   }
 
+  // ---------- Playback settings (calidad + pistas de audio) ----------
+  public getVariantTracksInfo(): {
+    auto: boolean;
+    activeHeight: number | null;
+    tracks: { height: number; bandwidth: number; active: boolean }[];
+  } | null {
+    if (!this.player) return null;
+    const cfg = this.player.getConfiguration();
+    const auto = !!(cfg.abr && cfg.abr.enabled);
+    const variants = this.player.getVariantTracks();
+    // Distinct heights, highest first.
+    const byHeight = new Map<number, { height: number; bandwidth: number; active: boolean }>();
+    for (const v of variants) {
+      if (!v.height) continue;
+      const existing = byHeight.get(v.height);
+      if (!existing || (v.bandwidth || 0) > existing.bandwidth) {
+        byHeight.set(v.height, { height: v.height, bandwidth: v.bandwidth || 0, active: !!v.active });
+      }
+    }
+    const tracks = Array.from(byHeight.values()).sort((a, b) => b.height - a.height);
+    const active = variants.find((v) => v.active);
+    return { auto, activeHeight: active?.height ?? null, tracks };
+  }
+
+  public getAudioTracksInfo(): {
+    language: string;
+    role: string;
+    label: string;
+    active: boolean;
+  }[] | null {
+    if (!this.player) return null;
+    try {
+      const tracks = this.player.getAudioTracks();
+      if (!tracks || !tracks.length) return null;
+      return tracks.map((t: any) => ({
+        language: t.language || 'und',
+        role: (t.roles && t.roles[0]) || '',
+        label: t.label || t.language?.toUpperCase() || 'UND',
+        active: !!t.active,
+      }));
+    } catch {
+      return null;
+    }
+  }
+
+  public selectQuality(option: number | 'auto') {
+    if (!this.player) return;
+    if (option === 'auto') {
+      this.player.configure({ abr: { enabled: true } });
+      return;
+    }
+    this.player.configure({ abr: { enabled: false } });
+    const candidates = this.player.getVariantTracks().filter((v) => v.height === option);
+    if (candidates.length) {
+      candidates.sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0));
+      this.player.selectVariantTrack(candidates[0], /* clearBuffer */ true);
+    }
+  }
+
+  public selectAudioTrack(language: string, role?: string) {
+    if (!this.player) return;
+    try {
+      const tracks = this.player.getAudioTracks();
+      const target = tracks.find((t: any) => {
+        const langMatch = t.language === language;
+        if (role) return langMatch && (t.roles || []).includes(role);
+        return langMatch;
+      });
+      if (target) {
+        this.player.selectAudioTrack(target, false);
+        if (this.videoElement?.paused) {
+          this.videoElement.play().catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.error('[CinelarPlayerEngine] selectAudioTrack error:', e);
+    }
+  }
+
+  // Selecciona la pista de audio preferida del usuario al montar (si hay
+  // varias). Específicamente útil en contenido multi-idioma (ej. doblaje/sub).
+  public applyPreferredAudioLanguage(preferred?: string) {
+    if (!this.player || !preferred) return;
+    const tracks = this.getAudioTracksInfo();
+    if (!tracks || tracks.length <= 1) return;
+    const lang = preferred.toLowerCase().split('-')[0];
+    const match = tracks.find((t) => t.language.toLowerCase().startsWith(lang));
+    if (match && !match.active) {
+      this.selectAudioTrack(match.language, match.role || undefined);
+    }
+  }
+
   public destroy() {
     if (this.player) {
       this.player.destroy();

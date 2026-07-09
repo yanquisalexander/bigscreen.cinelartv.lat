@@ -8,6 +8,7 @@ export function usePlayerEngine() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [duration, setDuration] = useState(0);
+  const [engineReady, setEngineReady] = useState(false);
 
   // Callback ref: el engine se crea justo cuando el <video> se monta en el DOM.
   // Usar videoRef.current directamente no funciona porque los refs no
@@ -19,6 +20,7 @@ export function usePlayerEngine() {
     if (el && !engineRef.current) {
       const engine = new CinelarPlayerEngine(el);
       engineRef.current = engine;
+      setEngineReady(true);
 
       engine.on('playing', () => setIsPlaying(true));
       engine.on('paused', () => setIsPlaying(false));
@@ -44,5 +46,30 @@ export function usePlayerEngine() {
   const seek = useCallback((time: number) => engineRef.current?.seek(time), []);
   const setOnEnded = useCallback((fn: () => void) => { onEndedRef.current = fn; }, []);
 
-  return { attachVideo, videoRef, load, play, pause, seek, setOnEnded, isPlaying, isBuffering, duration };
+  const getEngine = useCallback(() => engineRef.current, []);
+  const getVariantTracksInfo = useCallback(() => engineRef.current?.getVariantTracksInfo() ?? null, []);
+  const getAudioTracksInfo = useCallback(() => engineRef.current?.getAudioTracksInfo() ?? null, []);
+  const selectQuality = useCallback((option: number | 'auto') => engineRef.current?.selectQuality(option), []);
+  const selectAudioTrack = useCallback((language: string, role?: string) => engineRef.current?.selectAudioTrack(language, role), []);
+  const applyPreferredAudioLanguage = useCallback((lang?: string) => engineRef.current?.applyPreferredAudioLanguage(lang), []);
+
+  return {
+    attachVideo,
+    videoRef,
+    load,
+    play,
+    pause,
+    seek,
+    setOnEnded,
+    getEngine,
+    getVariantTracksInfo,
+    getAudioTracksInfo,
+    selectQuality,
+    selectAudioTrack,
+    applyPreferredAudioLanguage,
+    engineReady,
+    isPlaying,
+    isBuffering,
+    duration,
+  };
 }

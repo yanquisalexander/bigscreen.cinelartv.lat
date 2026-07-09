@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FocusContext, setFocus, useFocusable, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusContext, setFocus, useFocusable, getCurrentFocusKey, SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation';
 import { Focusable } from '@/components/tv/Focusable';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
@@ -12,12 +12,14 @@ import { usePlayerEngine } from '@/services/player/usePlayerEngine';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { AndroidTvHomeItem } from '@/services/NativeBridge';
 import '@/components/tv/EpisodesRailElement';
+import '@/components/tv/PlayerSettingsElement';
 import {
   LucidePlay,
   LucidePause,
   LucideChevronsRight,
   LucideLoader2,
   LucideX,
+  LucideSettings,
 } from 'lucide-react';
 import type { WatchData, Segment } from '@/types/content';
 import { M3eLoadingIndicator } from "@m3e/react/loading-indicator";
@@ -33,7 +35,7 @@ const ACCENT = '#FFFFFF';
    React only re-renders this wrapper when hasFocusedChild changes (rare).
    All heavy DOM work (episode cards, scroll, animations) happens inside
    the Web Component, completely outside React's reconciliation. */
-function EpisodesRailNorigin({
+const EpisodesRailNorigin = memo(function EpisodesRailNorigin({
   episodes,
   currentIndex,
   expanded,
@@ -98,7 +100,62 @@ function EpisodesRailNorigin({
       </div>
     </FocusContext.Provider>
   );
-}
+});
+
+/* Wrapper del panel de ajustes de reproducción (calidad + audio).
+   Igual que el rail: React solo registra el nodo padre en norigin y pasa
+   el engine al Web Component. El WC consulta las pistas directamente a
+   Shaka y aplica los cambios sin re-renderizar React. */
+const PlayerSettingsNorigin = memo(function PlayerSettingsNorigin({
+  engine,
+  open,
+  onClose,
+}: {
+  engine: any;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const settingsRef = useRef<any>(null);
+
+  const { ref: noriginRef, focusKey } = useFocusable({
+    focusKey: 'player-settings',
+    trackChildren: true,
+    saveLastFocusedChild: false,
+  });
+
+  useEffect(() => {
+    if (settingsRef.current) {
+      settingsRef.current.engine = engine;
+      settingsRef.current.open = open;
+    }
+  }, [engine, open]);
+
+  // Al cerrar el panel, devolver el foco a un nodo válido (el engranaje)
+  // para no dejar a norigin sin foco y bloquear la navegación remota.
+  useEffect(() => {
+    if (!open) {
+      SpatialNavigation.setFocus('watch-settings');
+    }
+  }, [open]);
+
+  // Cerrar con Back cuando el panel tiene el foco (lo maneja el padre,
+  // pero el WC escucha la tecla para delegar el cierre visual).
+  useEffect(() => {
+    const el = settingsRef.current;
+    if (!el) return;
+    const onCloseEvt = () => onClose();
+    el.addEventListener('settings-close', onCloseEvt);
+    return () => el.removeEventListener('settings-close', onCloseEvt);
+  }, [onClose]);
+
+  return (
+    <FocusContext.Provider value={focusKey}>
+      <div ref={noriginRef as React.RefObject<HTMLDivElement>} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+        <tv-player-settings ref={settingsRef} open={open} />
+      </div>
+    </FocusContext.Provider>
+  );
+});
 
 // Cada cuánto se re-evalúan segmentos / next-episode / progreso "lógico".
 // No afecta el suavizado visual de la seekbar, que corre por rAF aparte.
@@ -111,7 +168,7 @@ export function WatchScreen() {
   const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
   const toast = useToastStore();
 
-  const { attachVideo, videoRef, load, play, pause, seek, setOnEnded, isPlaying, isBuffering, duration } = usePlayerEngine();
+  const { attachVideo, videoRef, load, play, pause, seek, setOnEnded, getEngine, engineReady, applyPreferredAudioLanguage, isPlaying, isBuffering, duration } = usePlayerEngine();
   const [watchData, setWatchData] = useState<WatchData | null>(null);
   const [showControls, setShowControls] = useState(true);
   const [skipSegment, setSkipSegment] = useState<Segment | null>(null);
@@ -133,6 +190,18 @@ export function WatchScreen() {
   const nextShowingRef = useRef(false);
 
   const streamUrl = watchData?.sources?.[0]?.url;
+  const ready = !!(watchData && streamUrl);
+
+  // --- Playback settings (calidad + audio) ---
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const profile = useAuthStore((s) => s.selectedProfile);
+  // Idioma preferido del usuario: perfil > navegador. Se aplica al montar.
+  const userLang = useMemo(() => {
+    const prefs = (profile?.preferences as Array<{ audio_language?: string; language?: string }> | undefined) ?? [];
+    const langPref = prefs.find((p) => p?.audio_language || p?.language);
+    const val = langPref?.audio_language ?? langPref?.language;
+    return val || (typeof navigator !== 'undefined' ? navigator.language : 'es');
+  }, [profile]);
 
   // --- Native player delegation ---
   // "Prefers modern playback" override: when enabled, always use the web player
@@ -275,13 +344,36 @@ export function WatchScreen() {
     load(streamUrl, resume).then(() => {
       if (cancelled) return;
       play();
+      // Aplicar pista de audio preferida del usuario una vez cargado el stream.
+      applyPreferredAudioLanguage(userLang);
     });
     return () => { cancelled = true; };
-  }, [streamUrl, load, play, watchData]);
+  }, [streamUrl, load, play, watchData, applyPreferredAudioLanguage, userLang]);
 
   // --- Progress reporting al backend + NativeBridge (cada 10s, sin relación con el render) ---
   useEffect(() => {
     if (!tokens || !contentId || !watchData) return;
+
+    // Precomputar una sola vez las URLs y campos estáticos: evita 5× resolveImageUrl
+    // por tick (menos allocaciones / GC cada 10s durante la reproducción).
+    const cover = resolveImageUrl(watchData.content.cover, clientEndpoint);
+    const banner = resolveImageUrl(watchData.content.banner, clientEndpoint);
+    const cwItemBase: Omit<AndroidTvHomeItem, 'progress' | 'duration'> = {
+      content_id: contentId,
+      episode_id: episodeId,
+      title: watchData.content.title,
+      description: watchData.episode?.title ?? watchData.content.description,
+      content_type: watchData.content.content_type,
+      cover,
+      cover_resized: cover,
+      banner,
+      banner_resized: banner,
+      image_url: resolveImageUrl(watchData.content.banner ?? watchData.content.cover, clientEndpoint),
+      url: `/watch/${contentId}${episodeId ? `/${episodeId}` : ''}`,
+      episode_title: watchData.season?.title && watchData.episode?.title
+        ? `${watchData.season.title} - ${watchData.episode.title}`
+        : watchData.episode?.title,
+    };
 
     progressTimerRef.current = setInterval(() => {
       const video = videoRef.current;
@@ -294,25 +386,11 @@ export function WatchScreen() {
           video.duration,
         ).catch(() => { });
 
-        const cwItem: AndroidTvHomeItem = {
-          content_id: contentId,
-          episode_id: episodeId,
-          title: watchData.content.title,
-          description: watchData.episode?.title ?? watchData.content.description,
-          content_type: watchData.content.content_type,
-          cover: resolveImageUrl(watchData.content.cover, clientEndpoint),
-          cover_resized: resolveImageUrl(watchData.content.cover, clientEndpoint),
-          banner: resolveImageUrl(watchData.content.banner, clientEndpoint),
-          banner_resized: resolveImageUrl(watchData.content.banner, clientEndpoint),
+        addContinueWatching({
+          ...cwItemBase,
           progress: Math.round(video.currentTime * 1000),
           duration: Math.round(video.duration * 1000),
-          image_url: resolveImageUrl(watchData.content.banner ?? watchData.content.cover, clientEndpoint),
-          url: `/watch/${contentId}${episodeId ? `/${episodeId}` : ''}`,
-          episode_title: watchData.season?.title && watchData.episode?.title
-            ? `${watchData.season.title} - ${watchData.episode.title}`
-            : watchData.episode?.title,
-        };
-        addContinueWatching(cwItem);
+        });
       }
     }, 10000);
 
@@ -420,6 +498,13 @@ export function WatchScreen() {
     }, 4000);
   }, []);
 
+  // Limpiar el timer de auto-hide al desmontar (evita setState post-unmount)
+  useEffect(() => {
+    return () => {
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    };
+  }, []);
+
   // Auto-hide controls when video starts playing
   useEffect(() => {
     if (isPlaying && showControls) {
@@ -449,6 +534,10 @@ export function WatchScreen() {
 
   const { handleKeyDown } = useKeyHandler({
     onBack: () => {
+      if (settingsOpen) {
+        setSettingsOpen(false);
+        return;
+      }
       if (!watchData || !streamUrl) {
         navigate(-1);
         return;
@@ -504,9 +593,16 @@ export function WatchScreen() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [handleKeyDown, showControlsTemporarily]);
 
+  // Enfocar play/pause UNA sola vez cuando el contenido está listo.
+  // (Antes se hacía setFocus en cada toggle de showControls, lo que robaba
+  //  el foco al rail y provocaba thrash de foco en el Main Thread.)
+  const readyRef = useRef(false);
   useEffect(() => {
-    if (showControls) setFocus('watch-playpause');
-  }, [showControls]);
+    if (ready && !readyRef.current) {
+      readyRef.current = true;
+      setFocus('watch-playpause');
+    }
+  }, [ready]);
 
   useEffect(() => {
     if (skipSegment) setFocus('watch-skip');
@@ -525,8 +621,6 @@ export function WatchScreen() {
       setFocus('watch-next-play');
     }
   }, [showNextCard, showControls]);
-
-  const ready = !!(watchData && streamUrl);
 
   const skipLabel = (skipSegment?.type === 'intro' || skipSegment?.segment_type === 'skip_intro')
     ? 'intro'
@@ -568,32 +662,49 @@ export function WatchScreen() {
           </div>
         )}
 
-        {/* Los controles de transporte se ocultan mientras el carrusel de episodios está abierto,
-            igual que YouTube TV deja el video en pausa/de fondo detrás de la lista */}
+        {/* Scrim superior + título + gear — siempre visibles */}
+        <div
+          className={classNames(
+            'absolute inset-x-0 top-0 transition-opacity duration-300',
+            ready ? 'opacity-100' : 'opacity-0 pointer-events-none',
+          )}
+          style={{ zIndex: 20 }}
+        >
+          <div className="bg-gradient-to-b from-black/80 via-black/30 to-transparent pt-[clamp(1.25rem,3.4vh,2rem)] pb-[clamp(2.5rem,7vh,4rem)] px-[clamp(2rem,4vw,3rem)]">
+            <div className="flex items-start justify-between gap-4">
+              <div className="mt-[clamp(1rem,3vh,1.75rem)] max-w-3xl">
+                <h1 className="text-white font-bold leading-tight" style={{ fontSize: 'clamp(1.5rem, 2.6vw, 2.2rem)' }}>
+                  {watchData?.content.title}
+                </h1>
+                {watchData?.episode && (
+                  <p className="text-white/45 text-[15px] font-medium mt-1">
+                    {isTVShow && currentSeasonNumber
+                      ? `T${currentSeasonNumber} · `
+                      : ''}
+                    {watchData.episode.title}
+                  </p>
+                )}
+              </div>
+              <Focusable
+                onEnterPress={() => setSettingsOpen((v) => !v)}
+                focusKey="watch-settings"
+                focusedClassName="ring-4 ring-white/70"
+                className="mt-[clamp(1rem,3vh,1.75rem)] w-12 h-12 rounded-full flex items-center justify-center text-white/90 border border-white/20 bg-transparent transition-all duration-200 ease-out"
+              >
+                <LucideSettings size={22} />
+              </Focusable>
+            </div>
+          </div>
+        </div>
+
+        {/* Overlay de controles: centro (play/pause) + seekbar inferior + episodios — se ocultan tras inactividad */}
         <div
           className={classNames(
             'absolute inset-0 transition-opacity duration-300',
-            ready && showControls ? 'opacity-100' : 'opacity-0 pointer-events-none',
+            ready && (showControls || settingsOpen) ? 'opacity-100' : 'opacity-0 pointer-events-none',
           )}
+          style={{ zIndex: 15 }}
         >
-          {/* Scrim superior + navegación */}
-          <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/80 via-black/30 to-transparent pt-[clamp(1.25rem,3.4vh,2rem)] pb-[clamp(2.5rem,7vh,4rem)] px-[clamp(2rem,4vw,3rem)] pointer-events-auto">
-
-
-            <div className="mt-[clamp(1rem,3vh,1.75rem)] max-w-3xl">
-              <h1 className="text-white font-bold leading-tight" style={{ fontSize: 'clamp(1.5rem, 2.6vw, 2.2rem)' }}>
-                {watchData?.content.title}
-              </h1>
-              {watchData?.episode && (
-                <p className="text-white/45 text-[15px] font-medium mt-1">
-                  {isTVShow && currentSeasonNumber
-                    ? `T${currentSeasonNumber} · `
-                    : ''}
-                  {watchData.episode.title}
-                </p>
-              )}
-            </div>
-          </div>
 
           {/* Transporte central: se desvanece suavemente cuando el foco está en la fila de episodios */}
           <div
@@ -673,10 +784,19 @@ export function WatchScreen() {
                    onExpandChange={setRailExpanded}
                    onFocusedEpisodeChange={setFocusedRailEpisode}
                  />
-               )}
+                )}
 
+</div>
           </div>
-        </div>
+
+        {/* Panel de ajustes de reproducción (calidad + audio) — fuera del overlay para que siempre sea visible */}
+        {engineReady && (
+          <PlayerSettingsNorigin
+            engine={getEngine()}
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
 
         {/* --- SKIP INTRO/RESUME (siempre visible cuando hay segmento activo) --- */}
         {skipSegment && (

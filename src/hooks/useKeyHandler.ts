@@ -8,7 +8,7 @@ export function useKeyHandler(handlers: {
   handlersRef.current = handlers;
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'XF86Back') {
+    if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'XF86Back' || e.key === 'Back') {
       e.preventDefault();
       handlersRef.current.onBack?.();
     }
