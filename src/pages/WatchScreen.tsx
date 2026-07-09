@@ -538,15 +538,19 @@ export function WatchScreen() {
         setSettingsOpen(false);
         return;
       }
-      if (!watchData || !streamUrl) {
-        navigate(-1);
+      if (railExpanded) {
+        setRailExpanded(false);
         return;
       }
       if (showControls) {
         setShowControls(false);
-      } else {
-        navigate(-1);
+        return;
       }
+      if (!watchData || !streamUrl) {
+        navigate(-1);
+        return;
+      }
+      navigate(-1);
     },
     onPlayPause: togglePlay,
   });

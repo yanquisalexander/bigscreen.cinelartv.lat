@@ -7,12 +7,14 @@ interface ToggleProps {
   focusKey: string;
   label: string;
   description?: string;
+  onArrowPress?: (direction: string) => boolean;
 }
 
-function Toggle({ checked, onChange, focusKey, label, description }: ToggleProps) {
+function Toggle({ checked, onChange, focusKey, label, description, onArrowPress }: ToggleProps) {
   const { ref, focused } = useFocusable({
     focusKey,
     onEnterPress: () => onChange(!checked),
+    onArrowPress,
   });
 
   return (
