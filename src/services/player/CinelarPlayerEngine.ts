@@ -8,6 +8,8 @@ export class CinelarPlayerEngine {
   private videoElement: HTMLVideoElement | null = null;
   private eventListeners: Map<PlayerEvent, EventCallback[]> = new Map();
 
+  private attachPromise: Promise<void> | null = null;
+
   constructor(videoElement: HTMLVideoElement) {
     this.videoElement = videoElement;
     this.initShaka();
@@ -24,7 +26,10 @@ export class CinelarPlayerEngine {
       return;
     }
 
-    this.player = new shaka.Player(this.videoElement);
+    // Crear el Player sin mediaElement y adjuntarlo con attach()
+    // (inicializarlo con mediaElement está deprecado en Shaka moderno).
+    this.player = new shaka.Player();
+    this.attachPromise = this.player.attach(this.videoElement);
 
     this.player.configure({
       streaming: {
@@ -66,6 +71,8 @@ export class CinelarPlayerEngine {
     // Para MP4 progresivo u otros formatos, usar reproducción nativa.
     if (this.player && this.isAdaptiveManifest(url)) {
       try {
+        // Asegurar que attach() terminó antes de cargar.
+        if (this.attachPromise) await this.attachPromise;
         // Pasar startTime a Shaka es la forma correcta de reanudar:
         // setear video.currentTime tras load() es sobrescrito por Shaka.
         await this.player.load(url, startTime && startTime > 0 ? startTime : undefined);

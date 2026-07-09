@@ -452,14 +452,7 @@ export function WatchScreen() {
     }
   }, [showNextCard, showControls]);
 
-  if (!watchData || !streamUrl) {
-    return (
-      <div className="w-full h-full bg-black flex flex-col items-center justify-center gap-5">
-        <M3eLoadingIndicator style={{ "--m3e-loading-indicator-active-indicator-color": "#ddd" } as any} />
-        <p className="text-white/50 text-base tracking-wide">Preparando la reproduccion…</p>
-      </div>
-    );
-  }
+  const ready = !!(watchData && streamUrl);
 
   const chapterMarks = duration > 0
     ? allSegments
@@ -471,7 +464,7 @@ export function WatchScreen() {
     ? 'intro'
     : 'resumen';
 
-  const isTVShow = watchData.content.content_type === 'TVSHOW';
+  const isTVShow = watchData?.content.content_type === 'TVSHOW';
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -479,6 +472,9 @@ export function WatchScreen() {
         ref={ref as React.RefObject<HTMLDivElement>}
         className="fixed inset-0 w-screen h-screen bg-black overflow-hidden select-none"
       >
+        {/* El <video> se monta SIEMPRE y se reutiliza entre episodios.
+            Desmontarlo (early-return) destruía el elemento al que el engine
+            estaba adjunto, dejando solo audio al cambiar de episodio. */}
         <video
           ref={attachVideo}
           className="absolute inset-0 w-full h-full block"
@@ -490,7 +486,15 @@ export function WatchScreen() {
         {/* Viñeta persistente */}
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60" />
 
-        {isBuffering && (
+        {/* Pantalla de preparación mientras se cargan los datos del episodio */}
+        {!ready && (
+          <div className="absolute inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30">
+            <M3eLoadingIndicator style={{ "--m3e-loading-indicator-active-indicator-color": "#ddd" } as any} />
+            <p className="text-white/50 text-base tracking-wide">Preparando la reproduccion…</p>
+          </div>
+        )}
+
+        {ready && isBuffering && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <LucideLoader2 size={56} className="animate-spin" style={{ color: ACCENT }} />
           </div>
@@ -501,7 +505,7 @@ export function WatchScreen() {
         <div
           className={classNames(
             'absolute inset-0 transition-opacity duration-300',
-            showControls ? 'opacity-100' : 'opacity-0 pointer-events-none',
+            ready && showControls ? 'opacity-100' : 'opacity-0 pointer-events-none',
           )}
         >
           {/* Scrim superior + navegación */}
@@ -510,9 +514,9 @@ export function WatchScreen() {
 
             <div className="mt-[clamp(1rem,3vh,1.75rem)] max-w-3xl">
               <h1 className="text-white font-bold leading-tight" style={{ fontSize: 'clamp(1.5rem, 2.6vw, 2.2rem)' }}>
-                {watchData.content.title}
+                {watchData?.content.title}
               </h1>
-              {watchData.episode && (
+              {watchData?.episode && (
                 <p className="text-white/45 text-[15px] font-medium mt-1">
                   {isTVShow && currentSeasonNumber
                     ? `T${currentSeasonNumber} · `
