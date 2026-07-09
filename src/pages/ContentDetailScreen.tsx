@@ -22,6 +22,7 @@ export function ContentDetailScreen() {
   const { contentId } = useParams<{ contentId: string }>();
   const navigate = useNavigate();
   const tokens = useAuthStore((s) => s.tokens);
+  const isGuest = useAuthStore((s) => s.isGuest);
   const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
   const [content, setContent] = useState<ContentDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,12 +46,12 @@ export function ContentDetailScreen() {
   });
 
   useEffect(() => {
-    if (!tokens || !contentId) return;
+    if ((!tokens && !isGuest) || !contentId) return;
     setLoading(true);
-    getContentById(tokens.accessToken, contentId)
+    getContentById(tokens?.accessToken ?? '', contentId)
       .then(setContent)
       .finally(() => setLoading(false));
-  }, [tokens, contentId]);
+  }, [tokens, isGuest, contentId]);
 
   // Botón físico "Atrás" del control / Escape en teclado
   useEffect(() => {
@@ -140,14 +141,14 @@ export function ContentDetailScreen() {
 
   const handlePlayEpisodeFocus = useCallback(
     (episodeId: string | number) => {
-      if (!tokens || !contentId) return;
+      if ((!tokens && !isGuest) || !contentId) return;
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
       prefetchTimerRef.current = setTimeout(() => {
         prefetchTimerRef.current = null;
-        prefetchWatchData(tokens.accessToken, contentId, episodeId);
+        prefetchWatchData(tokens?.accessToken ?? '', contentId, episodeId);
       }, 4000);
     },
-    [tokens, contentId],
+    [tokens, isGuest, contentId],
   );
 
   const handlePlayEpisode = useCallback(
@@ -171,7 +172,7 @@ export function ContentDetailScreen() {
 
   // Debounced prefetch for Play button (4s hold)
   const handlePlayFocus = useCallback(() => {
-    if (!content || !tokens) return;
+    if (!content || (!tokens && !isGuest)) return;
     const episodeId = content.continue_watching?.episode_id
       ?? (content.content_type === 'TVSHOW'
         ? content.seasons?.[0]?.episodes?.[0]?.id
@@ -179,9 +180,9 @@ export function ContentDetailScreen() {
     if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
     prefetchTimerRef.current = setTimeout(() => {
       prefetchTimerRef.current = null;
-      prefetchWatchData(tokens.accessToken, content.id, episodeId);
+      prefetchWatchData(tokens?.accessToken ?? '', content.id, episodeId);
     }, 4000);
-  }, [content, tokens]);
+  }, [content, tokens, isGuest]);
 
   const handlePlayArrow = useCallback((direction: string) => {
     if (direction === 'left') return focusSidebarFromLeftEdge(direction);

@@ -13,7 +13,8 @@ export function BootScreen() {
 
     const timer = setTimeout(() => {
       if (!isAuthenticated) {
-        navigate('/auth', { replace: true });
+        useAuthStore.getState().enterGuestMode();
+        navigate('/home', { replace: true });
       } else if (!selectedProfile) {
         navigate('/select-profile', { replace: true });
       } else {
