@@ -37,7 +37,7 @@ export function FocusableCard({
       onFocus={onFocus}
       focusKey={focusKey}
       autoFocus={autoFocus}
-      focusedClassName="!scale-105 !shadow-[0_8px_32px_rgba(0,0,0,0.6)] !border-white/50"
+      focusedClassName="!scale-105 !shadow-[0_8px_32px_rgba(0,0,0,0.6)] !border-white"
       className={classNames(
         'rounded-xl overflow-hidden shrink-0',
         'transition-transform duration-200 ease-out border-2 border-transparent focus:outline-none',

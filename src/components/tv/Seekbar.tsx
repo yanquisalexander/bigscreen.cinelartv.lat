@@ -25,44 +25,38 @@ export function Seekbar({
     const currentTimeLabelRef = useRef<HTMLSpanElement>(null);
     const trackRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
+useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
-        let rafId: number;
-        let lastWrite = 0;
+        let timerId: number | null = null;
         let lastPct = -1;
-        // ~10fps es más que suficiente para una barra de progreso y libera
-        // el Main Thread (decisivo en Chromium viejo / CPU limitada).
         const FRAME_MS = 100;
 
-        const update = (ts: number) => {
-            if (ts - lastWrite >= FRAME_MS) {
-                lastWrite = ts;
-                const dur = video.duration || 0;
-                const ct = video.currentTime;
-                const pct = dur > 0 ? (ct / dur) * 100 : 0;
+        const update = () => {
+            const dur = video.duration || 0;
+            const ct = video.currentTime;
+            const pct = dur > 0 ? (ct / dur) * 100 : 0;
 
-                // Solo tocar el DOM si el valor cambió de forma visible.
-                if (Math.abs(pct - lastPct) > 0.5) {
-                    lastPct = pct;
-                    let bufferedEnd = 0;
-                    if (video.buffered.length > 0) {
-                        bufferedEnd = video.buffered.end(video.buffered.length - 1);
-                    }
-                    const bufferedPct = dur > 0 ? (bufferedEnd / dur) * 100 : 0;
-
-                    if (fillRef.current) fillRef.current.style.width = `${pct}%`;
-                    if (bufferedRef.current) bufferedRef.current.style.width = `${bufferedPct}%`;
-                    if (thumbRef.current) thumbRef.current.style.left = `${pct}%`;
-                    if (currentTimeLabelRef.current) currentTimeLabelRef.current.textContent = formatTime(ct);
+            // Solo tocar el DOM si el valor cambió de forma visible.
+            if (Math.abs(pct - lastPct) > 0.5) {
+                lastPct = pct;
+                let bufferedEnd = 0;
+                if (video.buffered.length > 0) {
+                    bufferedEnd = video.buffered.end(video.buffered.length - 1);
                 }
+                const bufferedPct = dur > 0 ? (bufferedEnd / dur) * 100 : 0;
+
+                if (fillRef.current) fillRef.current.style.width = `${pct}%`;
+                if (bufferedRef.current) bufferedRef.current.style.width = `${bufferedPct}%`;
+                if (thumbRef.current) thumbRef.current.style.left = `${pct}%`;
+                if (currentTimeLabelRef.current) currentTimeLabelRef.current.textContent = formatTime(ct);
             }
-            rafId = requestAnimationFrame(update);
+            timerId = window.setTimeout(update, FRAME_MS);
         };
 
-        rafId = requestAnimationFrame(update);
-        return () => cancelAnimationFrame(rafId);
+        timerId = window.setTimeout(update, FRAME_MS);
+        return () => { if (timerId) clearTimeout(timerId); };
     }, [videoRef]);
 
     return (

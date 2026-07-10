@@ -77,7 +77,7 @@ export function TVSidebar() {
                 focusKey={`nav-${item.key}`}
                 focusedClassName="bg-white !text-black"
                 className={classNames(
-                  'flex h-12 items-center gap-4 rounded-full px-3 text-base font-medium',
+                  'flex h-12 items-center gap-4 rounded-xl px-3 text-base font-medium',
                   hasFocusedChild ? 'justify-start' : 'justify-center',
                   isActive ? 'text-white' : 'text-white/70',
                 )}
@@ -102,7 +102,7 @@ export function TVSidebar() {
           focusKey="nav-settings"
           focusedClassName="bg-white !text-black"
           className={classNames(
-            'flex h-12 items-center gap-4 rounded-full px-3 text-base font-medium mb-1',
+            'flex h-12 items-center gap-4 rounded-xl px-3 text-base font-medium mb-1',
             hasFocusedChild ? 'justify-start' : 'justify-center',
             'text-white/70',
           )}
@@ -128,7 +128,7 @@ export function TVSidebar() {
             focusKey="nav-login"
             focusedClassName="bg-white !text-black"
             className={classNames(
-              'flex h-12 items-center gap-4 rounded-full px-3 text-base font-medium mb-1',
+              'flex h-12 items-center gap-4 rounded-xl px-3 text-base font-medium mb-1',
               hasFocusedChild ? 'justify-start' : 'justify-center',
               'text-white/70',
             )}
@@ -154,7 +154,7 @@ export function TVSidebar() {
             focusKey="nav-profile"
             focusedClassName="bg-white !text-black [&_span]:text-black"
             className={classNames(
-              'flex h-12 items-center gap-3 rounded-full px-2',
+              'flex h-12 items-center gap-3 rounded-xl px-2',
               hasFocusedChild ? 'justify-start' : 'justify-center',
             )}
           >
