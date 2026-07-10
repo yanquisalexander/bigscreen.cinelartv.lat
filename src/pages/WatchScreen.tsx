@@ -432,15 +432,15 @@ export function WatchScreen() {
         if (shouldShow && !nextShowingRef.current) {
           nextShowingRef.current = true;
           setShowNextCard(true);
-          
+
           let countdown = 10;
           if (nextCountdownRef.current) nextCountdownRef.current.innerText = `${countdown}s`;
-          
+
           if (nextTimerRef.current) clearInterval(nextTimerRef.current);
           nextTimerRef.current = setInterval(() => {
             countdown--;
             if (nextCountdownRef.current) nextCountdownRef.current.innerText = `${countdown}s`;
-            
+
             if (countdown <= 0) {
               if (nextTimerRef.current) clearInterval(nextTimerRef.current);
               nextShowingRef.current = false;
@@ -693,7 +693,7 @@ export function WatchScreen() {
               <Focusable
                 onEnterPress={() => setSettingsOpen((v) => !v)}
                 focusKey="watch-settings"
-                focusedClassName="ring-4 ring-white/70"
+                focusedClassName="ring-4 ring-white"
                 className="mt-[clamp(1rem,3vh,1.75rem)] w-12 h-12 rounded-full flex items-center justify-center text-white/90 border border-white/20 bg-transparent transition-all duration-200 ease-out pointer-events-auto"
               >
                 <LucideSettings size={22} />
@@ -732,17 +732,17 @@ export function WatchScreen() {
               railExpanded ? 'h-[clamp(80px,12vh,110px)]' : 'h-[clamp(44px,6vh,52px)]',
             )}>
               {/* Vista seekbar: se actualiza por DOM/rAF, fuera de React state */}
-               <Focusable
-                 onEnterPress={togglePlay}
-                 focusKey="watch-progress"
-                 focusedClassName="scale-101"
-                 className={classNames(
-                   'absolute inset-0 transition-opacity transition-transform duration-300',
-                   railExpanded ? 'opacity-0 translate-y-3 pointer-events-none' : 'opacity-100 translate-y-0',
-                 )}
-               >
-                 <Seekbar videoRef={videoRef} duration={duration} />
-               </Focusable>
+              <Focusable
+                onEnterPress={togglePlay}
+                focusKey="watch-progress"
+                focusedClassName="scale-101"
+                className={classNames(
+                  'absolute inset-0 transition-opacity transition-transform duration-300',
+                  railExpanded ? 'opacity-0 translate-y-3 pointer-events-none' : 'opacity-100 translate-y-0',
+                )}
+              >
+                <Seekbar videoRef={videoRef} duration={duration} />
+              </Focusable>
 
 
               {/* Vista expandida: título + descripción del episodio resaltado en la fila */}
@@ -768,21 +768,21 @@ export function WatchScreen() {
               </div>
             </div>
 
-               {/* Fila de episodios: siempre visible junto con los controles (estilo YouTube TV),
+            {/* Fila de episodios: siempre visible junto con los controles (estilo YouTube TV),
                    se agranda levemente cuando el foco entra en ella */}
-               {isTVShow && episodesWithThumb.length > 0 && (
-                 <EpisodesRailNorigin
-                   episodes={episodesWithThumb}
-                   currentIndex={currentEpisodeIndex}
-                   expanded={railExpanded}
-                   onSelect={navigateToEpisode}
-                   onExpandChange={setRailExpanded}
-                   onFocusedEpisodeChange={setFocusedRailEpisode}
-                 />
-                )}
+            {isTVShow && episodesWithThumb.length > 0 && (
+              <EpisodesRailNorigin
+                episodes={episodesWithThumb}
+                currentIndex={currentEpisodeIndex}
+                expanded={railExpanded}
+                onSelect={navigateToEpisode}
+                onExpandChange={setRailExpanded}
+                onFocusedEpisodeChange={setFocusedRailEpisode}
+              />
+            )}
 
-</div>
           </div>
+        </div>
 
         {/* Panel de ajustes de reproducción (calidad + audio) — fuera del overlay para que siempre sea visible */}
         {engineReady && (
@@ -833,10 +833,10 @@ export function WatchScreen() {
                 </span>
               </div>
 
-                  <div className="flex items-center gap-2 ml-1">
-                    <span ref={nextCountdownRef} className="text-white/70 text-xs font-semibold tabular-nums bg-white/[0.08] px-2 py-1 rounded-lg">
-                      10s
-                    </span>
+              <div className="flex items-center gap-2 ml-1">
+                <span ref={nextCountdownRef} className="text-white/70 text-xs font-semibold tabular-nums bg-white/[0.08] px-2 py-1 rounded-lg">
+                  10s
+                </span>
 
 
                 <Focusable

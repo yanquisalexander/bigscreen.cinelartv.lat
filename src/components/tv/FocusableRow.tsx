@@ -24,7 +24,7 @@ export function FocusableRow({ title, children, className = '', focusKey, prefer
   // bring the row itself into view in whatever ancestor scrolls vertically.
   useEffect(() => {
     if (hasFocusedChild) {
-      scrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      scrollRef.current?.scrollIntoView({ behavior: 'auto', block: 'nearest' });
     }
   }, [hasFocusedChild]);
 
@@ -65,7 +65,7 @@ export function FocusableRow({ title, children, className = '', focusKey, prefer
             (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
             (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
           }}
-          className="flex gap-[clamp(0.5rem,1vw,0.75rem)] px-[clamp(3rem,7.5vw,6rem)] overflow-x-auto hide-scrollbar py-[clamp(0.375rem,1vh,0.5rem)] scroll-smooth"
+          className="flex gap-[clamp(0.5rem,1vw,0.75rem)] px-[clamp(3rem,7.5vw,6rem)] overflow-x-auto hide-scrollbar py-[clamp(0.375rem,1vh,0.5rem)]"
         >
           {children}
         </div>

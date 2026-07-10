@@ -185,7 +185,7 @@ export function HomeScreen() {
                     key={catIdx}
                     title={category.title}
                     focusKey={`home-row-${catIdx}`}
-                    className="scroll-smooth"
+                    className=""
                     preferredChildFocusKey={
                       category.content?.[0]?.id != null ? `home-row-${catIdx}-item-${category.content[0].id}` : undefined
                     }
