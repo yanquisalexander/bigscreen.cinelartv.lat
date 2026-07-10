@@ -107,7 +107,7 @@ function flattenCascadeLayers(css: string): string {
 }
 
 function stripRegisteredProperties(css: string): string {
-  return css.replace(/@property\s+--[^{]+{[^}]*}/g, '')
+  return css.replace(/@property\s+--(?!tw-)[^{]+{[^}]*}/g, '')
 }
 
 function legacyCssPlugin(): Plugin {
