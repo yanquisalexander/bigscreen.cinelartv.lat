@@ -68,53 +68,10 @@ export function BlockedScreen() {
             >
                 {cfg.message || 'Esta aplicación no está disponible en tu ubicación actual.'}
             </p>
-            <div
-                ref={buttonRef}
-                tabIndex={0}
-                role="button"
-                aria-label="Reintentar"
-                onClick={() => handleRetry(false)}
-                onKeyDown={(e) => handleKeyDown(e, false)}
-                style={{
-                    padding: '16px 48px',
-                    fontSize: '22px',
-                    fontWeight: 'bold',
-                    color: '#000000',
-                    backgroundColor: '#ffffff',
-                    borderRadius: '999px',
-                    cursor: 'pointer',
-                    outline: 'none',
-                    border: '3px solid transparent',
-                    marginBottom: '16px',
-                    opacity: loading ? 0.5 : 1,
-                }}
-                onFocus={(e) => {
-                    (e.target as HTMLElement).style.borderColor = '#ffffff';
-                    (e.target as HTMLElement).style.boxShadow = '0 0 0 4px rgba(255,255,255,0.3)';
-                }}
-                onBlur={(e) => {
-                    (e.target as HTMLElement).style.borderColor = 'transparent';
-                    (e.target as HTMLElement).style.boxShadow = 'none';
-                }}
-            >
-                {loading ? 'Comprobando…' : 'Reintentar'}
-            </div>
-            <div
-                tabIndex={0}
-                role="button"
-                aria-label="Borrar caché y reintentar"
-                onClick={() => handleRetry(true)}
-                onKeyDown={(e) => handleKeyDown(e, true)}
-                style={{
-                    fontSize: '18px',
-                    color: '#4da3ff',
-                    cursor: 'pointer',
-                    outline: 'none',
-                    opacity: loading ? 0.5 : 1,
-                }}
-            >
-                Borrar caché y reintentar
-            </div>
+
+            <pre className="bg-zinc-800 !font-mono text-white p-4 mt-8" style={{ maxWidth: '600px', overflowX: 'auto' }}>
+                ERR_GEO_BLOCKED
+            </pre>
         </div>
     );
 }

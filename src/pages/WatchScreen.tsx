@@ -666,15 +666,16 @@ export function WatchScreen() {
           </div>
         )}
 
-        {/* Scrim superior + título + gear — siempre visibles */}
+        {/* Overlay de controles: scrim superior + centro (play/pause) + seekbar inferior + episodios — se ocultan tras inactividad */}
         <div
           className={classNames(
-            'absolute inset-x-0 top-0 transition-opacity duration-300',
-            ready ? 'opacity-100' : 'opacity-0 pointer-events-none',
+            'absolute inset-0 transition-opacity duration-300',
+            ready && showControls ? 'opacity-100' : 'opacity-0 pointer-events-none',
           )}
-          style={{ zIndex: 20 }}
+          style={{ zIndex: 15 }}
         >
-          <div className="bg-gradient-to-b from-black/80 via-black/30 to-transparent pt-[clamp(1.25rem,3.4vh,2rem)] pb-[clamp(2.5rem,7vh,4rem)] px-[clamp(2rem,4vw,3rem)]">
+          {/* Scrim superior + título + gear */}
+          <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/80 via-black/30 to-transparent pt-[clamp(1.25rem,3.4vh,2rem)] pb-[clamp(2.5rem,7vh,4rem)] px-[clamp(2rem,4vw,3rem)] pointer-events-auto">
             <div className="flex items-start justify-between gap-4">
               <div className="mt-[clamp(1rem,3vh,1.75rem)] max-w-3xl">
                 <h1 className="text-white font-bold leading-tight" style={{ fontSize: 'clamp(1.5rem, 2.6vw, 2.2rem)' }}>
@@ -693,22 +694,12 @@ export function WatchScreen() {
                 onEnterPress={() => setSettingsOpen((v) => !v)}
                 focusKey="watch-settings"
                 focusedClassName="ring-4 ring-white/70"
-                className="mt-[clamp(1rem,3vh,1.75rem)] w-12 h-12 rounded-full flex items-center justify-center text-white/90 border border-white/20 bg-transparent transition-all duration-200 ease-out"
+                className="mt-[clamp(1rem,3vh,1.75rem)] w-12 h-12 rounded-full flex items-center justify-center text-white/90 border border-white/20 bg-transparent transition-all duration-200 ease-out pointer-events-auto"
               >
                 <LucideSettings size={22} />
               </Focusable>
             </div>
           </div>
-        </div>
-
-        {/* Overlay de controles: centro (play/pause) + seekbar inferior + episodios — se ocultan tras inactividad */}
-        <div
-          className={classNames(
-            'absolute inset-0 transition-opacity duration-300',
-            ready && (showControls || settingsOpen) ? 'opacity-100' : 'opacity-0 pointer-events-none',
-          )}
-          style={{ zIndex: 15 }}
-        >
 
           {/* Transporte central: se desvanece suavemente cuando el foco está en la fila de episodios */}
           <div
