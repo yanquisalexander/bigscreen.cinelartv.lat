@@ -6,11 +6,11 @@ import { useConfigStore } from '@/stores/configStore';
 import { deassignProfile } from '@/features/auth/session';
 import { classNames } from '@/utils/helpers';
 import { LucideSearch, LucideTelescope, LucideTv, LucideSettings, LucideLogIn } from "lucide-react";
-
+import { CollectionsEmptyRegular, CollectionsRegular, SearchFilled, SearchRegular, SettingsRegular, TvRegular } from "@fluentui/react-icons";
 const NAV_ITEMS = [
-  { key: 'home', label: 'Inicio', icon: LucideTelescope, path: '/home' },
-  { key: 'search', label: 'Buscar', icon: LucideSearch, path: '/search' },
-  { key: 'live', label: 'TV en Vivo', icon: LucideTv, path: '/live' },
+  { key: 'home', label: 'Inicio', icon: CollectionsEmptyRegular, path: '/home' },
+  { key: 'search', label: 'Buscar', icon: SearchFilled, path: '/search' },
+  { key: 'live', label: 'TV en Vivo', icon: TvRegular, path: '/live' },
   //{ key: 'my-list', label: 'Mi Lista', icon: LucideTelescope, path: '/my-list' },
 ];
 
@@ -107,7 +107,7 @@ export function TVSidebar() {
             'text-white/70',
           )}
         >
-          <LucideSettings className="text-2xl" />
+          <SettingsRegular className="text-2xl" />
           <span
             className={classNames(
               'truncate whitespace-nowrap',
