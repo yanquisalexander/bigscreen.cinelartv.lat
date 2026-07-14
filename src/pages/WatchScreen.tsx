@@ -27,8 +27,17 @@ import { useToastStore } from "@/stores/toastStore";
 import { Seekbar } from '@/components/tv/Seekbar';
 import type { FlatEpisode } from '@/components/tv/RailEpisodeItem';
 import type { EpisodeWithThumb } from '@/components/tv/EpisodesRailElement';
+import { fetchVast } from '@/services/player/vast-client';
+import '@/components/tv/AdOverlayElement';
+import type { VastAd } from '@/types/vast';
 
 const ACCENT = '#FFFFFF';
+
+const AD_PREROLL_TAG = 'https://pubads.g.doubleclick.net/gampad/live/ads?iu=/22530741549/CTV_VAST_ADS&description_url=[DESCRIPTION_URL]&tfcd=0&npa=0&sz=400x300%7C640x480&gdfp_req=1&unviewed_position_start=1&output=vast&env=vp&impl=s&correlator=[CACHEBUSTER]';
+const AD_MIDROLL_TAG = 'https://pubads.g.doubleclick.net/gampad/live/ads?iu=/22530741549/CTV_VAST_ADS&description_url=[DESCRIPTION_URL]&tfcd=0&npa=0&sz=400x300%7C640x480&gdfp_req=1&unviewed_position_start=1&output=vast&env=vp&impl=s&correlator=[CACHEBUSTER]';
+const AD_POSTROLL_TAG = 'https://youradexchange.com/video/select.php?r=11621170';
+const AD_MIDROLL_INTERVAL = 1200;
+const AD_SKIP_OFFSET = 5;
 
 /* Thin React wrapper that bridges norigin-spatial-navigation with the
    vanilla-JS <tv-player-episodes-rail> Web Component.
@@ -157,6 +166,56 @@ const PlayerSettingsNorigin = memo(function PlayerSettingsNorigin({
   );
 });
 
+/* Wrapper del overlay de anuncios VAST.
+   React solo sincroniza la propiedad `ad` del Web Component y escucha
+   el evento `ad-complete` para notificar al padre. Toda la lógica de
+   reproducción, tracking y D-pad vive dentro del Web Component. */
+const AdOverlayNorigin = memo(function AdOverlayNorigin({
+  ad,
+  skipOffset,
+  onComplete,
+}: {
+  ad: VastAd | null;
+  skipOffset: number;
+  onComplete: () => void;
+}) {
+  const overlayRef = useRef<any>(null);
+  const { ref: noriginRef, focusKey } = useFocusable({
+    focusKey: 'ad-overlay',
+    trackChildren: true,
+  });
+
+  // Adjuntar el ad al WC y escuchar 'ad-complete' en el MISMO efecto que
+  // depende de `ad`. Si solo escucháramos [onComplete] (estable), el listener
+  // se registraría una sola vez al montar, cuando el <tv-ad-overlay> todavía
+  // no existe, y el evento 'ad-complete' nunca llegaría → overlay congelado.
+  useEffect(() => {
+    const el = overlayRef.current;
+    if (!el) return;
+    el.ad = ad;
+    const onAdComplete = () => onComplete();
+    el.addEventListener('ad-complete', onAdComplete);
+    return () => el.removeEventListener('ad-complete', onAdComplete);
+  }, [ad, onComplete]);
+
+  if (!ad) return null;
+
+  // El wrapper se registra en norigin con focusKey 'ad-overlay' (idéntico a
+  // FOCUS_KEY_ROOT del WC) y trackChildren, para que los botones del ad
+  // (skip/mute) sean hijos de este nodo y la navegación D-pad funcione. Al
+  // cerrarse el ad, el WC elimina sus focusables y el foco vuelve al padre.
+  return (
+    <FocusContext.Provider value={focusKey}>
+      <div
+        ref={noriginRef as React.RefObject<HTMLDivElement>}
+        style={{ position: 'fixed', inset: 0, zIndex: 50 }}
+      >
+        <tv-ad-overlay ref={overlayRef} skip-offset={String(skipOffset)} />
+      </div>
+    </FocusContext.Provider>
+  );
+});
+
 // Cada cuánto se re-evalúan segmentos / next-episode / progreso "lógico".
 // No afecta el suavizado visual de la seekbar, que corre por rAF aparte.
 const LOGIC_TICK_MS = 1000;
@@ -195,6 +254,18 @@ export function WatchScreen() {
   // --- Playback settings (calidad + audio) ---
   const [settingsOpen, setSettingsOpen] = useState(false);
   const profile = useAuthStore((s) => s.selectedProfile);
+
+  // --- Ad state ---
+  const [currentAd, setCurrentAd] = useState<VastAd | null>(null);
+  const [adPhase, setAdPhase] = useState<'none' | 'preroll' | 'midroll' | 'postroll'>('none');
+  const midrollTriggeredRef = useRef(new Set<number>());
+  const adResumeTimeRef = useRef(0);
+  const adPhaseRef = useRef<'none' | 'preroll' | 'midroll' | 'postroll'>('none');
+
+  // Sync adPhaseRef with adPhase state (for use in interval callbacks)
+  useEffect(() => {
+    adPhaseRef.current = adPhase;
+  }, [adPhase]);
   // Idioma preferido del usuario: perfil > navegador. Se aplica al montar.
   const userLang = useMemo(() => {
     const prefs = (profile?.preferences as Array<{ audio_language?: string; language?: string }> | undefined) ?? [];
@@ -293,11 +364,22 @@ export function WatchScreen() {
   // --- Sincronizar handler de "ended" con el Engine ---
   useEffect(() => {
     setOnEnded(() => {
-      if (nextEpisode) {
-        navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
-      } else {
-        navigate(-1);
-      }
+      // Try postroll ad before navigating
+      fetchVast(AD_POSTROLL_TAG).then((ad) => {
+        if (ad) {
+          pendingNavigationRef.current = nextEpisode
+            ? { contentId: contentId!, episodeId: nextEpisode.id }
+            : { contentId: contentId! };
+          setCurrentAd(ad);
+          setAdPhase('postroll');
+        } else {
+          if (nextEpisode) {
+            navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
+          } else {
+            navigate(-1);
+          }
+        }
+      });
     });
   }, [setOnEnded, nextEpisode, contentId, navigate]);
 
@@ -333,22 +415,44 @@ export function WatchScreen() {
       });
   }, [tokens, contentId, episodeId, navigate]);
 
-  // --- Cargar el stream en el Engine cuando el <video> ya está montado ---
-  // Debe correr en un efecto (no dentro del .then de la carga de datos)
-  // porque el elemento <video> solo se monta tras el setWatchData, y el
-  // engine se crea vía callback ref en ese commit.
+  // --- Preroll + midroll/postroll ad state ---
+  const [prerollChecked, setPrerollChecked] = useState(false);
+  const pendingNavigationRef = useRef<{ contentId: string; episodeId?: string } | null>(null);
+
+  // Reset ad state on content change
   useEffect(() => {
-    if (!streamUrl) return;
+    setPrerollChecked(false);
+    setAdPhase('none');
+    setCurrentAd(null);
+    midrollTriggeredRef.current.clear();
+  }, [contentId, episodeId]);
+
+  // --- Preroll: fetch VAST before loading the stream ---
+  useEffect(() => {
+    if (!streamUrl || prerollChecked || adPhase !== 'none') return;
+    fetchVast(AD_PREROLL_TAG).then((ad) => {
+      setPrerollChecked(true);
+      if (ad) {
+        setAdPhase('preroll');
+        setCurrentAd(ad);
+      }
+    });
+  }, [streamUrl, prerollChecked, adPhase]);
+
+  // --- Cargar el stream en el Engine cuando el <video> ya está montado ---
+  // Solo se carga cuando no hay un ad reproduciéndose (adPhase === 'none')
+  // y el preroll ya fue verificado.
+  useEffect(() => {
+    if (!streamUrl || adPhase !== 'none' || !prerollChecked) return;
     let cancelled = false;
     const resume = watchData?.continue_watching?.progress ?? 0;
     load(streamUrl, resume).then(() => {
       if (cancelled) return;
       play();
-      // Aplicar pista de audio preferida del usuario una vez cargado el stream.
       applyPreferredAudioLanguage(userLang);
     });
     return () => { cancelled = true; };
-  }, [streamUrl, load, play, watchData, applyPreferredAudioLanguage, userLang]);
+  }, [streamUrl, load, play, watchData, applyPreferredAudioLanguage, userLang, adPhase, prerollChecked]);
 
   // --- Progress reporting al backend + NativeBridge (cada 10s, sin relación con el render) ---
   useEffect(() => {
@@ -421,6 +525,25 @@ export function WatchScreen() {
         return active ?? null;
       });
 
+      // Midroll: check if we've passed a midroll threshold
+      if (adPhaseRef.current === 'none' && dur > 0) {
+        const midrollBucket = Math.floor(ct / AD_MIDROLL_INTERVAL);
+        if (midrollBucket > 0 && !midrollTriggeredRef.current.has(midrollBucket)) {
+          midrollTriggeredRef.current.add(midrollBucket);
+          adResumeTimeRef.current = ct;
+          pause();
+          fetchVast(AD_MIDROLL_TAG).then((ad) => {
+            if (ad) {
+              setCurrentAd(ad);
+              setAdPhase('midroll');
+            } else {
+              // No midroll ad available, resume playback
+              play();
+            }
+          });
+        }
+      }
+
       // Next episode: por segmento explícito o cercanía al final
       if (nextEpisode) {
         const nextEpSegment = allSegments.find(
@@ -487,6 +610,32 @@ export function WatchScreen() {
     seek(end);
     setSkipSegment(null);
   }, [skipSegment, seek]);
+
+  const handleAdComplete = useCallback(() => {
+    const prevPhase = adPhaseRef.current;
+    setCurrentAd(null);
+    setAdPhase('none');
+
+    // Restaurar el foco del reproductor: al cerrar el ad, el WC elimina sus
+    // focusables y norigin queda sin nodo enfocado, lo que bloquea el D-pad.
+    // Devolver el foco al play/pause recupera la navegación del player.
+    setFocus('watch-playpause');
+
+    if (prevPhase === 'postroll' && pendingNavigationRef.current) {
+      const nav = pendingNavigationRef.current;
+      pendingNavigationRef.current = null;
+      if (nav.episodeId) {
+        navigate(`/watch/${nav.contentId}/${nav.episodeId}`, { replace: true });
+      } else {
+        navigate(-1);
+      }
+    } else if (prevPhase === 'midroll') {
+      const resumeTime = adResumeTimeRef.current;
+      play().then(() => {
+        if (resumeTime > 0) seek(resumeTime);
+      });
+    }
+  }, [navigate, play, seek]);
 
   const showControlsTemporarily = useCallback(() => {
     setShowControls(true);
@@ -860,6 +1009,13 @@ export function WatchScreen() {
             </div>
           </div>
         )}
+
+        {/* --- AD OVERLAY --- */}
+        <AdOverlayNorigin
+          ad={currentAd}
+          skipOffset={AD_SKIP_OFFSET}
+          onComplete={handleAdComplete}
+        />
 
       </div>
     </FocusContext.Provider>

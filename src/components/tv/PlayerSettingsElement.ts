@@ -1,4 +1,5 @@
 import { SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusableRegistrar } from './spatialFocus';
 
 interface QualityInfo {
   auto: boolean;
@@ -23,7 +24,7 @@ const PARENT_FOCUS_KEY = 'player-settings';
 class PlayerSettingsElement extends HTMLElement {
   private _engine: EngineLike | null = null;
   private _open = false;
-  private _registeredKeys: string[] = [];
+  private _registrar = new FocusableRegistrar();
   private _quality: QualityInfo | null = null;
   private _audio: AudioInfo[] | null = null;
 
@@ -102,42 +103,30 @@ class PlayerSettingsElement extends HTMLElement {
   }
 
   private registerFocusables() {
-    this.unregisterFocusables();
-    const items = this.collectItems();
-    items.forEach((item) => {
+    const items = this.collectItems().map((item) => {
       const el = this.querySelector(`[data-set-key="${item.key}"]`) as HTMLElement | null;
-      if (!el) return;
-      this._registeredKeys.push(item.key);
-      SpatialNavigation.addFocusable({
+      if (!el) return null;
+      return {
         focusKey: item.key,
         node: el,
         parentFocusKey: PARENT_FOCUS_KEY,
-        focusable: true,
-        trackChildren: false,
-        saveLastFocusedChild: false,
-        isFocusBoundary: false,
-        autoRestoreFocus: true,
-        forceFocus: false,
         onEnterPress: () => item.activate(),
-        onEnterRelease: () => {},
         onArrowPress: () => true,
-        onArrowRelease: () => {},
         onFocus: () => {
           el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         },
-        onBlur: () => {},
         onUpdateFocus: (focused: boolean) => {
           el.style.background = focused ? 'rgba(255,255,255,0.12)' : 'transparent';
           el.style.fontWeight = focused ? '600' : '400';
         },
-        onUpdateHasFocusedChild: () => {},
-      });
-    });
+      };
+    }).filter((x): x is NonNullable<typeof x> => x !== null);
+
+    this._registrar.register(items);
   }
 
   private unregisterFocusables() {
-    this._registeredKeys.forEach((key) => SpatialNavigation.removeFocusable({ focusKey: key }));
-    this._registeredKeys = [];
+    this._registrar.unregisterAll();
   }
 
   private collectItems(): {

@@ -5,8 +5,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
 import { deassignProfile } from '@/features/auth/session';
 import { classNames } from '@/utils/helpers';
-import { LucideSearch, LucideTelescope, LucideTv, LucideSettings, LucideLogIn } from "lucide-react";
-import { CollectionsEmptyRegular, CollectionsRegular, SearchFilled, SearchRegular, SettingsRegular, TvRegular } from "@fluentui/react-icons";
+import { LucideLogIn } from "lucide-react";
+import { CollectionsEmptyRegular, SearchFilled, SettingsRegular, TvRegular } from "@fluentui/react-icons";
 const NAV_ITEMS = [
   { key: 'home', label: 'Inicio', icon: CollectionsEmptyRegular, path: '/home' },
   { key: 'search', label: 'Buscar', icon: SearchFilled, path: '/search' },

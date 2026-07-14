@@ -1,4 +1,10 @@
-import 'core-js/stable';
+// NOTE: `core-js/stable` was removed intentionally.
+// `compat.ts` gates the whole app to Chrome >= 80, which natively supports
+// every ES2015+ feature core-js would polyfill (Promise, Map, Set, Symbol,
+// Object.assign, padStart, flatMap, fromEntries, fetch, AbortController...).
+// Shipping the full core-js bundle was ~100KB+ of pure dead weight on TV
+// WebViews and delayed first paint. Only the few genuinely-missing APIs are
+// polyfilled below, each feature-detected so they are no-ops on modern TVs.
 import 'whatwg-fetch';
 import 'abortcontroller-polyfill/dist/abortcontroller-polyfill-only';
 import ResizeObserverPolyfill from 'resize-observer-polyfill';

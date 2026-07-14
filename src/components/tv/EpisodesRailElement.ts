@@ -1,4 +1,4 @@
-import { SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusableRegistrar } from './spatialFocus';
 import type { FlatEpisode } from './RailEpisodeItem';
 
 export type EpisodeWithThumb = { ep: FlatEpisode; thumbUrl: string | null | undefined };
@@ -10,7 +10,7 @@ class EpisodesRailElement extends HTMLElement {
   private _currentIndex = -1;
   private _expanded = false;
   private _seasonCount = 0;
-  private _registeredKeys: string[] = [];
+  private _registrar = new FocusableRegistrar();
 
   static get observedAttributes() {
     return ['expanded', 'current-index'];
@@ -178,22 +178,13 @@ class EpisodesRailElement extends HTMLElement {
   }
 
   private registerFocusables() {
-    this._episodes.forEach((item) => {
+    const items = this._episodes.map((item) => {
       const el = this.querySelector(`[data-id="${item.ep.id}"]`) as HTMLElement | null;
-      if (!el) return;
-      const focusKey = `rail-ep-item-${item.ep.id}`;
-      this._registeredKeys.push(focusKey);
-
-      SpatialNavigation.addFocusable({
-        focusKey,
+      if (!el) return null;
+      return {
+        focusKey: `rail-ep-item-${item.ep.id}`,
         node: el,
         parentFocusKey: PARENT_FOCUS_KEY,
-        focusable: true,
-        trackChildren: false,
-        saveLastFocusedChild: false,
-        isFocusBoundary: false,
-        autoRestoreFocus: true,
-        forceFocus: false,
         onEnterPress: () => {
           this.dispatchEvent(
             new CustomEvent('episode-selected', {
@@ -203,9 +194,7 @@ class EpisodesRailElement extends HTMLElement {
             }),
           );
         },
-        onEnterRelease: () => {},
         onArrowPress: () => true,
-        onArrowRelease: () => {},
         onFocus: () => {
           el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
           this.dispatchEvent(
@@ -216,7 +205,6 @@ class EpisodesRailElement extends HTMLElement {
             }),
           );
         },
-        onBlur: () => {},
         onUpdateFocus: (focused: boolean) => {
           const card = el.querySelector('[data-ep-card]') as HTMLElement | null;
           if (card) {
@@ -227,14 +215,14 @@ class EpisodesRailElement extends HTMLElement {
           const title = el.querySelector('[data-title]') as HTMLElement | null;
           if (title) title.style.color = focused ? 'rgba(255,255,255,0.9)' : '';
         },
-        onUpdateHasFocusedChild: () => {},
-      });
-    });
+      };
+    }).filter((x): x is NonNullable<typeof x> => x !== null);
+
+    this._registrar.register(items);
   }
 
   private unregisterFocusables() {
-    this._registeredKeys.forEach((key) => SpatialNavigation.removeFocusable({ focusKey: key }));
-    this._registeredKeys = [];
+    this._registrar.unregisterAll();
   }
 
   private updateExpanded() {

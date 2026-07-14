@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useAuthStore } from '@/stores/authStore';
@@ -12,6 +12,11 @@ import { Focusable } from '@/components/tv/Focusable';
 import type { ContentItem, ExploreResponse } from '@/types/content';
 import { syncContinueWatching, syncRecommendations } from '@/services/NativeBridge';
 import type { AndroidTvHomeItem } from '@/services/NativeBridge';
+
+const progressPercent = (item: ContentItem) => {
+  if (!item.progress || !item.duration) return 0;
+  return Math.min(100, Math.round((item.progress / item.duration) * 100));
+};
 
 
 export function HomeScreen() {
@@ -80,15 +85,15 @@ export function HomeScreen() {
     navigate(`/content/${item.id}`);
   };
 
-  const progressPercent = (item: ContentItem) => {
-    if (!item.progress || !item.duration) return 0;
-    return Math.min(100, Math.round((item.progress / item.duration) * 100));
-  };
-
-  const bannerItems = data?.banner_content ?? [];
-  const firstRowFirstItemId = data?.content?.[0]?.content?.[0]?.id;
-  const firstRowFocusKey = firstRowFirstItemId != null ? `home-row-0-item-${firstRowFirstItemId}` : undefined;
-  const preferredChildFocusKey = bannerItems.length > 0 ? 'hero-section' : 'home-row-0';
+  const { bannerItems, firstRowFocusKey, preferredChildFocusKey } = useMemo(() => {
+    const banner = data?.banner_content ?? [];
+    const firstId = data?.content?.[0]?.content?.[0]?.id;
+    return {
+      bannerItems: banner,
+      firstRowFocusKey: firstId != null ? `home-row-0-item-${firstId}` : undefined,
+      preferredChildFocusKey: banner.length > 0 ? 'hero-section' : 'home-row-0',
+    };
+  }, [data]);
   const { ref, focusKey } = useFocusable({
     focusKey: 'home-root',
     focusable: false,

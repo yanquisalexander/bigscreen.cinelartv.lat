@@ -168,6 +168,8 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
                 src={resolveImageUrl(item.banner ?? item.cover, clientEndpoint)!}
                 alt={item.title}
                 className="w-full h-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-accent/30 to-bg" />
