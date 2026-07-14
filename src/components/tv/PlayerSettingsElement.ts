@@ -103,6 +103,7 @@ class PlayerSettingsElement extends HTMLElement {
   }
 
   private registerFocusables() {
+    this.unregisterFocusables();
     const items = this.collectItems().map((item) => {
       const el = this.querySelector(`[data-set-key="${item.key}"]`) as HTMLElement | null;
       if (!el) return null;

@@ -178,6 +178,7 @@ class EpisodesRailElement extends HTMLElement {
   }
 
   private registerFocusables() {
+    this.unregisterFocusables();
     const items = this._episodes.map((item) => {
       const el = this.querySelector(`[data-id="${item.ep.id}"]`) as HTMLElement | null;
       if (!el) return null;
