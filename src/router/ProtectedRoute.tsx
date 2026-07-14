@@ -9,6 +9,7 @@ const GUEST_BLOCKED_PREFIXES = ['/watch', '/select-profile'];
 
 function isGuestAllowed(pathname: string): boolean {
   if (GUEST_ALLOWED_PATHS.includes(pathname)) return true;
+  // Permitimos ver el detalle del contenido (overview) pero no reproducirlo (watch)
   if (pathname.startsWith('/content/')) return true;
   return !GUEST_BLOCKED_PREFIXES.some((p) => pathname.startsWith(p));
 }

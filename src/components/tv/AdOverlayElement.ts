@@ -183,7 +183,6 @@ class AdOverlayElement extends HTMLElement {
   }
 
   private registerFocusables() {
-    this.unregisterFocusables();
     const items = [
       { key: `${FOCUS_KEY_ROOT}-skip`, activate: () => this.handleSkip() },
       { key: `${FOCUS_KEY_ROOT}-mute`, activate: () => this.handleMute() },

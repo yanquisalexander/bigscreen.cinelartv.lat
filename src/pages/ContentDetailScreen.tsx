@@ -46,12 +46,15 @@ export function ContentDetailScreen() {
   });
 
   useEffect(() => {
-    if ((!tokens && !isGuest) || !contentId) return;
+    // Si es invitado, no necesitamos token para ver el detalle
+    if (!contentId) return;
+    
     setLoading(true);
+    // Usamos token vacío si es invitado
     getContentById(tokens?.accessToken ?? '', contentId)
       .then(setContent)
       .finally(() => setLoading(false));
-  }, [tokens, isGuest, contentId]);
+  }, [tokens, contentId]);
 
   // Botón físico "Atrás" del control / Escape en teclado
   useEffect(() => {
@@ -120,6 +123,12 @@ export function ContentDetailScreen() {
 
   const handlePlay = useCallback(() => {
     if (!content || !canPlay) return;
+    
+    // Si es invitado y no hay token, redirigir a auth
+    if (!tokens && isGuest) {
+      navigate('/auth');
+      return;
+    }
 
     const episodeId = content.continue_watching?.episode_id;
     if (episodeId) {
@@ -137,25 +146,31 @@ export function ContentDetailScreen() {
     if (firstEpisode) {
       navigate(`/watch/${content.id}/${firstEpisode.id}`);
     }
-  }, [content, navigate, canPlay]);
+  }, [content, navigate, canPlay, tokens, isGuest]);
 
   const handlePlayEpisodeFocus = useCallback(
     (episodeId: string | number) => {
-      if ((!tokens && !isGuest) || !contentId) return;
+      // Si es invitado, no hacer prefetch porque requiere token
+      if (!tokens || !contentId) return;
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
       prefetchTimerRef.current = setTimeout(() => {
         prefetchTimerRef.current = null;
         prefetchWatchData(tokens?.accessToken ?? '', contentId, episodeId);
       }, 4000);
     },
-    [tokens, isGuest, contentId],
+    [tokens, contentId],
   );
 
   const handlePlayEpisode = useCallback(
     (episodeId: string | number) => {
+      // Si es invitado, redirigir a auth
+      if (!tokens && isGuest) {
+        navigate('/auth');
+        return;
+      }
       navigate(`/watch/${contentId}/${episodeId}`);
     },
-    [contentId, navigate],
+    [contentId, navigate, tokens, isGuest],
   );
 
   const focusSidebarFromLeftEdge = useCallback((direction: string) => {
@@ -172,7 +187,9 @@ export function ContentDetailScreen() {
 
   // Debounced prefetch for Play button (4s hold)
   const handlePlayFocus = useCallback(() => {
-    if (!content || (!tokens && !isGuest)) return;
+    // Si es invitado o no hay token, no hacer prefetch
+    if (!content || !tokens) return;
+    
     const episodeId = content.continue_watching?.episode_id
       ?? (content.content_type === 'TVSHOW'
         ? content.seasons?.[0]?.episodes?.[0]?.id
@@ -182,7 +199,7 @@ export function ContentDetailScreen() {
       prefetchTimerRef.current = null;
       prefetchWatchData(tokens?.accessToken ?? '', content.id, episodeId);
     }, 4000);
-  }, [content, tokens, isGuest]);
+  }, [content, tokens]);
 
   const handlePlayArrow = useCallback((direction: string) => {
     if (direction === 'left') return focusSidebarFromLeftEdge(direction);
