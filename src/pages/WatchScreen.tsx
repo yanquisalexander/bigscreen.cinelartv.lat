@@ -38,6 +38,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
   const [adPhase, setAdPhase] = useState<'none' | 'preroll' | 'midroll' | 'postroll'>('none');
   const [prerollChecked, setPrerollChecked] = useState(test);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [debugVisible, setDebugVisible] = useState(() => typeof window !== 'undefined' && window.location.search.includes('debug=1'));
 
   const controlsRef = useRef<any>(null);
   const adOverlayRef = useRef<any>(null);
@@ -198,6 +199,8 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
         setAdPhase('preroll');
         setCurrentAd(ad);
       }
+    }).catch(() => {
+      setPrerollChecked(true);
     });
   }, [test, streamUrl, prerollChecked, adPhase]);
 
@@ -210,6 +213,9 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
       if (cancelled) return;
       play();
       applyPreferredAudioLanguage(userLang);
+    }).catch(() => {
+      if (cancelled) return;
+      useToastStore.getState().show('No se pudo reproducir el contenido.', 'error', 4000);
     });
     return () => { cancelled = true; };
   }, [streamUrl, load, play, watchData, applyPreferredAudioLanguage, userLang, adPhase, prerollChecked]);
@@ -267,6 +273,12 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
           } else {
             navigate(-1);
           }
+        }
+      }).catch(() => {
+        if (nextEpisode) {
+          navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
+        } else {
+          navigate(-1);
         }
       });
     });
@@ -508,6 +520,21 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
               adOverlayRef.current = el;
             }}
           />
+        )}
+
+        {debugVisible && (
+          <div className="absolute top-0 right-0 z-50 p-3 bg-black/90 text-green-400 text-xs font-mono leading-5 max-w-xs">
+            <div>engineReady: {String(engineReady)}</div>
+            <div>watchData: {String(!!watchData)}</div>
+            <div>streamUrl: {streamUrl ? 'ok' : 'null'}</div>
+            <div>prerollChecked: {String(prerollChecked)}</div>
+            <div>adPhase: {adPhase}</div>
+            <div>isPlaying: {String(isPlaying)}</div>
+            <div>isBuffering: {String(isBuffering)}</div>
+            <div>video.paused: {videoRef.current ? String(videoRef.current.paused) : 'no-el'}</div>
+            <div>video.src: {videoRef.current?.src ? 'ok' : 'empty'}</div>
+            <div>ready: {String(ready)}</div>
+          </div>
         )}
       </div>
     </FocusContext.Provider>

@@ -45,6 +45,7 @@ class PlayerControlsElement extends HTMLElement {
   private _lastEnterKey = '';
   private _lastEnterTime = 0;
   private _lastFocusedControlKey = 'watch-playpause';
+  private _suppressNextEnter = false;
 
   static get observedAttributes() {
     return ['content-id', 'client-endpoint'];
@@ -1331,13 +1332,11 @@ class PlayerControlsElement extends HTMLElement {
       if (!isDirectional && !isAction) return;
       const currentFocus = getCurrentFocusKey() ?? '';
       if (this._settingsOpen || currentFocus.startsWith('player-settings')) return;
-      if (this._showControls) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      this._showControls = true;
-      this._updateControlsVisibility();
-      this._syncOverlayFocusability();
-      if (isDirectional) {
+      if (!this._showControls) {
+        this._showControls = true;
+        this._updateControlsVisibility();
+        this._syncOverlayFocusability();
+        if (isAction) this._suppressNextEnter = true;
         this._restoreControlFocus();
       }
     };
@@ -1347,6 +1346,10 @@ class PlayerControlsElement extends HTMLElement {
   }
 
   private _handleEnterPress = (e: Event) => {
+    if (this._suppressNextEnter) {
+      this._suppressNextEnter = false;
+      return;
+    }
     const source = e.composedPath().find(
       (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('focus-key'),
     );

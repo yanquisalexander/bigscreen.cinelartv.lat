@@ -1,4 +1,4 @@
-import { SpatialNavigation, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
+import { SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation';
 import { FocusableRegistrar } from './spatialFocus';
 
 class FocusableElement extends HTMLElement {
@@ -78,8 +78,6 @@ class FocusableElement extends HTMLElement {
         preferredChildFocusKey: this.getAttribute('preferred-child-focus-key') ?? undefined,
         isFocusBoundary: this.getAttribute('focus-boundary') === 'true',
         onEnterPress: () => {
-          const currentFocus = getCurrentFocusKey();
-          if (currentFocus && currentFocus !== this._focusKey) return;
           this.dispatchEvent(new CustomEvent('enter-press', { bubbles: true, composed: true }));
         },
         onArrowPress: (direction: string) => {

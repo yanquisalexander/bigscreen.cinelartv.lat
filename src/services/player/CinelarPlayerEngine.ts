@@ -125,7 +125,9 @@ export class CinelarPlayerEngine {
   }
 
   public play() {
-    this.videoElement?.play().catch(() => {});
+    this.videoElement?.play().catch((err) => {
+      toast(`[Player] Autoplay bloqueado: ${err?.message ?? String(err)}`);
+    });
   }
 
   public pause() {
