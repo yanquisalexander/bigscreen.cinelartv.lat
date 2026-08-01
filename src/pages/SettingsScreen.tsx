@@ -216,18 +216,20 @@ function SettingsRow({
   label,
   description,
   children,
+  onEnterPress,
   onArrowLeft,
 }: {
   focusKey: string;
   label: string;
   description?: string;
   children?: React.ReactNode;
+  onEnterPress?: () => void;
   onArrowLeft?: () => void;
 }) {
   return (
     <Focusable
       focusKey={focusKey}
-      onEnterPress={() => {}}
+      onEnterPress={onEnterPress}
       onArrowPress={(direction) => {
         if (direction === 'left' && onArrowLeft) {
           onArrowLeft();
@@ -283,6 +285,7 @@ function ReproducionSection({
           focusKey="settings-section-reproduccion-first"
           label="Reproductor moderno"
           description="Usa el reproductor web en lugar del nativo del dispositivo."
+          onEnterPress={() => setPrefersModernPlayback(!prefersModernPlayback)}
           onArrowLeft={() => setFocus('settings-nav-reproduccion')}
         >
           <Toggle checked={prefersModernPlayback} onChange={setPrefersModernPlayback} />

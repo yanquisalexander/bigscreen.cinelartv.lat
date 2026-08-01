@@ -98,13 +98,12 @@ class TVSidebarElement extends HTMLElement {
               font-weight: 500;
               color: ${isActive ? '#ffffff' : '#8e8e93'};
               background: transparent;
-              transition: all 150ms ease;
               cursor: pointer;
               outline: none;
             "
           >
             <span data-nav-icon style="display: flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem;">${iconHtml}</span>
-            <span data-nav-label style="white-space: nowrap; opacity: 0; transition: opacity 150ms ease;">${item.label}</span>
+            <span data-nav-label style="white-space: nowrap; opacity: 0;">${item.label}</span>
           </div>
         `;
       })
@@ -127,7 +126,6 @@ class TVSidebarElement extends HTMLElement {
             font-weight: 500;
             color: #8e8e93;
             background: transparent;
-            transition: all 150ms ease;
             cursor: pointer;
             outline: none;
           ">
@@ -147,7 +145,6 @@ class TVSidebarElement extends HTMLElement {
               font-weight: 500;
               color: #ffffff;
               background: transparent;
-              transition: all 150ms ease;
               cursor: pointer;
               outline: none;
             ">
@@ -174,7 +171,6 @@ class TVSidebarElement extends HTMLElement {
           font-weight: 500;
           color: #8e8e93;
           background: transparent;
-          transition: all 150ms ease;
           cursor: pointer;
           outline: none;
         ">
@@ -194,7 +190,6 @@ class TVSidebarElement extends HTMLElement {
         flex-direction: column;
         gap: 0.5rem;
         background: linear-gradient(to right, #000000 20%, rgba(0,0,0,0.3), rgba(0,0,0,0));
-        transition: width 300ms ease, padding 300ms ease;
         z-index: 50;
       ">
         <div style="height: 2rem; margin-bottom: 3rem;"></div>

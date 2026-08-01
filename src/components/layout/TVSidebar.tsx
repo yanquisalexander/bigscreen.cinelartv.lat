@@ -68,18 +68,19 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
     return profile.avatar_url ?? `${clientEndpoint}/assets/default/avatars/${profile.avatar_id ?? 'coolCat'}.png`;
   }, [profile, clientEndpoint]);
 
+  const labelStyle = (show: boolean): React.CSSProperties => ({
+    opacity: show ? 1 : 0,
+    transition: 'none',
+  });
+
   return (
     <FocusContext.Provider value={focusKey}>
       <aside
         ref={ref as React.RefObject<HTMLElement>}
         style={{ gridArea: 'sidebar' }}
-        className={classNames(
-          'relative h-full w-full flex flex-col py-6',
-          'bg-surface/10',
-          hasFocusedChild ? 'px-4' : 'px-2',
-        )}
+        className="relative h-full w-full flex flex-col py-6 px-4 bg-surface/10"
       >
-        <div className={classNames('flex items-center mb-12 h-8 px-2', hasFocusedChild ? 'justify-start' : 'justify-center')} />
+        <div className="flex items-center mb-12 h-8 px-2 justify-start" />
 
         <nav className="flex-1 flex flex-col gap-2">
           {NAV_ITEMS.map((item) => {
@@ -92,17 +93,14 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
                 focusKey={`nav-${item.key}`}
                 focusedClassName="bg-white !text-black"
                 className={classNames(
-                  'flex h-12 items-center gap-4 rounded-xl px-3 text-base font-medium',
-                  hasFocusedChild ? 'justify-start' : 'justify-center',
+                  'flex h-12 items-center gap-4 rounded-xl px-3 text-base font-medium justify-start',
                   isActive ? 'text-white' : 'text-white/70',
                 )}
               >
-                <item.icon className="text-2xl" />
-                {hasFocusedChild && (
-                  <span className="truncate whitespace-nowrap">
-                    {item.label}
-                  </span>
-                )}
+                <item.icon className="text-2xl flex-shrink-0" />
+                <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
+                  {item.label}
+                </span>
               </Focusable>
             );
           })}
@@ -113,18 +111,12 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
           onArrowPress={focusContent}
           focusKey="nav-settings"
           focusedClassName="bg-white !text-black"
-          className={classNames(
-            'flex h-12 items-center gap-4 rounded-xl px-3 text-base font-medium mb-1',
-            hasFocusedChild ? 'justify-start' : 'justify-center',
-            'text-white/70',
-          )}
+          className="flex h-12 items-center gap-4 rounded-xl px-3 text-base font-medium mb-1 justify-start text-white/70"
         >
-          <SettingsRegular className="text-2xl" />
-          {hasFocusedChild && (
-            <span className="truncate whitespace-nowrap">
-              Ajustes
-            </span>
-          )}
+          <SettingsRegular className="text-2xl flex-shrink-0" />
+          <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
+            Ajustes
+          </span>
         </Focusable>
 
         {isGuest ? (
@@ -133,18 +125,12 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
             onArrowPress={focusContent}
             focusKey="nav-login"
             focusedClassName="bg-white !text-black"
-            className={classNames(
-              'flex h-12 items-center gap-4 rounded-xl px-3 text-base font-medium mb-1',
-              hasFocusedChild ? 'justify-start' : 'justify-center',
-              'text-white/70',
-            )}
+            className="flex h-12 items-center gap-4 rounded-xl px-3 text-base font-medium mb-1 justify-start text-white/70"
           >
-            <LucideLogIn className="text-2xl" />
-            {hasFocusedChild && (
-              <span className="truncate whitespace-nowrap">
-                Iniciar sesión
-              </span>
-            )}
+            <LucideLogIn className="text-2xl flex-shrink-0" />
+            <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
+              Iniciar sesión
+            </span>
           </Focusable>
         ) : profile && (
           <Focusable
@@ -152,10 +138,7 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
             onArrowPress={focusContent}
             focusKey="nav-profile"
             focusedClassName="bg-white !text-black [&_span]:text-black"
-            className={classNames(
-              'flex h-12 items-center gap-3 rounded-xl px-2',
-              hasFocusedChild ? 'justify-start' : 'justify-center',
-            )}
+            className="flex h-12 items-center gap-3 rounded-xl px-2 justify-start"
           >
             <img
               src={avatarUrl}
@@ -174,11 +157,9 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
             >
               {profile.name.charAt(0).toUpperCase()}
             </div>
-            {hasFocusedChild && (
-              <span className="truncate whitespace-nowrap text-white">
-                {profile.name}
-              </span>
-            )}
+            <span className="truncate whitespace-nowrap text-white" style={labelStyle(hasFocusedChild)}>
+              {profile.name}
+            </span>
           </Focusable>
         )}
       </aside>

@@ -252,7 +252,7 @@ class PlayerControlsElement extends HTMLElement {
           z-index: 2;
           color: #fff;
           font-size: clamp(0.8rem, 1.2vw, 1.05rem);
-          font-weight: 400;
+          font-weight: 700;
           letter-spacing: 0.02em;
           opacity: 1;
           pointer-events: none;
@@ -1337,7 +1337,9 @@ class PlayerControlsElement extends HTMLElement {
       this._showControls = true;
       this._updateControlsVisibility();
       this._syncOverlayFocusability();
-      this._restoreControlFocus();
+      if (isDirectional) {
+        this._restoreControlFocus();
+      }
     };
 
     window.addEventListener('keydown', handleKey, true);

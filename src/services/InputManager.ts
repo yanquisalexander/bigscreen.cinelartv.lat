@@ -28,6 +28,7 @@ export class InputManager {
       this.dispatch('enter', e);
       if (e.key === ' ') this.dispatch('space', e);
     }
+    if (e.key === ' ') this.dispatch('space', e);
     switch (e.key) {
       case 'ArrowUp': this.dispatch('arrow-up', e); break;
       case 'ArrowDown': this.dispatch('arrow-down', e); break;
