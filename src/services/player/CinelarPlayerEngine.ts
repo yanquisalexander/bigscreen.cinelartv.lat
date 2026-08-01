@@ -1,10 +1,16 @@
-import shaka from 'shaka-player/dist/shaka-player.compiled.js';
+import * as shakaModule from 'shaka-player/dist/shaka-player.compiled.js';
+// UMD default export is unreliable with Rolldown; resolve from namespace or globalThis
+const shaka: any = (shakaModule as any).Player
+  ? shakaModule
+  : (shakaModule as any).default
+    ?? (typeof globalThis !== 'undefined' && (globalThis as any).shaka)
+    ?? shakaModule;
 
 type PlayerEvent = 'playing' | 'paused' | 'buffering' | 'error' | 'timeupdate' | 'durationchange' | 'ended';
 type EventCallback = (data?: any) => void;
 
 export class CinelarPlayerEngine {
-  private player: shaka.Player | null = null;
+  private player: any = null;
   private videoElement: HTMLVideoElement | null = null;
   private eventListeners: Map<PlayerEvent, EventCallback[]> = new Map();
 
@@ -17,6 +23,11 @@ export class CinelarPlayerEngine {
 
   private initShaka() {
     if (!this.videoElement) return;
+
+    if (!shaka || !shaka.Player) {
+      console.error('Shaka Player no está disponible. Fallback a reproducción nativa.');
+      return;
+    }
 
     // Instalar polyfills necesarios
     shaka.polyfill.installAll();
