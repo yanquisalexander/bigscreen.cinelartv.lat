@@ -211,7 +211,7 @@ export function LiveTVScreen() {
               onEnterPress={() => navigate('/home')}
               onArrowPress={(direction) => {
                 if (direction !== 'left') return true;
-                setFocus('nav-home');
+                setFocus('sidebar');
                 return false;
               }}
               focusedClassName="!bg-white !text-black scale-105"
@@ -293,7 +293,7 @@ export function LiveTVScreen() {
               onEnterPress={fetchChannels}
               onArrowPress={(direction) => {
                 if (direction !== 'left') return true;
-                setFocus('nav-home');
+                setFocus('sidebar');
                 return false;
               }}
               focusedClassName="!bg-white !text-black scale-105"
@@ -328,7 +328,7 @@ export function LiveTVScreen() {
                       key={channel.id}
                       channel={channel}
                       onPlay={handlePlayChannel}
-                      onLeftEdge={() => setFocus('nav-home')}
+                      onLeftEdge={() => setFocus('sidebar')}
                       isFavorite
                       onToggleFavorite={toggleFavorite}
                     />
@@ -350,7 +350,7 @@ export function LiveTVScreen() {
                       key={channel.id}
                       channel={channel}
                       onPlay={handlePlayChannel}
-                      onLeftEdge={() => setFocus('nav-home')}
+                      onLeftEdge={() => setFocus('sidebar')}
                       isFavorite={isFavorite(channel.id)}
                       onToggleFavorite={toggleFavorite}
                     />

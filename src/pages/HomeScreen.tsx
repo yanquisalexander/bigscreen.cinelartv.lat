@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusContext, setFocus, useFocusable, getCurrentFocusKey, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
+import { useToastStore } from '@/stores/toastStore';
 import { getExplore } from '@/features/content/explore';
 import { resolveImageUrl } from '@/utils/helpers';
 import { HeroSection } from '@/components/home/HeroSection';
@@ -10,7 +11,7 @@ import { FocusableCard } from '@/components/tv/FocusableCard';
 import { FocusableRow } from '@/components/tv/FocusableRow';
 import { Focusable } from '@/components/tv/Focusable';
 import type { ContentItem, ExploreResponse } from '@/types/content';
-import { syncContinueWatching, syncRecommendations } from '@/services/NativeBridge';
+import { syncContinueWatching, syncRecommendations, exitApp } from '@/services/NativeBridge';
 import type { AndroidTvHomeItem } from '@/services/NativeBridge';
 
 const progressPercent = (item: ContentItem) => {
@@ -26,17 +27,25 @@ export function HomeScreen() {
   const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
   const [data, setData] = useState<ExploreResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [heroImmersive, setHeroImmersive] = useState(false);
 
   const fetchData = useCallback(async () => {
+    setError(false);
+    setLoading(true);
     try {
       const explore = await getExplore(tokens?.accessToken, {
         include_trailers: true,
       });
       setData(explore);
-    } catch {
-      // silently fail, show empty state
+    } catch (e) {
+      setError(true);
+      useToastStore.getState().show(
+        'Error al cargar la página. Intenta de nuevo.',
+        'error',
+        5000,
+      );
     } finally {
       setLoading(false);
     }
@@ -110,35 +119,41 @@ export function HomeScreen() {
 
   const focusSidebarFromRowStart = useCallback((direction: string) => {
     if (direction !== 'left') return true;
-    setFocus('nav-home');
+    setFocus('sidebar');
     return false;
   }, []);
 
-  // Detect if sidebar has focus
+  // Detect if sidebar has focus via spatial navigation state (document.activeElement is never set)
   const isSidebarFocused = useCallback(() => {
-    const focused = document.activeElement;
-    if (!focused) return false;
-    const key = focused.getAttribute('data-focus-key');
-    return !!key && key.startsWith('nav-');
+    const key = getCurrentFocusKey();
+    return !!key && (key === 'sidebar' || key.startsWith('nav-'));
   }, []);
 
-  // Back key: expand sidebar or show exit dialog
-  const sidebarBackRef = useRef(false);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+      const currentKey = getCurrentFocusKey();
+      if (currentKey && doesFocusableExist(currentKey)) return;
+      e.preventDefault();
+      setFocus(loading || error ? 'sidebar' : 'home-root');
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [loading, error]);
+
+  // Back key: focus sidebar or show exit dialog
   useEffect(() => {
     const handleBack = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'XF86Back' || e.key === 'GoBack' || e.key === 'BrowserBack') {
         e.preventDefault();
         if (showExitDialog) {
           setShowExitDialog(false);
-          sidebarBackRef.current = false;
           return;
         }
-        if (isSidebarFocused() || sidebarBackRef.current) {
+        if (isSidebarFocused()) {
           setShowExitDialog(true);
-          sidebarBackRef.current = false;
         } else {
-          setFocus('nav-home');
-          sidebarBackRef.current = true;
+          setFocus('sidebar');
         }
       }
     };
@@ -170,6 +185,20 @@ export function HomeScreen() {
                 ))}
               </div>
             </div>
+          ) : error ? (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-8 px-8">
+              <p className="text-text-secondary text-[clamp(1rem,1.4vw,1.25rem)] text-center max-w-md">
+                No se pudo cargar el contenido. Verifica tu conexión e intenta de nuevo.
+              </p>
+              <Focusable
+                onEnterPress={fetchData}
+                focusKey="home-retry"
+                focusedClassName="!bg-white !text-black scale-105"
+                className="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(2rem,3vw,3rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
+              >
+                Reintentar
+              </Focusable>
+            </div>
           ) : (
             <>
               {bannerItems.length > 0 && (
@@ -179,7 +208,7 @@ export function HomeScreen() {
                   onInfo={handleInfo}
                   clientEndpoint={clientEndpoint}
                   firstRowFocusKey={firstRowFocusKey}
-                  sidebarFocusKey="nav-home"
+                  sidebarFocusKey="sidebar"
                   onImmersiveChange={setHeroImmersive}
                 />
               )}
@@ -220,14 +249,14 @@ export function HomeScreen() {
             </>
           )}
         </div>
-      </FocusContext.Provider>
 
-      {showExitDialog && (
-        <ExitDialog
-          onConfirm={() => window.close()}
-          onCancel={() => setShowExitDialog(false)}
-        />
-      )}
+        {showExitDialog && (
+          <ExitDialog
+            onConfirm={() => exitApp()}
+            onCancel={() => setShowExitDialog(false)}
+          />
+        )}
+      </FocusContext.Provider>
     </>
   );
 }
@@ -244,26 +273,24 @@ function ExitDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: 
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-md">
+    <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center bg-bg">
       <FocusContext.Provider value={focusKey}>
         <div
           ref={ref as React.RefObject<HTMLDivElement>}
-          className="bg-surface rounded-2xl w-[clamp(360px,50vw,520px)] shadow-2xl border border-white/10"
+          className="flex flex-col items-center text-center w-[clamp(420px,55vw,720px)]"
         >
-          <div className="px-[clamp(2rem,4vw,3rem)] pt-[clamp(3rem,6vh,4rem)] pb-[clamp(1.5rem,3vh,2rem)]">
-            <h2 className="text-white text-[clamp(1.5rem,2.2vw,1.875rem)] font-semibold mb-[clamp(0.75rem,1.5vh,1rem)]">
-              Salir de CinelarTV
-            </h2>
-            <p className="text-text-secondary text-[clamp(1rem,1.4vw,1.25rem)]">
-              ¿Quieres cerrar la aplicación?
-            </p>
-          </div>
-          <div className="flex justify-end gap-[clamp(0.75rem,1.5vw,1rem)] px-[clamp(2rem,4vw,3rem)] pb-[clamp(2rem,4vh,3rem)]">
+          <h2 className="text-white text-[clamp(2rem,4vw,3rem)] font-semibold leading-tight">
+            Salir de CinelarTV
+          </h2>
+          <p className="text-text-secondary text-[clamp(1rem,1.6vw,1.25rem)] mt-[clamp(1rem,2vh,1.5rem)] max-w-[clamp(420px,50vw,600px)] leading-relaxed">
+            ¿Quieres cerrar la aplicación? Se detendrá cualquier reproducción en curso.
+          </p>
+          <div className="flex items-center gap-[clamp(1rem,2vw,1.5rem)] mt-[clamp(2.5rem,6vh,4rem)]">
             <Focusable
               onEnterPress={onCancel}
               focusKey="exit-cancel"
-              focusedClassName="!bg-white !text-black"
-              className="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium transition-all duration-200 cursor-pointer"
+              focusedClassName="!bg-white !text-black scale-105"
+              className="h-[clamp(3rem,5.5vh,3.75rem)] px-[clamp(2.5rem,5vw,4rem)] rounded-full bg-white/10 text-white text-[clamp(1rem,1.5vw,1.25rem)] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
             >
               Cancelar
             </Focusable>
@@ -271,11 +298,14 @@ function ExitDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: 
               onEnterPress={onConfirm}
               focusKey="exit-confirm"
               focusedClassName="!bg-white !text-black scale-105"
-              className="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium transition-all duration-200 cursor-pointer"
+              className="h-[clamp(3rem,5.5vh,3.75rem)] px-[clamp(2.5rem,5vw,4rem)] rounded-full bg-live text-white text-[clamp(1rem,1.5vw,1.25rem)] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
             >
               Salir
             </Focusable>
           </div>
+          <p className="text-text-tertiary text-[clamp(0.8rem,1.1vw,0.95rem)] mt-[clamp(2rem,4vh,3rem)]">
+            Pulsa ATRÁS para seguir viendo CinelarTV
+          </p>
         </div>
       </FocusContext.Provider>
     </div>

@@ -13,7 +13,7 @@ export type FlatEpisode = WatchEpisode & { seasonNumber: number };
    necesitamos el callback onFocus real de norigin-spatial-navigation
    para centrar el scroll cuando el foco llega vía mando (flechas),
    no solo al hacer click/enter.
-   Memoizado: con onSelect/onCenter/registerNode estables, esta card no
+    Memoizado: con onSelect/onCenter estables, esta card no
    vuelve a renderizar salvo que cambien sus propias props. */
 
 export const RailEpisodeItem = memo(function RailEpisodeItem({
@@ -35,12 +35,12 @@ export const RailEpisodeItem = memo(function RailEpisodeItem({
     thumbUrl: string | null | undefined;
     onSelect: (epId: string | number) => void;
     onCenter: (ep: FlatEpisode) => void;
-    registerNode: (id: string, node: HTMLDivElement | null) => void;
+    registerNode?: (id: string, node: HTMLDivElement | null) => void;
 }) {
     const handleSelect = useCallback(() => onSelect(ep.id), [onSelect, ep.id]);
     const handleCenter = useCallback(() => onCenter(ep), [onCenter, ep]);
     const handleRegisterNode = useCallback(
-        (node: HTMLDivElement | null) => registerNode(String(ep.id), node),
+        (node: HTMLDivElement | null) => registerNode?.(String(ep.id), node),
         [registerNode, ep.id],
     );
 
@@ -50,21 +50,24 @@ export const RailEpisodeItem = memo(function RailEpisodeItem({
         onFocus: handleCenter,
     });
 
-    const cardWidth = expanded ? 'clamp(180px, 13.5vw, 260px)' : 'clamp(156px, 11.5vw, 220px)';
-    const cardHeight = expanded ? 'clamp(101px, 7.6vw, 146px)' : 'clamp(88px, 6.5vw, 124px)';
+    // El rail permanece compacto hasta que esta tarjeta recibe el foco. Así no
+    // se agrandan todos los episodios al entrar en la fila.
+    const isExpanded = expanded && focused;
+    const cardWidth = isExpanded ? 'clamp(180px, 13.5vw, 260px)' : 'clamp(112px, 8.2vw, 156px)';
+    const cardHeight = isExpanded ? 'clamp(101px, 7.6vw, 146px)' : 'clamp(63px, 4.6vw, 88px)';
 
     return (
         <div
             ref={ref as React.RefObject<HTMLDivElement>}
             onClick={handleSelect}
             className={classNames(
-                'snap-center flex-shrink-0 transition-all duration-300 cursor-pointer',
-                focused && 'scale-105',
+                'snap-center shrink-0 transition-all duration-300 cursor-pointer',
+                focused && 'scale-[1.03]',
             )}
             style={{ width: cardWidth }}
         >
             <div
-                ref={handleRegisterNode}
+                ref={registerNode ? handleRegisterNode : undefined}
                 className={classNames(
                     'relative bg-neutral-900 transition-all duration-300 rounded-xl overflow-hidden',
                     focused && 'ring-2 ring-white/80 shadow-lg shadow-black/40',
@@ -83,13 +86,13 @@ export const RailEpisodeItem = memo(function RailEpisodeItem({
                 )}
 
                 {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
 
                 {/* Active indicator */}
                 {isActive && (
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                         <div className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                            <div className="flex items-end gap-[2px] h-3.5">
+                            <div className="flex items-end gap-0.5 h-3.5">
                                 <div className="w-[2.5px] h-2 rounded-full animate-pulse" style={{ backgroundColor: '#000' }} />
                                 <div className="w-[2.5px] h-3.5 rounded-full animate-pulse [animation-delay:0.15s]" style={{ backgroundColor: '#000' }} />
                                 <div className="w-[2.5px] h-2.5 rounded-full animate-pulse [animation-delay:0.3s]" style={{ backgroundColor: '#000' }} />
@@ -104,7 +107,10 @@ export const RailEpisodeItem = memo(function RailEpisodeItem({
                 </div>
             </div>
 
-            <div className="mt-2 px-0.5">
+            <div className={classNames(
+                'px-0.5 overflow-hidden transition-all duration-300',
+                isExpanded ? 'mt-2 max-h-10 opacity-100' : 'mt-0 max-h-0 opacity-0',
+            )}>
                 <p className={classNames(
                     'text-[13px] font-medium leading-snug truncate transition-colors duration-200',
                     isActive ? 'text-white' : focused ? 'text-white/90' : 'text-white/65',

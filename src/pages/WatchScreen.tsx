@@ -1,314 +1,66 @@
-import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+// WatchScreen.tsx
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FocusContext, setFocus, useFocusable, getCurrentFocusKey, SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation';
-import { Focusable } from '@/components/tv/Focusable';
+import { FocusContext, setFocus, useFocusable, getCurrentFocusKey, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
 import { consumeWatchData, updateProgress } from '@/features/content/api';
-import { useKeyHandler } from '@/hooks/useKeyHandler';
-import { classNames, resolveImageUrl } from '@/utils/helpers';
-import { addContinueWatching, prefersNative as prefersNativePlayer, launchNativePlayer, setOnNativePlayerFinished } from '@/services/NativeBridge';
 import { usePlayerEngine } from '@/services/player/usePlayerEngine';
 import { useSettingsStore } from '@/stores/settingsStore';
-import type { AndroidTvHomeItem } from '@/services/NativeBridge';
-import '@/components/tv/EpisodesRailElement';
-import '@/components/tv/PlayerSettingsElement';
-import {
-  LucidePlay,
-  LucidePause,
-  LucideChevronsRight,
-  LucideLoader2,
-  LucideX,
-  LucideSettings,
-} from 'lucide-react';
-import type { WatchData, Segment } from '@/types/content';
-import { M3eLoadingIndicator } from "@m3e/react/loading-indicator";
-import { useToastStore } from "@/stores/toastStore";
-import { Seekbar } from '@/components/tv/Seekbar';
-import type { FlatEpisode } from '@/components/tv/RailEpisodeItem';
-import type { EpisodeWithThumb } from '@/components/tv/EpisodesRailElement';
+import { useToastStore } from '@/stores/toastStore';
+import { resolveImageUrl } from '@/utils/helpers';
+import { addContinueWatching, prefersNative as prefersNativePlayer, launchNativePlayer, setOnNativePlayerFinished } from '@/services/NativeBridge';
 import { fetchVast } from '@/services/player/vast-client';
-import '@/components/tv/AdOverlayElement';
+import { M3eLoadingIndicator } from '@m3e/react/loading-indicator';
+import { inputManager } from '@/services/InputManager';
+import type { WatchData } from '@/types/content';
+import type { FlatEpisode } from '@/components/tv/RailEpisodeItem';
 import type { VastAd } from '@/types/vast';
 
-const ACCENT = '#FFFFFF';
+import '@/components/tv/PlayerControlsElement';
+import '@/components/tv/FocusableElement';
+import '@/components/tv/FocusableCardElement';
+import { PlayerSettingsPanel } from '@/components/player/PlayerSettingsPanel';
 
 const AD_PREROLL_TAG = 'https://pubads.g.doubleclick.net/gampad/live/ads?iu=/22530741549/CTV_VAST_ADS&description_url=[DESCRIPTION_URL]&tfcd=0&npa=0&sz=400x300%7C640x480&gdfp_req=1&unviewed_position_start=1&output=vast&env=vp&impl=s&correlator=[CACHEBUSTER]';
-const AD_MIDROLL_TAG = 'https://pubads.g.doubleclick.net/gampad/live/ads?iu=/22530741549/CTV_VAST_ADS&description_url=[DESCRIPTION_URL]&tfcd=0&npa=0&sz=400x300%7C640x480&gdfp_req=1&unviewed_position_start=1&output=vast&env=vp&impl=s&correlator=[CACHEBUSTER]';
 const AD_POSTROLL_TAG = 'https://youradexchange.com/video/select.php?r=11621170';
-const AD_MIDROLL_INTERVAL = 1200;
-const AD_SKIP_OFFSET = 5;
+const TEST_STREAM_URL = 'https://storage.googleapis.com/shaka-demo-assets/bbb-dark-truths-hls/hls.m3u8';
 
-/* Thin React wrapper that bridges norigin-spatial-navigation with the
-   vanilla-JS <tv-player-episodes-rail> Web Component.
-   React only re-renders this wrapper when hasFocusedChild changes (rare).
-   All heavy DOM work (episode cards, scroll, animations) happens inside
-   the Web Component, completely outside React's reconciliation. */
-const EpisodesRailNorigin = memo(function EpisodesRailNorigin({
-  episodes,
-  currentIndex,
-  expanded,
-  onSelect,
-  onExpandChange,
-  onFocusedEpisodeChange,
-}: {
-  episodes: EpisodeWithThumb[];
-  currentIndex: number;
-  expanded: boolean;
-  onSelect: (epId: string | number) => void;
-  onExpandChange: (expanded: boolean) => void;
-  onFocusedEpisodeChange: (ep: FlatEpisode | null) => void;
-}) {
-  const railRef = useRef<any>(null);
-
-  const { ref: noriginRef, focusKey, hasFocusedChild } = useFocusable({
-    focusKey: 'episodes-rail',
-    trackChildren: true,
-    saveLastFocusedChild: true,
-    preferredChildFocusKey: currentIndex >= 0 ? `rail-ep-item-${episodes[currentIndex]?.ep.id}` : undefined,
-  });
-
-  useEffect(() => {
-    onExpandChange(hasFocusedChild);
-    if (!hasFocusedChild) onFocusedEpisodeChange(null);
-  }, [hasFocusedChild]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Sync episodes data (only when list changes)
-  useEffect(() => {
-    if (railRef.current) railRef.current.episodes = episodes;
-  }, [episodes]);
-
-  // Sync attributes (targeted DOM updates, no React render)
-  useEffect(() => {
-    if (railRef.current) {
-      railRef.current.setAttribute('current-index', String(currentIndex));
-      railRef.current.setAttribute('expanded', String(expanded));
-    }
-  }, [currentIndex, expanded]);
-
-  // Listen for events from the Web Component
-  useEffect(() => {
-    const el = railRef.current;
-    if (!el) return;
-    const handleSelect = (e: Event) => onSelect((e as CustomEvent).detail.epId);
-    const handleFocus = (e: Event) => {
-      onFocusedEpisodeChange((e as CustomEvent).detail.ep);
-    };
-    el.addEventListener('episode-selected', handleSelect);
-    el.addEventListener('episode-focused', handleFocus);
-    return () => {
-      el.removeEventListener('episode-selected', handleSelect);
-      el.removeEventListener('episode-focused', handleFocus);
-    };
-  }, [onSelect, onFocusedEpisodeChange]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <FocusContext.Provider value={focusKey}>
-      <div ref={noriginRef as React.RefObject<HTMLDivElement>} data-episode-rail>
-        <tv-player-episodes-rail ref={railRef} />
-      </div>
-    </FocusContext.Provider>
-  );
-});
-
-/* Wrapper del panel de ajustes de reproducción (calidad + audio).
-   Igual que el rail: React solo registra el nodo padre en norigin y pasa
-   el engine al Web Component. El WC consulta las pistas directamente a
-   Shaka y aplica los cambios sin re-renderizar React. */
-const PlayerSettingsNorigin = memo(function PlayerSettingsNorigin({
-  engine,
-  open,
-  onClose,
-}: {
-  engine: any;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const settingsRef = useRef<any>(null);
-
-  const { ref: noriginRef, focusKey } = useFocusable({
-    focusKey: 'player-settings',
-    trackChildren: true,
-    saveLastFocusedChild: false,
-  });
-
-  useEffect(() => {
-    if (settingsRef.current) {
-      settingsRef.current.engine = engine;
-      settingsRef.current.open = open;
-    }
-  }, [engine, open]);
-
-  // Al cerrar el panel, devolver el foco a un nodo válido (el engranaje)
-  // para no dejar a norigin sin foco y bloquear la navegación remota.
-  useEffect(() => {
-    if (!open) {
-      SpatialNavigation.setFocus('watch-settings');
-    }
-  }, [open]);
-
-  // Cerrar con Back cuando el panel tiene el foco (lo maneja el padre,
-  // pero el WC escucha la tecla para delegar el cierre visual).
-  useEffect(() => {
-    const el = settingsRef.current;
-    if (!el) return;
-    const onCloseEvt = () => onClose();
-    el.addEventListener('settings-close', onCloseEvt);
-    return () => el.removeEventListener('settings-close', onCloseEvt);
-  }, [onClose]);
-
-  return (
-    <FocusContext.Provider value={focusKey}>
-      <div ref={noriginRef as React.RefObject<HTMLDivElement>} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-        <tv-player-settings ref={settingsRef} open={open} />
-      </div>
-    </FocusContext.Provider>
-  );
-});
-
-/* Wrapper del overlay de anuncios VAST.
-   React solo sincroniza la propiedad `ad` del Web Component y escucha
-   el evento `ad-complete` para notificar al padre. Toda la lógica de
-   reproducción, tracking y D-pad vive dentro del Web Component. */
-const AdOverlayNorigin = memo(function AdOverlayNorigin({
-  ad,
-  skipOffset,
-  onComplete,
-}: {
-  ad: VastAd | null;
-  skipOffset: number;
-  onComplete: () => void;
-}) {
-  const overlayRef = useRef<any>(null);
-  const { ref: noriginRef, focusKey } = useFocusable({
-    focusKey: 'ad-overlay',
-    trackChildren: true,
-  });
-
-  // Adjuntar el ad al WC y escuchar 'ad-complete' en el MISMO efecto que
-  // depende de `ad`. Si solo escucháramos [onComplete] (estable), el listener
-  // se registraría una sola vez al montar, cuando el <tv-ad-overlay> todavía
-  // no existe, y el evento 'ad-complete' nunca llegaría → overlay congelado.
-  useEffect(() => {
-    const el = overlayRef.current;
-    if (!el) return;
-    el.ad = ad;
-    const onAdComplete = () => onComplete();
-    el.addEventListener('ad-complete', onAdComplete);
-    return () => el.removeEventListener('ad-complete', onAdComplete);
-  }, [ad, onComplete]);
-
-  if (!ad) return null;
-
-  // El wrapper se registra en norigin con focusKey 'ad-overlay' (idéntico a
-  // FOCUS_KEY_ROOT del WC) y trackChildren, para que los botones del ad
-  // (skip/mute) sean hijos de este nodo y la navegación D-pad funcione. Al
-  // cerrarse el ad, el WC elimina sus focusables y el foco vuelve al padre.
-  return (
-    <FocusContext.Provider value={focusKey}>
-      <div
-        ref={noriginRef as React.RefObject<HTMLDivElement>}
-        style={{ position: 'fixed', inset: 0, zIndex: 50 }}
-      >
-        <tv-ad-overlay ref={overlayRef} skip-offset={String(skipOffset)} />
-      </div>
-    </FocusContext.Provider>
-  );
-});
-
-// Cada cuánto se re-evalúan segmentos / next-episode / progreso "lógico".
-// No afecta el suavizado visual de la seekbar, que corre por rAF aparte.
-const LOGIC_TICK_MS = 1000;
-
-export function WatchScreen() {
+export function WatchScreen({ test = false }: { test?: boolean }) {
   const { contentId, episodeId } = useParams<{ contentId: string; episodeId: string }>();
   const navigate = useNavigate();
   const tokens = useAuthStore((s) => s.tokens);
   const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
-  const toast = useToastStore();
 
-  const { attachVideo, videoRef, load, play, pause, seek, setOnEnded, getEngine, engineReady, applyPreferredAudioLanguage, isPlaying, isBuffering, duration } = usePlayerEngine();
+  const { attachVideo, videoRef, load, play, setOnEnded, getEngine, engineReady, applyPreferredAudioLanguage, isPlaying, isBuffering } = usePlayerEngine();
   const [watchData, setWatchData] = useState<WatchData | null>(null);
-  const [showControls, setShowControls] = useState(true);
-  const [skipSegment, setSkipSegment] = useState<Segment | null>(null);
+  const [currentAd, setCurrentAd] = useState<VastAd | null>(null);
+  const [adPhase, setAdPhase] = useState<'none' | 'preroll' | 'midroll' | 'postroll'>('none');
+  const [prerollChecked, setPrerollChecked] = useState(test);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // Foco dentro de la fila de episodios: alterna entre la vista de seekbar
-  // y la vista expandida (título + descripción del episodio resaltado)
-  const [railExpanded, setRailExpanded] = useState(false);
-  const [focusedRailEpisode, setFocusedRailEpisode] = useState<FlatEpisode | null>(null);
-
-  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const logicTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // --- Next episode state ---
-  const [nextEpisode, setNextEpisode] = useState<FlatEpisode | null>(null);
-  const [showNextCard, setShowNextCard] = useState(false);
-  const nextCountdownRef = useRef<HTMLSpanElement>(null);
-  const nextTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const nextShowingRef = useRef(false);
+  const controlsRef = useRef<any>(null);
+  const adOverlayRef = useRef<any>(null);
+  const adPhaseRef = useRef<'none' | 'preroll' | 'midroll' | 'postroll'>('none');
+  const pendingNavigationRef = useRef<{ contentId: string; episodeId?: string } | null>(null);
 
   const streamUrl = watchData?.sources?.[0]?.url;
   const ready = !!(watchData && streamUrl);
 
-  // --- Playback settings (calidad + audio) ---
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const profile = useAuthStore((s) => s.selectedProfile);
-
-  // --- Ad state ---
-  const [currentAd, setCurrentAd] = useState<VastAd | null>(null);
-  const [adPhase, setAdPhase] = useState<'none' | 'preroll' | 'midroll' | 'postroll'>('none');
-  const midrollTriggeredRef = useRef(new Set<number>());
-  const adResumeTimeRef = useRef(0);
-  const adPhaseRef = useRef<'none' | 'preroll' | 'midroll' | 'postroll'>('none');
-
-  // Sync adPhaseRef with adPhase state (for use in interval callbacks)
-  useEffect(() => {
-    adPhaseRef.current = adPhase;
-  }, [adPhase]);
-  // Idioma preferido del usuario: perfil > navegador. Se aplica al montar.
-  const userLang = useMemo(() => {
-    const prefs = (profile?.preferences as Array<{ audio_language?: string; language?: string }> | undefined) ?? [];
-    const langPref = prefs.find((p) => p?.audio_language || p?.language);
-    const val = langPref?.audio_language ?? langPref?.language;
-    return val || (typeof navigator !== 'undefined' ? navigator.language : 'es');
-  }, [profile]);
-
-  // --- Native player delegation ---
-  // "Prefers modern playback" override: when enabled, always use the web player
-  // and ignore the native player preference reported by the device.
   const prefersModernPlayback = useSettingsStore((s) => s.prefersModernPlayback);
   const useNative = useMemo(
     () => !prefersModernPlayback && prefersNativePlayer(),
     [prefersModernPlayback],
   );
 
-  useEffect(() => {
-    if (!useNative || !contentId || !tokens) return;
-    launchNativePlayer({
-      contentId,
-      episodeId,
-      accessToken: tokens.accessToken,
-      clientEndpoint,
-    });
-    setOnNativePlayerFinished(() => {
-      navigate('/home', { replace: true });
-    });
-    return () => setOnNativePlayerFinished(null);
-  }, [useNative, contentId, episodeId, tokens, clientEndpoint, navigate]);
+  const userLang = useMemo(() => {
+    const prefs = (useAuthStore.getState().selectedProfile?.preferences as Array<{ audio_language?: string; language?: string }> | undefined) ?? [];
+    const langPref = prefs.find((p) => p?.audio_language || p?.language);
+    const val = langPref?.audio_language ?? langPref?.language;
+    return val || (typeof navigator !== 'undefined' ? navigator.language : 'es');
+  }, []);
 
-  // When prefersNative, show only a loading spinner while native player is active
-  if (useNative) {
-    return (
-      <div className="w-full h-full bg-black flex flex-col items-center justify-center gap-5">
-        <M3eLoadingIndicator style={{ "--m3e-loading-indicator-active-indicator-color": "#ddd" } as any} />
-        <p className="text-white/50 text-base tracking-wide">Abriendo reproductor nativo…</p>
-      </div>
-    );
-  }
-
-  // --- Flatten episodes from seasons ---
-  const allEpisodes = useMemo<FlatEpisode[]>(() => {
+  const allEpisodes = useMemo(() => {
     if (!watchData?.seasons) return [];
     const result: FlatEpisode[] = [];
     for (const season of watchData.seasons) {
@@ -319,14 +71,6 @@ export function WatchScreen() {
     }
     return result;
   }, [watchData?.seasons]);
-
-  // thumbUrl por episodio calculado una sola vez cuando cambia la lista,
-  // en vez de en cada render de EpisodesRow (evita recomputar resolveImageUrl
-  // por cada card en cada re-render).
-  const episodesWithThumb = useMemo(
-    () => allEpisodes.map((ep) => ({ ep, thumbUrl: resolveImageUrl(ep.thumbnail, clientEndpoint) })),
-    [allEpisodes, clientEndpoint],
-  );
 
   const currentEpisodeIndex = useMemo(() => {
     if (!episodeId || allEpisodes.length === 0) return -1;
@@ -339,16 +83,13 @@ export function WatchScreen() {
     return idx >= 0 ? (watchData.seasons[idx].position ?? idx + 1) : null;
   }, [watchData]);
 
-  // --- Find next episode ---
-  useEffect(() => {
+  const nextEpisode = useMemo(() => {
     if (currentEpisodeIndex >= 0 && currentEpisodeIndex < allEpisodes.length - 1) {
-      setNextEpisode(allEpisodes[currentEpisodeIndex + 1]);
-    } else {
-      setNextEpisode(null);
+      return allEpisodes[currentEpisodeIndex + 1];
     }
+    return null;
   }, [currentEpisodeIndex, allEpisodes]);
 
-  // --- Collect all segments (episode + content) ---
   const allSegments = useMemo(() => {
     const epSegs = watchData?.episode?.segments ?? [];
     const contentSegs = watchData?.content?.segments ?? [];
@@ -358,36 +99,69 @@ export function WatchScreen() {
   const { ref, focusKey } = useFocusable({
     focusKey: 'watch-root',
     trackChildren: true,
+    saveLastFocusedChild: true,
     preferredChildFocusKey: 'watch-playpause',
   });
-
-  // --- Sincronizar handler de "ended" con el Engine ---
-  useEffect(() => {
-    setOnEnded(() => {
-      // Try postroll ad before navigating
-      fetchVast(AD_POSTROLL_TAG).then((ad) => {
-        if (ad) {
-          pendingNavigationRef.current = nextEpisode
-            ? { contentId: contentId!, episodeId: nextEpisode.id }
-            : { contentId: contentId! };
-          setCurrentAd(ad);
-          setAdPhase('postroll');
-        } else {
-          if (nextEpisode) {
-            navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
-          } else {
-            navigate(-1);
-          }
-        }
-      });
+  const focusPlaybackControl = useCallback(() => {
+    requestAnimationFrame(() => {
+      if (doesFocusableExist('watch-playpause')) {
+        setFocus('watch-playpause');
+      } else if (doesFocusableExist('watch-root')) {
+        setFocus('watch-root');
+      }
     });
-  }, [setOnEnded, nextEpisode, contentId, navigate]);
+  }, []);
+
+
+  // --- Native player delegation ---
+  useEffect(() => {
+    if (!useNative || !contentId || !tokens) return;
+    launchNativePlayer({ contentId, episodeId, accessToken: tokens.accessToken, clientEndpoint });
+    setOnNativePlayerFinished(() => navigate('/home', { replace: true }));
+    return () => setOnNativePlayerFinished(null);
+  }, [useNative, contentId, episodeId, tokens, clientEndpoint, navigate]);
+
+  // --- Sync adPhaseRef ---
+  useEffect(() => { adPhaseRef.current = adPhase; }, [adPhase]);
+
+  // --- Heal norigin ghost focus on unmount ---
+  // When the player unmounts, the focused key is removed from norigin without a
+  // live parent, leaving a stale "ghost" focusKey behind. Any subsequent arrow
+  // press then aborts (smartNavigate cannot find the component), killing
+  // navigation on the destination screen. Redirect focus to a key that is
+  // guaranteed to exist (the always-mounted sidebar).
+  useEffect(() => {
+    return () => {
+      const key = getCurrentFocusKey();
+      if (key && !doesFocusableExist(key)) {
+        setFocus('sidebar');
+      }
+    };
+  }, []);
+
+  // --- Reset ad state on content change ---
+  useEffect(() => {
+    if (test) return;
+    setPrerollChecked(false);
+    setAdPhase('none');
+    setCurrentAd(null);
+  }, [contentId, episodeId, test]);
 
   // --- Load watch data ---
   useEffect(() => {
+    if (test) {
+      setWatchData({
+        sources: [{ url: TEST_STREAM_URL }],
+        content: {
+          title: 'Big Buck Bunny',
+          content_type: 'MOVIE',
+          description: 'Video de prueba',
+        },
+      } as unknown as WatchData);
+      return;
+    }
     if (!tokens || !contentId) return;
     setWatchData(null);
-    setSkipSegment(null);
     consumeWatchData(tokens.accessToken, contentId, episodeId)
       .then((data) => {
         const isTVShow = data.content.content_type === 'TVSHOW';
@@ -411,25 +185,13 @@ export function WatchScreen() {
       })
       .catch(() => {
         useToastStore.getState().show('No se pudo cargar el contenido. Intenta de nuevo más tarde.', 'error', 4000);
-        navigate('/home', { replace: true })
+        navigate('/home', { replace: true });
       });
-  }, [tokens, contentId, episodeId, navigate]);
+  }, [test, tokens, contentId, episodeId, navigate]);
 
-  // --- Preroll + midroll/postroll ad state ---
-  const [prerollChecked, setPrerollChecked] = useState(false);
-  const pendingNavigationRef = useRef<{ contentId: string; episodeId?: string } | null>(null);
-
-  // Reset ad state on content change
+  // --- Preroll ---
   useEffect(() => {
-    setPrerollChecked(false);
-    setAdPhase('none');
-    setCurrentAd(null);
-    midrollTriggeredRef.current.clear();
-  }, [contentId, episodeId]);
-
-  // --- Preroll: fetch VAST before loading the stream ---
-  useEffect(() => {
-    if (!streamUrl || prerollChecked || adPhase !== 'none') return;
+    if (test || !streamUrl || prerollChecked || adPhase !== 'none') return;
     fetchVast(AD_PREROLL_TAG).then((ad) => {
       setPrerollChecked(true);
       if (ad) {
@@ -437,11 +199,9 @@ export function WatchScreen() {
         setCurrentAd(ad);
       }
     });
-  }, [streamUrl, prerollChecked, adPhase]);
+  }, [test, streamUrl, prerollChecked, adPhase]);
 
-  // --- Cargar el stream en el Engine cuando el <video> ya está montado ---
-  // Solo se carga cuando no hay un ad reproduciéndose (adPhase === 'none')
-  // y el preroll ya fue verificado.
+  // --- Load stream ---
   useEffect(() => {
     if (!streamUrl || adPhase !== 'none' || !prerollChecked) return;
     let cancelled = false;
@@ -454,15 +214,13 @@ export function WatchScreen() {
     return () => { cancelled = true; };
   }, [streamUrl, load, play, watchData, applyPreferredAudioLanguage, userLang, adPhase, prerollChecked]);
 
-  // --- Progress reporting al backend + NativeBridge (cada 10s, sin relación con el render) ---
+  // --- Progress reporting ---
   useEffect(() => {
-    if (!tokens || !contentId || !watchData) return;
+    if (test || !tokens || !contentId || !watchData) return;
 
-    // Precomputar una sola vez las URLs y campos estáticos: evita 5× resolveImageUrl
-    // por tick (menos allocaciones / GC cada 10s durante la reproducción).
-    const cover = resolveImageUrl(watchData.content.cover, clientEndpoint);
-    const banner = resolveImageUrl(watchData.content.banner, clientEndpoint);
-    const cwItemBase: Omit<AndroidTvHomeItem, 'progress' | 'duration'> = {
+    const cover = resolveImageUrl(watchData.content.cover, clientEndpoint) ?? undefined;
+    const banner = resolveImageUrl(watchData.content.banner, clientEndpoint) ?? undefined;
+    const cwItemBase = {
       content_id: contentId,
       episode_id: episodeId,
       title: watchData.content.title,
@@ -472,314 +230,240 @@ export function WatchScreen() {
       cover_resized: cover,
       banner,
       banner_resized: banner,
-      image_url: resolveImageUrl(watchData.content.banner ?? watchData.content.cover, clientEndpoint),
+      image_url: resolveImageUrl(watchData.content.banner ?? watchData.content.cover, clientEndpoint) ?? undefined,
       url: `/watch/${contentId}${episodeId ? `/${episodeId}` : ''}`,
       episode_title: watchData.season?.title && watchData.episode?.title
         ? `${watchData.season.title} - ${watchData.episode.title}`
         : watchData.episode?.title,
     };
 
-    progressTimerRef.current = setInterval(() => {
+    const timer = setInterval(() => {
       const video = videoRef.current;
       if (video && video.duration) {
-        updateProgress(
-          tokens.accessToken,
-          contentId,
-          episodeId,
-          video.currentTime,
-          video.duration,
-        ).catch(() => { });
-
-        addContinueWatching({
-          ...cwItemBase,
-          progress: Math.round(video.currentTime * 1000),
-          duration: Math.round(video.duration * 1000),
-        });
+        updateProgress(tokens.accessToken, contentId, episodeId, video.currentTime, video.duration).catch(() => { });
+        addContinueWatching({ ...cwItemBase, progress: Math.round(video.currentTime * 1000), duration: Math.round(video.duration * 1000) });
       }
     }, 10000);
+    return () => clearInterval(timer);
+  }, [test, tokens, contentId, watchData, clientEndpoint, episodeId, videoRef]);
 
-    return () => { if (progressTimerRef.current) clearInterval(progressTimerRef.current); };
-  }, [tokens, contentId, watchData, clientEndpoint, episodeId]);
-
-  // --- Tick de lógica a 1Hz: detección de segmento activo + next-episode ---
-  // Antes esto corría dentro de "timeupdate" (hasta 4 veces por segundo) y
-  // cada corrida terminaba en un setState que re-renderizaba el árbol
-  // completo. Un segundo de resolución es más que suficiente para decidir
-  // si mostrar "Omitir intro" o la tarjeta de siguiente episodio.
+  // --- Ended handler ---
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    logicTimerRef.current = setInterval(() => {
-      const ct = video.currentTime;
-      const dur = video.duration || 0;
-
-      // Segmento de skip activo
-      const active = allSegments.find((s) => {
-        const start = s.start ?? s.start_time ?? 0;
-        const end = s.end ?? s.end_time ?? 0;
-        return ct >= start && ct <= end && (s.type === 'intro' || s.segment_type === 'skip_intro' || s.type === 'resume' || s.segment_type === 'skip_resume');
-      });
-      setSkipSegment((prev) => {
-        if (prev?.id === active?.id) return prev;
-        return active ?? null;
-      });
-
-      // Midroll: check if we've passed a midroll threshold
-      if (adPhaseRef.current === 'none' && dur > 0) {
-        const midrollBucket = Math.floor(ct / AD_MIDROLL_INTERVAL);
-        if (midrollBucket > 0 && !midrollTriggeredRef.current.has(midrollBucket)) {
-          midrollTriggeredRef.current.add(midrollBucket);
-          adResumeTimeRef.current = ct;
-          pause();
-          fetchVast(AD_MIDROLL_TAG).then((ad) => {
-            if (ad) {
-              setCurrentAd(ad);
-              setAdPhase('midroll');
-            } else {
-              // No midroll ad available, resume playback
-              play();
-            }
-          });
-        }
+    setOnEnded(() => {
+      if (test) {
+        navigate('/home');
+        return;
       }
-
-      // Next episode: por segmento explícito o cercanía al final
-      if (nextEpisode) {
-        const nextEpSegment = allSegments.find(
-          (seg) => seg.segment_type === 'next_episode' && seg.start_time !== null && ct >= (seg.start_time ?? 0),
-        );
-        const nearEnd = dur > 0 && (dur - ct) <= 30;
-        const shouldShow = !!(nextEpSegment || nearEnd);
-
-        if (shouldShow && !nextShowingRef.current) {
-          nextShowingRef.current = true;
-          setShowNextCard(true);
-
-          let countdown = 10;
-          if (nextCountdownRef.current) nextCountdownRef.current.innerText = `${countdown}s`;
-
-          if (nextTimerRef.current) clearInterval(nextTimerRef.current);
-          nextTimerRef.current = setInterval(() => {
-            countdown--;
-            if (nextCountdownRef.current) nextCountdownRef.current.innerText = `${countdown}s`;
-
-            if (countdown <= 0) {
-              if (nextTimerRef.current) clearInterval(nextTimerRef.current);
-              nextShowingRef.current = false;
-              navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
-            }
-          }, 1000);
-        } else if (!shouldShow && nextShowingRef.current) {
-          nextShowingRef.current = false;
-          setShowNextCard(false);
-          if (nextTimerRef.current) clearInterval(nextTimerRef.current);
+      fetchVast(AD_POSTROLL_TAG).then((ad) => {
+        if (ad) {
+          pendingNavigationRef.current = nextEpisode
+            ? { contentId: contentId!, episodeId: nextEpisode.id }
+            : { contentId: contentId! };
+          setCurrentAd(ad);
+          setAdPhase('postroll');
+        } else {
+          if (nextEpisode) {
+            navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
+          } else {
+            navigate(-1);
+          }
         }
-      }
-    }, LOGIC_TICK_MS);
+      });
+    });
+  }, [setOnEnded, nextEpisode, contentId, navigate, test]);
 
-    return () => {
-      if (logicTimerRef.current) clearInterval(logicTimerRef.current);
-    };
-  }, [allSegments, nextEpisode, contentId, navigate]);
-
-  // Si desaparece el next episode (cambio de contenido), limpiar estado
+  // --- Sync controls ref with engine + data ---
   useEffect(() => {
-    if (!nextEpisode) {
-      if (nextTimerRef.current) clearInterval(nextTimerRef.current);
-      nextShowingRef.current = false;
-      setShowNextCard(false);
+    const el = controlsRef.current;
+    if (!el) return;
+    if (engineReady) el.engineRef = getEngine();
+    el.videoEl = videoRef.current;
+    if (watchData) {
+      el.contentTitle = watchData.content.title;
+      el.contentSubtitle = watchData.episode?.title
+        ? `${watchData.content.content_type === 'TVSHOW' && currentSeasonNumber ? `T${currentSeasonNumber} · ` : ''}${watchData.episode.title}`
+        : '';
     }
-  }, [nextEpisode]);
+    if (allEpisodes.length > 0) {
+      el.episodes = { episodes: allEpisodes, currentId: episodeId, contentId };
+    }
+    el.segments = allSegments;
+    el.clientEndpoint = clientEndpoint;
+    el.nextEpisode = nextEpisode;
+  }, [engineReady, getEngine, watchData, allEpisodes, allSegments, currentSeasonNumber, episodeId, contentId, clientEndpoint, nextEpisode, videoRef]);
 
-  // --- Cleanup next timer on unmount ---
+  // --- Handle controls events ---
   useEffect(() => {
-    return () => {
-      if (nextTimerRef.current) clearInterval(nextTimerRef.current);
+    const el = controlsRef.current;
+    if (!el) return;
+
+    const handleSettingsToggle = (e: CustomEvent) => {
+      const open = !!e.detail.open;
+      setSettingsOpen(open);
+      if (!open) {
+        requestAnimationFrame(() => {
+          if (doesFocusableExist('watch-settings')) {
+            setFocus('watch-settings');
+          } else if (doesFocusableExist('watch-root')) {
+            setFocus('watch-root');
+          }
+        });
+      }
     };
-  }, []);
 
-  const togglePlay = useCallback(() => {
-    if (isPlaying) pause();
-    else play();
-  }, [isPlaying, play, pause]);
+    const handleNextEpisode = (e: CustomEvent) => {
+      const { contentId: cid, episodeId: eid } = e.detail;
+      navigate(`/watch/${cid}/${eid}`, { replace: true });
+    };
 
-  const handleSkip = useCallback(() => {
-    if (!skipSegment) return;
-    const end = skipSegment.end ?? skipSegment.end_time ?? 0;
-    seek(end);
-    setSkipSegment(null);
-  }, [skipSegment, seek]);
+    const handleSkip = () => {
+      focusPlaybackControl();
+    };
 
-  const handleAdComplete = useCallback(() => {
-    const prevPhase = adPhaseRef.current;
-    setCurrentAd(null);
-    setAdPhase('none');
+    const handleEpisodeSelect = (e: CustomEvent<{ episodeId: string | number }>) => {
+      const selectedEpisodeId = e.detail.episodeId;
+      if (String(selectedEpisodeId) !== String(episodeId)) {
+        navigate(`/watch/${contentId}/${selectedEpisodeId}`, { replace: true });
+      }
+    };
 
-    // Restaurar el foco del reproductor: al cerrar el ad, el WC elimina sus
-    // focusables y norigin queda sin nodo enfocado, lo que bloquea el D-pad.
-    // Devolver el foco al play/pause recupera la navegación del player.
-    setFocus('watch-playpause');
+    el.addEventListener('settings-toggle', handleSettingsToggle);
+    el.addEventListener('next-episode', handleNextEpisode);
+    el.addEventListener('skip', handleSkip);
+    el.addEventListener('episode-select', handleEpisodeSelect as EventListener);
 
-    if (prevPhase === 'postroll' && pendingNavigationRef.current) {
-      const nav = pendingNavigationRef.current;
-      pendingNavigationRef.current = null;
-      if (nav.episodeId) {
-        navigate(`/watch/${nav.contentId}/${nav.episodeId}`, { replace: true });
+    return () => {
+      el.removeEventListener('settings-toggle', handleSettingsToggle);
+      el.removeEventListener('next-episode', handleNextEpisode);
+      el.removeEventListener('skip', handleSkip);
+      el.removeEventListener('episode-select', handleEpisodeSelect as EventListener);
+    };
+  }, [contentId, episodeId, navigate, focusPlaybackControl, engineReady]);
+
+  // --- Handle ad completion ---
+  useEffect(() => {
+    const el = adOverlayRef.current;
+    if (!el) return;
+
+    const handleAdComplete = () => {
+      const pending = pendingNavigationRef.current;
+      if (pending) {
+        pendingNavigationRef.current = null;
+        navigate(
+          pending.episodeId
+            ? `/watch/${pending.contentId}/${pending.episodeId}`
+            : `/watch/${pending.contentId}`,
+          { replace: true },
+        );
+        return;
+      }
+      setCurrentAd(null);
+      setAdPhase('none');
+      setFocus('watch-playpause');
+    };
+
+    el.addEventListener('ad-complete', handleAdComplete);
+    return () => el.removeEventListener('ad-complete', handleAdComplete);
+  }, [currentAd, navigate]);
+
+  // --- Push current ad into the overlay element ---
+  useEffect(() => {
+    const el = adOverlayRef.current;
+    if (el) {
+      el.ad = currentAd;
+      el.setAttribute('skip-offset', '5');
+    }
+  }, [currentAd]);
+
+  // --- Back button + play/pause via InputManager ---
+  useEffect(() => {
+    const handleBack = () => {
+      if (settingsOpen) {
+        if (controlsRef.current) controlsRef.current.settingsOpen = false;
+        return;
+      }
+      if (controlsRef.current?.railExpanded) {
+        controlsRef.current.railExpanded = false;
+        setFocus('watch-episodes');
+        return;
+      }
+      if (!controlsRef.current?.showControls) {
+        controlsRef.current.showControls = true;
+        focusPlaybackControl();
+        return;
+      }
+      if (test) {
+        navigate('/home');
       } else {
         navigate(-1);
       }
-    } else if (prevPhase === 'midroll') {
-      const resumeTime = adResumeTimeRef.current;
-      play().then(() => {
-        if (resumeTime > 0) seek(resumeTime);
-      });
-    }
-  }, [navigate, play, seek]);
+    };
 
-  const showControlsTemporarily = useCallback(() => {
-    setShowControls(true);
-    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-    controlsTimerRef.current = setTimeout(() => {
-      if (videoRef.current && !videoRef.current.paused) {
-        setShowControls(false);
-      }
-    }, 4000);
-  }, []);
+    const handlePlayPause = () => {
+      if (controlsRef.current?.settingsOpen) return;
+      controlsRef.current?.togglePlayPause();
+    };
 
-  // Limpiar el timer de auto-hide al desmontar (evita setState post-unmount)
-  useEffect(() => {
+    inputManager.on('back', handleBack);
+    inputManager.on('playpause', handlePlayPause);
+
     return () => {
-      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+      inputManager.off('back', handleBack);
+      inputManager.off('playpause', handlePlayPause);
     };
-  }, []);
+  }, [navigate, settingsOpen, test, focusPlaybackControl, engineReady]);
 
-  // Auto-hide controls when video starts playing
+  // --- Auto-hide on play ---
   useEffect(() => {
-    if (isPlaying && showControls) {
-      showControlsTemporarily();
+    if (isPlaying && controlsRef.current) {
+      controlsRef.current.showControls = true;
+      setTimeout(() => {
+        const controls = controlsRef.current;
+        const currentFocus = getCurrentFocusKey() ?? '';
+        if (
+          controls &&
+          !controls.video?.paused &&
+          !controls.settingsOpen &&
+          !controls.railExpanded &&
+          !currentFocus.startsWith('player-settings')
+        ) {
+          controlsRef.current.showControls = false;
+        }
+      }, 4000);
     }
-  }, [isPlaying, showControls, showControlsTemporarily]);
+  }, [isPlaying]);
 
-  const cancelNextEpisode = useCallback(() => {
-    nextShowingRef.current = false;
-    setShowNextCard(false);
-    if (nextTimerRef.current) clearInterval(nextTimerRef.current);
-  }, []);
-
-  const playNextEpisode = useCallback(() => {
-    if (!nextEpisode) return;
-    cancelNextEpisode();
-    navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
-  }, [nextEpisode, contentId, navigate, cancelNextEpisode]);
-
-  const navigateToEpisode = useCallback(
-    (epId: string | number) => {
-      if (String(epId) === String(episodeId)) return;
-      navigate(`/watch/${contentId}/${epId}`, { replace: true });
-    },
-    [episodeId, contentId, navigate],
-  );
-
-  const { handleKeyDown } = useKeyHandler({
-    onBack: () => {
-      if (settingsOpen) {
-        setSettingsOpen(false);
-        return;
-      }
-      if (railExpanded) {
-        setRailExpanded(false);
-        return;
-      }
-      if (showControls) {
-        setShowControls(false);
-        return;
-      }
-      if (!watchData || !streamUrl) {
-        navigate(-1);
-        return;
-      }
-      navigate(-1);
-    },
-    onPlayPause: togglePlay,
-  });
-
-  // FIX: antes se chequeaba document.activeElement?.closest('[data-episode-rail]')
-  // para decidir si las flechas eran seek o navegación del rail. Pero
-  // norigin-spatial-navigation maneja el foco de forma virtual y no mueve el
-  // foco real del DOM, así que ese chequeo nunca era verdadero y las flechas
-  // siempre terminaban haciendo seek, incluso con foco dentro del rail.
-  // Ahora usamos railExpanded (ya calculado a partir de hasFocusedChild del
-  // rail) como fuente de verdad.
+  // --- Focus play/pause when ready ---
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      const isSeekKey = e.key === 'ArrowLeft' || e.key === 'ArrowRight';
-      if (!isSeekKey) return;
-
-      const focusKey = getCurrentFocusKey();
-      if (focusKey === 'episodes-rail' || focusKey.startsWith('rail-ep-item-')) return;
-
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      const video = videoRef.current;
-      if (video) {
-        const delta = e.key === 'ArrowLeft' ? -10 : 10;
-        video.currentTime = Math.max(0, Math.min(video.currentTime + delta, video.duration || 0));
-        showControlsTemporarily();
-      }
-    };
-    window.addEventListener('keydown', handleKey, true);
-    return () => window.removeEventListener('keydown', handleKey, true);
-  }, [showControlsTemporarily]);
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      const isBackKey = e.key === 'Escape' || e.key === 'Backspace' || e.key === 'XF86Back' || e.key === 'GoBack' || e.key === 'BrowserBack';
-      const isActionKey = e.key === ' ' || e.key === 'Enter';
-      const isNavArrow = e.key === 'ArrowUp' || e.key === 'ArrowDown';
-      handleKeyDown(e);
-      if (isActionKey || isNavArrow || (!isBackKey && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) {
-        showControlsTemporarily();
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [handleKeyDown, showControlsTemporarily]);
-
-  // Enfocar play/pause UNA sola vez cuando el contenido está listo.
-  // (Antes se hacía setFocus en cada toggle de showControls, lo que robaba
-  //  el foco al rail y provocaba thrash de foco en el Main Thread.)
-  const readyRef = useRef(false);
-  useEffect(() => {
-    if (ready && !readyRef.current) {
-      readyRef.current = true;
-      setFocus('watch-playpause');
+    if (ready && engineReady) {
+      focusPlaybackControl();
     }
-  }, [ready]);
+  }, [ready, engineReady, focusPlaybackControl]);
 
+  // --- Sync isBuffering to WC ---
   useEffect(() => {
-    if (skipSegment) setFocus('watch-skip');
-  }, [skipSegment]);
-
-  // Auto-focus skip button when it appears and controls are hidden
-  useEffect(() => {
-    if (skipSegment && !showControls) {
-      setFocus('watch-skip');
+    if (controlsRef.current) {
+      controlsRef.current.isBuffering = isBuffering;
     }
-  }, [skipSegment, showControls]);
+  }, [isBuffering]);
 
-  // Auto-focus next episode card when it appears and controls are hidden
+  // --- Sync duration to WC ---
   useEffect(() => {
-    if (showNextCard && !showControls) {
-      setFocus('watch-next-play');
+    if (controlsRef.current) {
+      const el = controlsRef.current.shadowRoot?.querySelector('[data-duration-time]');
+      if (el) el.textContent = '';
     }
-  }, [showNextCard, showControls]);
+  }, [isBuffering]);
 
-  const skipLabel = (skipSegment?.type === 'intro' || skipSegment?.segment_type === 'skip_intro')
-    ? 'intro'
-    : 'resumen';
-
-  const isTVShow = watchData?.content.content_type === 'TVSHOW';
+  // When prefersNative, show only a loading spinner while native player is active
+  if (useNative) {
+    return (
+      <div className="w-full h-full bg-black flex flex-col items-center justify-center gap-5">
+        <M3eLoadingIndicator style={{ '--m3e-loading-indicator-active-indicator-color': '#ddd' } as any} />
+        <p className="text-white/50 text-base tracking-wide">Abriendo reproductor nativo…</p>
+      </div>
+    );
+  }
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -787,9 +471,18 @@ export function WatchScreen() {
         ref={ref as React.RefObject<HTMLDivElement>}
         className="fixed inset-0 w-screen h-screen bg-black overflow-hidden select-none"
       >
-        {/* El <video> se monta SIEMPRE y se reutiliza entre episodios.
-            Desmontarlo (early-return) destruía el elemento al que el engine
-            estaba adjunto, dejando solo audio al cambiar de episodio. */}
+        {!ready && (
+          <div className="absolute inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30">
+            <p className="text-white/50 text-xl tracking-wide uppercase">Cargando...</p>
+          </div>
+        )}
+
+        {test && (
+          <div className="absolute top-0 left-0 z-30 px-4 py-2 bg-live/80 text-white text-xs font-bold uppercase tracking-wider rounded-br-xl">
+            Modo prueba
+          </div>
+        )}
+
         <video
           ref={attachVideo}
           className="absolute inset-0 w-full h-full block"
@@ -798,225 +491,24 @@ export function WatchScreen() {
           playsInline
         />
 
-        {/* Viñeta persistente */}
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60" />
+        <div className="absolute inset-0 pointer-events-none bg-linear-to-t from-black/70 via-transparent to-black/40 opacity-60" />
 
-        {/* Pantalla de preparación mientras se cargan los datos del episodio */}
-        {!ready && (
-          <div className="absolute inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30">
-            <M3eLoadingIndicator style={{ "--m3e-loading-indicator-active-indicator-color": "#ddd" } as any} />
-            <p className="text-white/50 text-base tracking-wide">Preparando la reproduccion…</p>
-          </div>
-        )}
-
-        {ready && isBuffering && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <LucideLoader2 size={56} className="animate-spin" style={{ color: ACCENT }} />
-          </div>
-        )}
-
-        {/* Overlay de controles: scrim superior + centro (play/pause) + seekbar inferior + episodios — se ocultan tras inactividad */}
-        <div
-          className={classNames(
-            'absolute inset-0 transition-opacity duration-300',
-            ready && showControls ? 'opacity-100' : 'opacity-0 pointer-events-none',
-          )}
-          style={{ zIndex: 15 }}
-        >
-          {/* Scrim superior + título + gear */}
-          <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/80 via-black/30 to-transparent pt-[clamp(1.25rem,3.4vh,2rem)] pb-[clamp(2.5rem,7vh,4rem)] px-[clamp(2rem,4vw,3rem)] pointer-events-auto">
-            <div className="flex items-start justify-between gap-4">
-              <div className="mt-[clamp(1rem,3vh,1.75rem)] max-w-3xl">
-                <h1 className="text-white font-bold leading-tight" style={{ fontSize: 'clamp(1.5rem, 2.6vw, 2.2rem)' }}>
-                  {watchData?.content.title}
-                </h1>
-                {watchData?.episode && (
-                  <p className="text-white/45 text-[15px] font-medium mt-1">
-                    {isTVShow && currentSeasonNumber
-                      ? `T${currentSeasonNumber} · `
-                      : ''}
-                    {watchData.episode.title}
-                  </p>
-                )}
-              </div>
-              <Focusable
-                onEnterPress={() => setSettingsOpen((v) => !v)}
-                focusKey="watch-settings"
-                focusedClassName="ring-4 ring-white"
-                className="mt-[clamp(1rem,3vh,1.75rem)] w-12 h-12 rounded-full flex items-center justify-center text-white/90 border border-white/20 bg-transparent transition-all duration-200 ease-out pointer-events-auto"
-              >
-                <LucideSettings size={22} />
-              </Focusable>
-            </div>
-          </div>
-
-          {/* Transporte central: se desvanece suavemente cuando el foco está en la fila de episodios */}
-          <div
-            className={classNames(
-              'absolute inset-0 flex items-center justify-center pointer-events-auto transition-opacity transition-transform duration-300',
-              railExpanded ? 'opacity-0 -translate-y-3 pointer-events-none' : 'opacity-100 translate-y-0',
-            )}
-          >
-            <Focusable
-              onEnterPress={togglePlay}
-              focusKey="watch-playpause"
-              focusedClassName="scale-110 ring-4"
-              className="w-[clamp(4.25rem,8vw,6rem)] h-[clamp(4.25rem,8vw,6rem)] rounded-2xl flex items-center justify-center text-black transition-all duration-200 ease-out bg-white/[0.92] backdrop-blur-sm border border-white/20 shadow-lg shadow-black/30 hover:bg-white"
-            >
-              {isPlaying ? (
-                <LucidePause size="38%" fill="currentColor" strokeWidth={0} />
-              ) : (
-                <LucidePlay size="38%" fill="currentColor" strokeWidth={0} className="ml-1" />
-              )}
-            </Focusable>
-          </div>
-
-          {/* Scrim inferior: seekbar y (título + descripción del episodio resaltado) se
-              apilan en el mismo lugar (position: relative/absolute) y hacen cross-fade con
-              opacity + translate. Nada se recorta ni se desmonta: ambas vistas existen
-              siempre en el DOM, solo cambia cuál es visible/interactiva. */}
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-[clamp(2.5rem,7vh,5rem)] pb-[clamp(1.25rem,3.5vh,2.25rem)] px-[clamp(2rem,4vw,3rem)] pointer-events-auto">
-            <div className={classNames(
-              'relative transition-all duration-300',
-              railExpanded ? 'h-[clamp(80px,12vh,110px)]' : 'h-[clamp(44px,6vh,52px)]',
-            )}>
-              {/* Vista seekbar: se actualiza por DOM/rAF, fuera de React state */}
-              <Focusable
-                onEnterPress={togglePlay}
-                focusKey="watch-progress"
-                focusedClassName="scale-101"
-                className={classNames(
-                  'absolute inset-0 transition-opacity transition-transform duration-300',
-                  railExpanded ? 'opacity-0 translate-y-3 pointer-events-none' : 'opacity-100 translate-y-0',
-                )}
-              >
-                <Seekbar videoRef={videoRef} duration={duration} />
-              </Focusable>
-
-
-              {/* Vista expandida: título + descripción del episodio resaltado en la fila */}
-              <div
-                className={classNames(
-                  'absolute inset-0 flex flex-col justify-center transition-opacity transition-transform duration-300',
-                  railExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-3 pointer-events-none',
-                )}
-              >
-                <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-white/40 mb-1">
-                  {focusedRailEpisode
-                    ? `Ep ${allEpisodes.findIndex((e) => e.id === focusedRailEpisode.id) + 1}`
-                    : 'Episodios'}
-                </p>
-                <h3 className="text-white text-[15px] font-medium leading-snug line-clamp-1">
-                  {focusedRailEpisode?.title}
-                </h3>
-                {focusedRailEpisode?.description && (
-                  <p className="text-white/45 text-[13px] leading-snug line-clamp-2 mt-0.5">
-                    {focusedRailEpisode.description}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Fila de episodios: siempre visible junto con los controles (estilo YouTube TV),
-                   se agranda levemente cuando el foco entra en ella */}
-            {isTVShow && episodesWithThumb.length > 0 && (
-              <EpisodesRailNorigin
-                episodes={episodesWithThumb}
-                currentIndex={currentEpisodeIndex}
-                expanded={railExpanded}
-                onSelect={navigateToEpisode}
-                onExpandChange={setRailExpanded}
-                onFocusedEpisodeChange={setFocusedRailEpisode}
-              />
-            )}
-
-          </div>
-        </div>
-
-        {/* Panel de ajustes de reproducción (calidad + audio) — fuera del overlay para que siempre sea visible */}
         {engineReady && (
-          <PlayerSettingsNorigin
-            engine={getEngine()}
-            open={settingsOpen}
-            onClose={() => setSettingsOpen(false)}
+          <tv-player-controls
+            ref={controlsRef}
+            style={{ display: ready ? 'block' : 'none' }}
           />
         )}
 
-        {/* --- SKIP INTRO/RESUME (siempre visible cuando hay segmento activo) --- */}
-        {skipSegment && (
-          <div className="absolute bottom-[clamp(7rem,16vh,11rem)] right-[clamp(2rem,4vw,3rem)] z-25 pointer-events-auto transition-all duration-350 ease-out opacity-100 translate-y-0">
-            <Focusable
-              onEnterPress={handleSkip}
-              focusKey="watch-skip"
-              focusedClassName="scale-105 ring-4"
-              className="flex items-center gap-2.5 px-5 py-3 bg-white/[0.92] backdrop-blur-md border border-white/20 rounded-2xl shadow-lg shadow-black/30 text-black text-sm font-semibold transition-all duration-200 ease-out hover:scale-[1.04] active:scale-[0.96]"
-            >
-              <span className="tracking-wide">Omitir {skipLabel}</span>
-              <LucideChevronsRight size={16} strokeWidth={2.5} />
-            </Focusable>
-          </div>
+        <PlayerSettingsPanel engine={getEngine()} open={settingsOpen} />
+
+        {currentAd && (
+          <tv-ad-overlay
+            ref={(el: any) => {
+              adOverlayRef.current = el;
+            }}
+          />
         )}
-
-        {/* --- NEXT EPISODE CARD --- */}
-        {showNextCard && nextEpisode && (
-          <div className="absolute bottom-[clamp(7rem,16vh,11rem)] right-[clamp(2rem,4vw,3rem)] z-25 pointer-events-auto transition-all duration-400 ease-out opacity-100 translate-y-0">
-            <div className="flex items-center gap-3.5 bg-white/[0.05] backdrop-blur-2xl rounded-2xl shadow-xl shadow-black/40 border border-white/[0.08] px-4 py-3 min-w-[300px]">
-              {nextEpisode.thumbnail ? (
-                <img
-                  src={resolveImageUrl(nextEpisode.thumbnail, clientEndpoint) ?? undefined}
-                  alt={nextEpisode.title}
-                  className="w-[4.5rem] h-[2.75rem] rounded-xl object-cover flex-shrink-0 bg-neutral-800"
-                />
-              ) : (
-                <div className="w-[4.5rem] h-[2.75rem] rounded-xl bg-white/[0.08] flex items-center justify-center flex-shrink-0">
-                  <LucidePlay size={14} className="text-white/30" />
-                </div>
-              )}
-
-              <div className="flex flex-col min-w-0 gap-0.5">
-                <span className="text-[0.65rem] font-semibold uppercase tracking-wider text-white/40">
-                  Siguiente episodio
-                </span>
-                <span className="text-white text-sm font-medium truncate max-w-[180px]">
-                  {nextEpisode.title}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 ml-1">
-                <span ref={nextCountdownRef} className="text-white/70 text-xs font-semibold tabular-nums bg-white/[0.08] px-2 py-1 rounded-lg">
-                  10s
-                </span>
-
-
-                <Focusable
-                  onEnterPress={playNextEpisode}
-                  focusKey="watch-next-play"
-                  focusedClassName="scale-110 ring-4"
-                  className="w-9 h-9 rounded-xl bg-white text-black flex items-center justify-center transition-all duration-200 ease-out hover:scale-105"
-                >
-                  <LucidePlay size={14} fill="currentColor" strokeWidth={0} className="ml-0.5" />
-                </Focusable>
-
-                <Focusable
-                  onEnterPress={cancelNextEpisode}
-                  focusKey="watch-next-cancel"
-                  focusedClassName="scale-110 ring-4"
-                  className="w-9 h-9 rounded-xl bg-white/[0.08] flex items-center justify-center text-white/70 transition-all duration-200 ease-out"
-                >
-                  <LucideX size={14} />
-                </Focusable>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- AD OVERLAY --- */}
-        <AdOverlayNorigin
-          ad={currentAd}
-          skipOffset={AD_SKIP_OFFSET}
-          onComplete={handleAdComplete}
-        />
-
       </div>
     </FocusContext.Provider>
   );

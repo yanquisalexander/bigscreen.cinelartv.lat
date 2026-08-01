@@ -1,14 +1,25 @@
 import { Outlet } from 'react-router-dom';
+import { useState } from 'react';
 import { useSpatialNavInit } from '@/hooks/useSpatialNavInit';
 import { TVSidebar } from './TVSidebar';
 
 export function AppShell() {
   useSpatialNavInit();
 
+  const [sidebarFocused, setSidebarFocused] = useState(false);
+
   return (
-    <div className="relative h-dvh overflow-hidden bg-bg">
-      <TVSidebar />
-      <main className="h-full w-full overflow-hidden">
+    <div
+      className="grid h-dvh overflow-hidden bg-bg"
+      style={{
+        gridTemplateColumns: sidebarFocused
+          ? 'var(--sidebar-w, 260px) 1fr'
+          : 'var(--sidebar-w-collapsed, 88px) 1fr',
+        gridTemplateAreas: '"sidebar main"',
+      }}
+    >
+      <TVSidebar onFocusChange={setSidebarFocused} />
+      <main className="h-full w-full overflow-hidden" style={{ gridArea: 'main' }}>
         <Outlet />
       </main>
     </div>

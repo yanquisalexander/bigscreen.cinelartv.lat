@@ -7,20 +7,26 @@ import { deassignProfile } from '@/features/auth/session';
 import { classNames } from '@/utils/helpers';
 import { LucideLogIn } from "lucide-react";
 import { CollectionsEmptyRegular, SearchFilled, SettingsRegular, TvRegular } from "@fluentui/react-icons";
+import { memo, useCallback, useEffect, useMemo } from 'react';
+
 const NAV_ITEMS = [
   { key: 'home', label: 'Inicio', icon: CollectionsEmptyRegular, path: '/home' },
   { key: 'search', label: 'Buscar', icon: SearchFilled, path: '/search' },
   { key: 'live', label: 'TV en Vivo', icon: TvRegular, path: '/live' },
-  //{ key: 'my-list', label: 'Mi Lista', icon: LucideTelescope, path: '/my-list' },
 ];
 
-export function TVSidebar() {
+interface TVSidebarProps {
+  onFocusChange?: (focused: boolean) => void;
+}
+
+export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const profile = useAuthStore((s) => s.selectedProfile);
   const isGuest = useAuthStore((s) => s.isGuest);
   const exitGuestMode = useAuthStore((s) => s.exitGuestMode);
   const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
+
   const { ref, focusKey, hasFocusedChild } = useFocusable({
     focusKey: 'sidebar',
     trackChildren: true,
@@ -28,43 +34,52 @@ export function TVSidebar() {
     preferredChildFocusKey: 'nav-home',
   });
 
-  const focusKeyForPath = (path: string): string => {
+  useEffect(() => {
+    onFocusChange?.(hasFocusedChild);
+  }, [hasFocusedChild, onFocusChange]);
+
+  const focusKeyForPath = useCallback((path: string): string => {
     if (path.startsWith('/content/')) return 'content-root';
     if (path.startsWith('/search')) return 'search-root';
     if (path.startsWith('/live')) return 'livetv-root';
     if (path.startsWith('/settings')) return 'settings-root';
     return 'home-root';
-  };
+  }, []);
 
-  const navigateAndCollapse = (path: string) => {
-    navigate(path);
-    requestAnimationFrame(() => setFocus(focusKeyForPath(path)));
-  };
-
-  const focusContent = (direction: string) => {
+  const focusContent = useCallback((direction: string) => {
     if (direction !== 'right') return true;
     setFocus(focusKeyForPath(location.pathname));
     return false;
-  };
+  }, [focusKeyForPath, location.pathname]);
+
+  const handleLogin = useCallback(() => {
+    exitGuestMode();
+    navigate('/auth');
+  }, [exitGuestMode, navigate]);
+
+  const handleProfile = useCallback(() => {
+    const token = useAuthStore.getState().tokens?.accessToken;
+    if (token) deassignProfile(token).catch(() => { });
+    navigate('/select-profile');
+  }, [navigate]);
+
+  const avatarUrl = useMemo(() => {
+    if (!profile) return '';
+    return profile.avatar_url ?? `${clientEndpoint}/assets/default/avatars/${profile.avatar_id ?? 'coolCat'}.png`;
+  }, [profile, clientEndpoint]);
 
   return (
     <FocusContext.Provider value={focusKey}>
       <aside
         ref={ref as React.RefObject<HTMLElement>}
+        style={{ gridArea: 'sidebar' }}
         className={classNames(
-          'absolute left-0 top-0 z-50 h-full py-6',
-          'flex flex-col',
-          // Gradiente izq -> der, opaco -> transparente (look YouTube TV)
-          'bg-gradient-to-r',
-          hasFocusedChild
-            ? 'from-black from-40% via-black/80 to-transparent w-80 px-4'
-            : 'from-black/85 from-20% via-black/30 to-transparent w-24 px-2',
-          'transition-[width,padding] duration-300 ease-out',
+          'relative h-full w-full flex flex-col py-6',
+          'bg-surface/10',
+          hasFocusedChild ? 'px-4' : 'px-2',
         )}
       >
-        <div className={classNames('flex items-center mb-12 h-8 px-2', hasFocusedChild ? 'justify-start' : 'justify-center')}>
-
-        </div>
+        <div className={classNames('flex items-center mb-12 h-8 px-2', hasFocusedChild ? 'justify-start' : 'justify-center')} />
 
         <nav className="flex-1 flex flex-col gap-2">
           {NAV_ITEMS.map((item) => {
@@ -72,7 +87,7 @@ export function TVSidebar() {
             return (
               <Focusable
                 key={item.key}
-                onEnterPress={() => navigateAndCollapse(item.path)}
+                onEnterPress={() => navigate(item.path)}
                 onArrowPress={focusContent}
                 focusKey={`nav-${item.key}`}
                 focusedClassName="bg-white !text-black"
@@ -83,21 +98,18 @@ export function TVSidebar() {
                 )}
               >
                 <item.icon className="text-2xl" />
-                <span
-                  className={classNames(
-                    'truncate whitespace-nowrap',
-                    hasFocusedChild ? 'opacity-100' : 'w-0 opacity-0',
-                  )}
-                >
-                  {item.label}
-                </span>
+                {hasFocusedChild && (
+                  <span className="truncate whitespace-nowrap">
+                    {item.label}
+                  </span>
+                )}
               </Focusable>
             );
           })}
         </nav>
 
         <Focusable
-          onEnterPress={() => navigateAndCollapse('/settings')}
+          onEnterPress={() => navigate('/settings')}
           onArrowPress={focusContent}
           focusKey="nav-settings"
           focusedClassName="bg-white !text-black"
@@ -108,22 +120,16 @@ export function TVSidebar() {
           )}
         >
           <SettingsRegular className="text-2xl" />
-          <span
-            className={classNames(
-              'truncate whitespace-nowrap',
-              hasFocusedChild ? 'opacity-100' : 'w-0 opacity-0',
-            )}
-          >
-            Ajustes
-          </span>
+          {hasFocusedChild && (
+            <span className="truncate whitespace-nowrap">
+              Ajustes
+            </span>
+          )}
         </Focusable>
 
         {isGuest ? (
           <Focusable
-            onEnterPress={() => {
-              exitGuestMode();
-              navigateAndCollapse('/auth');
-            }}
+            onEnterPress={handleLogin}
             onArrowPress={focusContent}
             focusKey="nav-login"
             focusedClassName="bg-white !text-black"
@@ -134,22 +140,15 @@ export function TVSidebar() {
             )}
           >
             <LucideLogIn className="text-2xl" />
-            <span
-              className={classNames(
-                'truncate whitespace-nowrap',
-                hasFocusedChild ? 'opacity-100' : 'w-0 opacity-0',
-              )}
-            >
-              Iniciar sesión
-            </span>
+            {hasFocusedChild && (
+              <span className="truncate whitespace-nowrap">
+                Iniciar sesión
+              </span>
+            )}
           </Focusable>
         ) : profile && (
           <Focusable
-            onEnterPress={() => {
-              const token = useAuthStore.getState().tokens?.accessToken;
-              if (token) deassignProfile(token).catch(() => { });
-              navigateAndCollapse('/select-profile');
-            }}
+            onEnterPress={handleProfile}
             onArrowPress={focusContent}
             focusKey="nav-profile"
             focusedClassName="bg-white !text-black [&_span]:text-black"
@@ -159,7 +158,7 @@ export function TVSidebar() {
             )}
           >
             <img
-              src={`${clientEndpoint}/assets/default/avatars/${profile.avatar_id ?? 'coolCat'}.png`}
+              src={avatarUrl}
               alt={profile.name}
               className="w-9 h-9 rounded-full object-cover flex-shrink-0"
               onError={(e) => {
@@ -175,17 +174,14 @@ export function TVSidebar() {
             >
               {profile.name.charAt(0).toUpperCase()}
             </div>
-            <span
-              className={classNames(
-                'truncate whitespace-nowrap text-white',
-                hasFocusedChild ? 'opacity-100' : 'w-0 opacity-0',
-              )}
-            >
-              {profile.name}
-            </span>
+            {hasFocusedChild && (
+              <span className="truncate whitespace-nowrap text-white">
+                {profile.name}
+              </span>
+            )}
           </Focusable>
         )}
       </aside>
     </FocusContext.Provider>
   );
-}
+});

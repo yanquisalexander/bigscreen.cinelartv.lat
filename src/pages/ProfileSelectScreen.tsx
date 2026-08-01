@@ -72,13 +72,13 @@ export function ProfileSelectScreen() {
               key={profile.id}
               onEnterPress={() => handleSelectProfile(profile)}
               autoFocus={profiles.indexOf(profile) === 0}
-              focusedClassName="scale-105 [&_div]:bg-accent-light/20 [&_div]:border-accent-light"
+              focusedClassName="scale-105 [&_div]:bg-white/20 [&_div]:border-accent-light"
               className={classNames(
-                'flex flex-col items-center gap-4 transition-transform duration-200',
+                'flex flex-col items-center gap-4',
                 isSelecting && 'opacity-50 [&_div]:bg-black/50 [&_div]:cursor-wait',
               )}
             >
-              <div className="relative w-32 h-32 rounded-full overflow-hidden bg-surface border-4 border-transparent transition-colors">
+              <div className="relative w-32 h-32 rounded-full overflow-hidden bg-surface border-4 border-transparent">
                 <img
                   src={avatarUrl}
                   alt={profile.name}
@@ -111,7 +111,7 @@ export function ProfileSelectScreen() {
       <Focusable
         onEnterPress={handleLogout}
         focusedClassName="text-white"
-        className="text-text-secondary text-lg transition-colors"
+        className="text-text-secondary text-lg"
       >
         Cerrar sesión
       </Focusable>

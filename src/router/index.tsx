@@ -12,6 +12,7 @@ import { ContentDetailScreen } from '@/pages/ContentDetailScreen';
 import { WatchScreen } from '@/pages/WatchScreen';
 import { BlockedScreen } from '@/pages/BlockedScreen';
 import { IS_DEV } from "@/stores/configStore";
+import { FallbackScreen } from '@/pages/FallbackScreen';
 
 const createRouterFunction = IS_DEV ? createBrowserRouter : createHashRouter;
 
@@ -29,6 +30,10 @@ export const router = createRouterFunction([
     element: <BlockedScreen />,
   },
   {
+    path: '/watch/test',
+    element: <WatchScreen test />,
+  },
+  {
     element: <ProtectedRoute />,
     children: [
       {
@@ -41,6 +46,7 @@ export const router = createRouterFunction([
           {
             path: '/home',
             element: <HomeScreen />,
+            errorElement: <FallbackScreen />,
           },
           {
             path: '/search',

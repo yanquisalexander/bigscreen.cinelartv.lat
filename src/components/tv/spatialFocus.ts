@@ -1,15 +1,16 @@
 import { SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation';
+import type { FocusableComponentLayout, FocusDetails, KeyPressDetails } from '@noriginmedia/norigin-spatial-navigation';
 
 export interface FocusableItem {
   focusKey: string;
   node: HTMLElement;
   parentFocusKey: string;
-  onEnterPress?: () => void;
+  onEnterPress?: (details?: KeyPressDetails) => void;
   onEnterRelease?: () => void;
-  onArrowPress?: (direction: string, details?: unknown) => boolean;
-  onArrowRelease?: (direction: string, details?: unknown) => void;
-  onFocus?: () => void;
-  onBlur?: () => void;
+  onArrowPress?: (direction: string, details: KeyPressDetails) => boolean;
+  onArrowRelease?: (direction: string) => void;
+  onFocus?: (layout: FocusableComponentLayout, details: FocusDetails) => void;
+  onBlur?: (layout: FocusableComponentLayout, details: FocusDetails) => void;
   onUpdateFocus?: (focused: boolean) => void;
   onUpdateHasFocusedChild?: (hasFocusedChild: boolean) => void;
   trackChildren?: boolean;
@@ -17,6 +18,7 @@ export interface FocusableItem {
   isFocusBoundary?: boolean;
   autoRestoreFocus?: boolean;
   forceFocus?: boolean;
+  preferredChildFocusKey?: string;
 }
 
 /**
@@ -42,16 +44,24 @@ export class FocusableRegistrar {
         isFocusBoundary: item.isFocusBoundary ?? false,
         autoRestoreFocus: item.autoRestoreFocus ?? true,
         forceFocus: item.forceFocus ?? false,
-        onEnterPress: item.onEnterPress,
-        onEnterRelease: item.onEnterRelease,
-        onArrowPress: item.onArrowPress,
-        onArrowRelease: item.onArrowRelease,
-        onFocus: item.onFocus,
-        onBlur: item.onBlur,
-        onUpdateFocus: item.onUpdateFocus,
-        onUpdateHasFocusedChild: item.onUpdateHasFocusedChild,
+        preferredChildFocusKey: item.preferredChildFocusKey,
+        onEnterPress: item.onEnterPress ?? (() => {}),
+        onEnterRelease: item.onEnterRelease ?? (() => {}),
+        onArrowPress: item.onArrowPress ?? (() => true),
+        onArrowRelease: item.onArrowRelease ?? (() => {}),
+        onFocus: item.onFocus ?? (() => {}),
+        onBlur: item.onBlur ?? (() => {}),
+        onUpdateFocus: item.onUpdateFocus ?? (() => {}),
+        onUpdateHasFocusedChild: item.onUpdateHasFocusedChild ?? (() => {}),
       });
     }
+  }
+
+  unregister(focusKey: string): void {
+    const idx = this.registered.indexOf(focusKey);
+    if (idx === -1) return;
+    this.registered.splice(idx, 1);
+    SpatialNavigation.removeFocusable({ focusKey });
   }
 
   unregisterAll(): void {

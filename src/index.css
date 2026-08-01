@@ -24,6 +24,11 @@
   }
 }
 
+/* Ocultamos scrollbar nativo */
+::-webkit-scrollbar {
+  display: none;
+}
+
 *, ::before, ::after {
   --tw-translate-x: 0;
   --tw-translate-y: 0;

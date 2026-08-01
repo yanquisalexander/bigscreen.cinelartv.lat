@@ -175,7 +175,7 @@ export function ContentDetailScreen() {
 
   const focusSidebarFromLeftEdge = useCallback((direction: string) => {
     if (direction !== 'left') return true;
-    setFocus('nav-home');
+    setFocus('sidebar');
     return false;
   }, []);
 

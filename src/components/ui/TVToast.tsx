@@ -43,12 +43,12 @@ export function TVToast() {
   return (
     <div
       className={classNames(
-        'fixed top-6 right-6 z-[9999] max-w-sm w-full',
+        'fixed top-0 right-0 z-[9999]',
         animState === 'in' ? 'animate-toast-in' : 'animate-toast-out',
       )}
     >
       <div className={classNames(
-        'rounded-2xl bg-[#1c1c1e]/95 backdrop-blur-xl border border-white/10 shadow-2xl px-5 py-4',
+        'rounded-xl bg-[#181818] px-5 py-4 max-w-[23rem] mr-12 mt-12',
         'flex items-start gap-4',
       )}>
         <Icon size={24} className={classNames(color, 'mt-0.5 flex-shrink-0')} strokeWidth={2} />

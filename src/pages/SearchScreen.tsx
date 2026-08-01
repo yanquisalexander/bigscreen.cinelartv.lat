@@ -135,7 +135,7 @@ export function SearchScreen() {
                 onEnterPress={handleClear}
                 focusKey="sk-clear-btn"
                 focusedClassName="bg-white/20"
-                className="w-9 h-9 rounded-full flex items-center justify-center text-white/50 transition-colors flex-shrink-0"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white/50 flex-shrink-0"
               >
                 <LucideX size={18} />
               </Focusable>
@@ -152,7 +152,7 @@ export function SearchScreen() {
                     onEnterPress={() => handleKeyPress(char)}
                     onArrowPress={(direction) => {
                       if (direction !== 'left' || charIdx !== 0) return true;
-                      setFocus('nav-home');
+                      setFocus('sidebar');
                       return false;
                     }}
                     focusedClassName="!bg-white !text-black scale-110"
@@ -160,7 +160,7 @@ export function SearchScreen() {
                       'w-[clamp(2rem,2.8vw,2.8rem)] h-[clamp(2rem,2.8vw,2.8rem)]',
                       'rounded-lg flex items-center justify-center',
                       'text-[clamp(0.875rem,1.2vw,1.125rem)] font-semibold',
-                      'bg-white/15 text-white transition-all duration-100',
+                      'bg-white/15 text-white',
                       'cursor-pointer select-none',
                     )}
                   >
@@ -176,7 +176,7 @@ export function SearchScreen() {
                 onEnterPress={handleSpace}
                 onArrowPress={(direction) => {
                   if (direction !== 'left') return true;
-                  setFocus('nav-home');
+                  setFocus('sidebar');
                   return false;
                 }}
                 focusedClassName="bg-white text-black scale-105"
@@ -184,7 +184,7 @@ export function SearchScreen() {
                   'w-[clamp(6rem,10vw,8rem)] h-[clamp(2rem,2.8vw,2.8rem)]',
                   'rounded-lg flex items-center justify-center',
                   'text-[clamp(0.75rem,1vw,0.875rem)] font-medium',
-                  'bg-white/15 text-white/70 transition-all duration-100',
+                  'bg-white/15 text-white/70',
                   'cursor-pointer select-none',
                 )}
               >
@@ -198,7 +198,7 @@ export function SearchScreen() {
                   'w-[clamp(2.5rem,3.5vw,3.5rem)] h-[clamp(2rem,2.8vw,2.8rem)]',
                   'rounded-lg flex items-center justify-center',
                   'text-[clamp(0.875rem,1.2vw,1.125rem)] font-semibold',
-                  'bg-white/15 text-white transition-all duration-100',
+                  'bg-white/15 text-white',
                   'cursor-pointer select-none',
                 )}
               >
@@ -212,7 +212,7 @@ export function SearchScreen() {
                   'w-[clamp(3rem,4.5vw,4.5rem)] h-[clamp(2rem,2.8vw,2.8rem)]',
                   'rounded-lg flex items-center justify-center',
                   'text-[clamp(0.65rem,0.9vw,0.8rem)] font-semibold',
-                  'bg-white/15 text-white/50 transition-all duration-100',
+                  'bg-white/15 text-white/50',
                   'cursor-pointer select-none',
                 )}
               >
