@@ -926,7 +926,7 @@ class PlayerControlsElement extends HTMLElement {
           <span class="countdown" data-next-countdown>10s</span>
           <tv-focusable focus-key="watch-next-play" parent-focus-key="watch-root" data-focused="false" class="play-btn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0">
-              <polygon points="6 4v16l12-8z"></polygon>
+              <polygon points="6,4 6,20 18,12"></polygon>
             </svg>
           </tv-focusable>
           <tv-focusable focus-key="watch-next-cancel" parent-focus-key="watch-root" data-focused="false" class="cancel-btn">
