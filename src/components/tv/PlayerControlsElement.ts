@@ -45,7 +45,6 @@ class PlayerControlsElement extends HTMLElement {
   private _lastEnterKey = '';
   private _lastEnterTime = 0;
   private _lastFocusedControlKey = 'watch-playpause';
-  private _suppressNextEnter = false;
 
   static get observedAttributes() {
     return ['content-id', 'client-endpoint'];
@@ -252,8 +251,8 @@ class PlayerControlsElement extends HTMLElement {
           right: clamp(2rem, 4vw, 3rem);
           z-index: 2;
           color: #fff;
-          font-size: clamp(1.1rem, 1.45vw, 1.2rem);
-          font-weight: 500;
+          font-size: clamp(0.8rem, 1.2vw, 1.05rem);
+          font-weight: 700;
           letter-spacing: 0.02em;
           opacity: 1;
           pointer-events: none;
@@ -927,7 +926,7 @@ class PlayerControlsElement extends HTMLElement {
           <span class="countdown" data-next-countdown>10s</span>
           <tv-focusable focus-key="watch-next-play" parent-focus-key="watch-root" data-focused="false" class="play-btn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0">
-              <polygon points="6,4 6,20 18,12"></polygon>
+              <polygon points="6 4v16l12-8z"></polygon>
             </svg>
           </tv-focusable>
           <tv-focusable focus-key="watch-next-cancel" parent-focus-key="watch-root" data-focused="false" class="cancel-btn">
@@ -1332,11 +1331,13 @@ class PlayerControlsElement extends HTMLElement {
       if (!isDirectional && !isAction) return;
       const currentFocus = getCurrentFocusKey() ?? '';
       if (this._settingsOpen || currentFocus.startsWith('player-settings')) return;
-      if (!this._showControls) {
-        this._showControls = true;
-        this._updateControlsVisibility();
-        this._syncOverlayFocusability();
-        if (isAction) this._suppressNextEnter = true;
+      if (this._showControls) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      this._showControls = true;
+      this._updateControlsVisibility();
+      this._syncOverlayFocusability();
+      if (isDirectional) {
         this._restoreControlFocus();
       }
     };
@@ -1346,10 +1347,6 @@ class PlayerControlsElement extends HTMLElement {
   }
 
   private _handleEnterPress = (e: Event) => {
-    if (this._suppressNextEnter) {
-      this._suppressNextEnter = false;
-      return;
-    }
     const source = e.composedPath().find(
       (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('focus-key'),
     );
