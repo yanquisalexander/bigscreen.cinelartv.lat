@@ -1317,7 +1317,7 @@ class PlayerControlsElement extends HTMLElement {
     this.controlsTimer = setTimeout(() => {
       if (!this.video || this.video.paused || this._settingsOpen || this._railExpanded) return;
       const activeFocus = getCurrentFocusKey() ?? '';
-      if (activeFocus.startsWith('player-settings')) return;
+      if (activeFocus.startsWith('player-settings') || activeFocus.startsWith('watch-') || activeFocus.startsWith('rail-ep-item-')) return;
       this._showControls = false;
       this._updateControlsVisibility();
       this._syncOverlayFocusability();
