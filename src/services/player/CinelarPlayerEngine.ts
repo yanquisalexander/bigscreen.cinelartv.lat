@@ -1,10 +1,20 @@
+import { useToastStore } from '@/stores/toastStore';
+
+function toast(msg: string) {
+  try { useToastStore.getState().show(msg, 'error', 8000); } catch { /* ignore */ }
+}
+
+// Static import of the UMD bundle. Rolldown resolves CJS exports as named
+// properties, so shakaModule.Player, shakaModule.polyfill, etc. should exist.
 import * as shakaModule from 'shaka-player/dist/shaka-player.compiled.js';
-// UMD default export is unreliable with Rolldown; resolve from namespace or globalThis
-const shaka: any = (shakaModule as any).Player
-  ? shakaModule
-  : (shakaModule as any).default
-    ?? (typeof globalThis !== 'undefined' && (globalThis as any).shaka)
-    ?? shakaModule;
+
+// Build the shaka reference from whichever interop shape Rolldown produces.
+const _mod = shakaModule as any;
+const shaka: any =
+  _mod.Player ? _mod :
+  _mod.default?.Player ? _mod.default :
+  (typeof globalThis !== 'undefined' && (globalThis as any).shaka?.Player) ? (globalThis as any).shaka :
+  _mod;
 
 type PlayerEvent = 'playing' | 'paused' | 'buffering' | 'error' | 'timeupdate' | 'durationchange' | 'ended';
 type EventCallback = (data?: any) => void;
@@ -13,7 +23,6 @@ export class CinelarPlayerEngine {
   private player: any = null;
   private videoElement: HTMLVideoElement | null = null;
   private eventListeners: Map<PlayerEvent, EventCallback[]> = new Map();
-
   private attachPromise: Promise<void> | null = null;
 
   constructor(videoElement: HTMLVideoElement) {
@@ -22,30 +31,23 @@ export class CinelarPlayerEngine {
   }
 
   private initShaka() {
-    if (!this.videoElement) return;
-
-    if (!shaka || !shaka.Player) {
-      console.error('Shaka Player no está disponible. Fallback a reproducción nativa.');
+    if (!this.videoElement) {
+      toast('[Player] No hay elemento video');
       return;
     }
 
-    // Instalar polyfills necesarios
+    if (!shaka || !shaka.Player) {
+      toast('[Player] Shaka Player no se pudo cargar');
+      return;
+    }
+
     try {
       shaka.polyfill.installAll();
-    } catch (e) {
-      console.warn('[CinelarPlayerEngine] polyfill.installAll error:', e);
-    }
-
-    const supported = shaka.Player.isBrowserSupported();
-    console.log('[CinelarPlayerEngine] Shaka isBrowserSupported:', supported);
-
-    if (!supported) {
-      console.warn('[CinelarPlayerEngine] Browser not fully supported by Shaka, forcing initialization for TV...');
+    } catch (e: any) {
+      toast(`[Player] Polyfill: ${e?.message ?? String(e)}`);
     }
 
     try {
-      // Crear el Player sin mediaElement y adjuntarlo con attach()
-      // (inicializarlo con mediaElement está deprecado en Shaka moderno).
       this.player = new shaka.Player();
       this.attachPromise = this.player.attach(this.videoElement);
 
@@ -61,15 +63,16 @@ export class CinelarPlayerEngine {
       });
 
       this.player.addEventListener('error', (event: any) => {
-        console.error('Error de Shaka:', event.detail);
+        const code = event?.detail?.code ?? 'unknown';
+        const message = event?.detail?.message ?? '';
+        toast(`[Player] Error: ${code} ${message}`);
         this.emit('error', event.detail);
       });
-    } catch (e) {
-      console.error('[CinelarPlayerEngine] Failed to initialize Shaka Player:', e);
+    } catch (e: any) {
+      toast(`[Player] Init fallo: ${e?.message ?? String(e)}`);
       this.player = null;
     }
 
-    // Mapeo de eventos
     this.videoElement.addEventListener('play', () => this.emit('playing'));
     this.videoElement.addEventListener('pause', () => this.emit('paused'));
     this.videoElement.addEventListener('waiting', () => this.emit('buffering', true));
@@ -89,25 +92,18 @@ export class CinelarPlayerEngine {
   public async load(url: string, startTime?: number) {
     if (!this.videoElement) return;
 
-    // Shaka Player solo maneja manifiestos adaptativos (HLS/DASH).
-    // Para MP4 progresivo u otros formatos, usar reproducción nativa.
     if (this.player && this.isAdaptiveManifest(url)) {
       try {
-        // Asegurar que attach() terminó antes de cargar.
         if (this.attachPromise) await this.attachPromise;
-        // Pasar startTime a Shaka es la forma correcta de reanudar:
-        // setear video.currentTime tras load() es sobrescrito por Shaka.
         await this.player.load(url, startTime && startTime > 0 ? startTime : undefined);
         return;
-      } catch (e) {
-        console.error('Error al cargar contenido en Shaka:', e);
+      } catch (e: any) {
+        toast(`[Player] Load fallo: ${e?.message ?? String(e)}`);
         this.emit('error', e);
         return;
       }
     }
 
-    // Fallback nativo: desconectar Shaka del elemento para evitar conflictos
-    // con el MediaSource attach que hace Shaka en el constructor.
     try {
       if (this.player) {
         await this.player.detach();
@@ -129,8 +125,6 @@ export class CinelarPlayerEngine {
   }
 
   public play() {
-    // Nunca mutear como fallback: las apps de TV no tienen control de volumen
-    // para reactivar el audio. En TVs el autoplay con sonido está permitido.
     this.videoElement?.play().catch(() => {});
   }
 
@@ -142,7 +136,6 @@ export class CinelarPlayerEngine {
     if (this.videoElement) this.videoElement.currentTime = time;
   }
 
-  // ---------- Playback settings (calidad + pistas de audio) ----------
   public getVariantTracksInfo(): {
     auto: boolean;
     activeHeight: number | null;
@@ -152,7 +145,6 @@ export class CinelarPlayerEngine {
     const cfg = this.player.getConfiguration();
     const auto = !!(cfg.abr && cfg.abr.enabled);
     const variants = this.player.getVariantTracks();
-    // Distinct heights, highest first.
     const byHeight = new Map<number, { height: number; bandwidth: number; active: boolean }>();
     for (const v of variants) {
       if (!v.height) continue;
@@ -162,7 +154,7 @@ export class CinelarPlayerEngine {
       }
     }
     const tracks = Array.from(byHeight.values()).sort((a, b) => b.height - a.height);
-    const active = variants.find((v) => v.active);
+    const active = variants.find((v: any) => v.active);
     return { auto, activeHeight: active?.height ?? null, tracks };
   }
 
@@ -194,10 +186,10 @@ export class CinelarPlayerEngine {
       return;
     }
     this.player.configure({ abr: { enabled: false } });
-    const candidates = this.player.getVariantTracks().filter((v) => v.height === option);
+    const candidates = this.player.getVariantTracks().filter((v: any) => v.height === option);
     if (candidates.length) {
-      candidates.sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0));
-      this.player.selectVariantTrack(candidates[0], /* clearBuffer */ true);
+      candidates.sort((a: any, b: any) => (b.bandwidth || 0) - (a.bandwidth || 0));
+      this.player.selectVariantTrack(candidates[0], true);
     }
   }
 
@@ -216,13 +208,11 @@ export class CinelarPlayerEngine {
           this.videoElement.play().catch(() => {});
         }
       }
-    } catch (e) {
-      console.error('[CinelarPlayerEngine] selectAudioTrack error:', e);
+    } catch (e: any) {
+      toast(`[Player] Audio error: ${e?.message ?? String(e)}`);
     }
   }
 
-  // Selecciona la pista de audio preferida del usuario al montar (si hay
-  // varias). Específicamente útil en contenido multi-idioma (ej. doblaje/sub).
   public applyPreferredAudioLanguage(preferred?: string) {
     if (!this.player || !preferred) return;
     const tracks = this.getAudioTracksInfo();
