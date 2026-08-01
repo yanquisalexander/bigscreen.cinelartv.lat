@@ -30,33 +30,44 @@ export class CinelarPlayerEngine {
     }
 
     // Instalar polyfills necesarios
-    shaka.polyfill.installAll();
-
-    if (!shaka.Player.isBrowserSupported()) {
-      console.error('Shaka Player no es compatible con este navegador.');
-      return;
+    try {
+      shaka.polyfill.installAll();
+    } catch (e) {
+      console.warn('[CinelarPlayerEngine] polyfill.installAll error:', e);
     }
 
-    // Crear el Player sin mediaElement y adjuntarlo con attach()
-    // (inicializarlo con mediaElement está deprecado en Shaka moderno).
-    this.player = new shaka.Player();
-    this.attachPromise = this.player.attach(this.videoElement);
+    const supported = shaka.Player.isBrowserSupported();
+    console.log('[CinelarPlayerEngine] Shaka isBrowserSupported:', supported);
 
-    this.player.configure({
-      streaming: {
-        bufferingGoal: 60,
-        rebufferingGoal: 5,
-        stallEnabled: true,
-      },
-      abr: {
-        enabled: true,
-      },
-    });
+    if (!supported) {
+      console.warn('[CinelarPlayerEngine] Browser not fully supported by Shaka, forcing initialization for TV...');
+    }
 
-    this.player.addEventListener('error', (event: any) => {
-      console.error('Error de Shaka:', event.detail);
-      this.emit('error', event.detail);
-    });
+    try {
+      // Crear el Player sin mediaElement y adjuntarlo con attach()
+      // (inicializarlo con mediaElement está deprecado en Shaka moderno).
+      this.player = new shaka.Player();
+      this.attachPromise = this.player.attach(this.videoElement);
+
+      this.player.configure({
+        streaming: {
+          bufferingGoal: 60,
+          rebufferingGoal: 5,
+          stallEnabled: true,
+        },
+        abr: {
+          enabled: true,
+        },
+      });
+
+      this.player.addEventListener('error', (event: any) => {
+        console.error('Error de Shaka:', event.detail);
+        this.emit('error', event.detail);
+      });
+    } catch (e) {
+      console.error('[CinelarPlayerEngine] Failed to initialize Shaka Player:', e);
+      this.player = null;
+    }
 
     // Mapeo de eventos
     this.videoElement.addEventListener('play', () => this.emit('playing'));
