@@ -5,7 +5,7 @@ import type { Segment } from '@/types/content';
 import type { FlatEpisode } from './RailEpisodeItem';
 
 const PARENT_FOCUS_KEY = 'watch-root';
-const CONTROLS_HIDE_DELAY = 4000;
+const CONTROLS_HIDE_DELAY = 5000;
 const LOGIC_TICK_MS = 1000;
 const SEEK_STEP_SECONDS = 10;
 
@@ -264,8 +264,11 @@ class PlayerControlsElement extends HTMLElement {
         /* Top scrim */
         .top-scrim {
           position: absolute;
-          inset-x: 0;
+          left: 0;
+          right: 0;
           top: 0;
+          width: 100%;
+          box-sizing: border-box;
           background: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.3), transparent);
           padding: clamp(1.25rem, 3.4vh, 2rem) clamp(2rem, 4vw, 3rem);
           display: flex;
@@ -335,7 +338,6 @@ class PlayerControlsElement extends HTMLElement {
           color: #ffffff;
           background: rgba(255,255,255,0.08);
           border: 1px solid rgba(255,255,255,0.1);
-          transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
           cursor: pointer;
           outline: none;
           pointer-events: auto;
@@ -430,7 +432,6 @@ class PlayerControlsElement extends HTMLElement {
 
         .seekbar-focus[data-focused="true"] .seekbar-thumb {
           transform: translate(-50%, -50%) scale(1.3);
-          box-shadow: 0 0 12px rgba(255,255,255,0.65);
         }
 
         .seekbar-track:hover .seekbar-track-bg {
@@ -461,7 +462,6 @@ class PlayerControlsElement extends HTMLElement {
           inset: 0;
           left: 0;
           background: linear-gradient(to right, #f03 80%, #ff2791 100%);
-          box-shadow: 0 0 clamp(0.25rem, 0.5vw, 0.5rem) rgba(255,255,255,0.55);
           border-radius: 9999px;
         }
 
@@ -481,7 +481,6 @@ class PlayerControlsElement extends HTMLElement {
 
         .seekbar-track:hover .seekbar-thumb {
           transform: translate(-50%, -50%) scale(1.35);
-          box-shadow: 0 0 12px rgba(255,255,255,0.6);
         }
 
         .seekbar-time-end {
@@ -676,7 +675,6 @@ class PlayerControlsElement extends HTMLElement {
           color: #000000;
           font-size: clamp(0.875rem, 1.1vw, 1rem);
           font-weight: 600;
-          transition: all 200ms ease;
           cursor: pointer;
           outline: none;
           pointer-events: auto;
@@ -782,7 +780,6 @@ class PlayerControlsElement extends HTMLElement {
           align-items: center;
           justify-content: center;
           color: #000000;
-          transition: all 200ms ease;
           cursor: pointer;
           outline: none;
           border: none;
@@ -802,7 +799,6 @@ class PlayerControlsElement extends HTMLElement {
           align-items: center;
           justify-content: center;
           color: rgba(255,255,255,0.7);
-          transition: all 200ms ease;
           cursor: pointer;
           outline: none;
           border: none;
@@ -1317,7 +1313,7 @@ class PlayerControlsElement extends HTMLElement {
     this.controlsTimer = setTimeout(() => {
       if (!this.video || this.video.paused || this._settingsOpen || this._railExpanded) return;
       const activeFocus = getCurrentFocusKey() ?? '';
-      if (activeFocus.startsWith('player-settings') || activeFocus.startsWith('watch-') || activeFocus.startsWith('rail-ep-item-')) return;
+      if (activeFocus.startsWith('player-settings')) return;
       this._showControls = false;
       this._updateControlsVisibility();
       this._syncOverlayFocusability();

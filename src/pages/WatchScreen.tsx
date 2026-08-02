@@ -447,9 +447,8 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
         setFocus('watch-episodes');
         return;
       }
-      if (!controlsRef.current?.showControls) {
-        controlsRef.current.showControls = true;
-        focusPlaybackControl();
+      if (controlsRef.current?.showControls) {
+        controlsRef.current.showControls = false;
         return;
       }
       if (test) {
@@ -489,7 +488,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
         ) {
           controlsRef.current.showControls = false;
         }
-      }, 4000);
+      }, 5000);
     }
   }, [isPlaying]);
 
