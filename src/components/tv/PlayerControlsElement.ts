@@ -252,7 +252,7 @@ class PlayerControlsElement extends HTMLElement {
           z-index: 2;
           color: #fff;
           font-size: clamp(1.1rem, 1.45vw, 1.2rem);
-          font-weight: 400;
+          font-weight: 500;
           letter-spacing: 0.02em;
           opacity: 1;
           pointer-events: none;
