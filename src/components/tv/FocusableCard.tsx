@@ -90,7 +90,7 @@ export function FocusableCard({
       ref={ref}
       data-focused={focused}
       className={classNames(
-        'shrink-0 rounded-xl overflow-hidden border-2 transition-all duration-300 ease-out focus:outline-none will-change-transform',
+        'shrink-0 rounded-xl overflow-hidden border-2 transition-all duration-300 ease-out focus:outline-none will-change-transform snap-start',
         isRowVariant
           ? (focused ? 'w-[500px] h-[281px] border-white opacity-100' : 'w-[180px] h-[270px] border-transparent opacity-80')
           : 'w-[230px] h-[130px] border-transparent scale-100',

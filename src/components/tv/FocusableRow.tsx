@@ -65,14 +65,14 @@ export function FocusableRow({ title, children, className = '', focusKey, prefer
 
   return (
     <FocusContext.Provider value={resolvedFocusKey}>
-      <div className={`mb-[clamp(1.5rem,4vh,2rem)] ${className}`}>
-        {title && <h2 className="text-[clamp(1rem,1.4vw,1.125rem)] font-bold text-text-primary mb-[clamp(0.75rem,2vh,1rem)] px-[clamp(3rem,7.5vw,6rem)]">{title}</h2>}
+      <div className={`mb-[clamp(0.5rem,1.5vh,1rem)] ${className}`}>
+        {title && <h2 className="text-[clamp(1rem,1.4vw,1.125rem)] font-bold text-text-primary mb-[clamp(0.25rem,0.6vh,0.5rem)] px-[clamp(3rem,7.5vw,6rem)]">{title}</h2>}
         <div
           ref={(node) => {
             (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
             (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
           }}
-          className="flex gap-4 px-[clamp(3rem,7.5vw,6rem)] overflow-x-auto hide-scrollbar py-10 min-h-[350px]"
+          className="flex gap-4 px-[clamp(3rem,7.5vw,6rem)] overflow-x-auto hide-scrollbar pt-2 pb-6 snap-x snap-start min-h-[300px]"
         >
           {children}
         </div>
