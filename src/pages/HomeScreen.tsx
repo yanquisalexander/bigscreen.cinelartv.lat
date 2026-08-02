@@ -241,7 +241,7 @@ export function HomeScreen() {
                           item.banner_resized ?? item.banner,
                           clientEndpoint,
                         )}
-                        subtitle={isTVShow(item) ? 'Serie' : 'Película'}
+                        subtitle={undefined}
                         progress={progressPercent(item)}
                         onArrowPress={(direction) => {
                           if (catIdx === 0 && direction === 'up') return focusHeroFromFirstRow(direction);
