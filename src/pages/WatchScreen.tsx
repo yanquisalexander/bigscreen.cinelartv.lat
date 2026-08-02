@@ -15,6 +15,7 @@ import { pdbg } from '@/services/player/playerDebug';
 import { M3eLoadingIndicator } from '@m3e/react/loading-indicator';
 import { inputManager } from '@/services/InputManager';
 import type { WatchData } from '@/types/content';
+import { isTVShow } from '@/types/content';
 import type { FlatEpisode } from '@/components/tv/RailEpisodeItem';
 import type { VastAd } from '@/types/vast';
 
@@ -169,7 +170,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     consumeWatchData(tokens.accessToken, contentId, episodeId)
       .then((data) => {
         pdbg('watch.watchdata', 'resolved', { hasSources: !!data.sources?.length, title: data.content?.title });
-        const isTVShow = data.content.content_type === 'TVSHOW';
+        const isTVShow = data.content.content_type === 'TVSHOW' || data.content.contentType === 'TVSHOW';
         if (isTVShow && !episodeId && !data.episode) {
           const firstEpisode = data.seasons?.[0]?.episodes?.[0];
           if (firstEpisode) {
@@ -250,7 +251,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
       episode_id: episodeId,
       title: watchData.content.title,
       description: watchData.episode?.title ?? watchData.content.description,
-      content_type: watchData.content.content_type,
+      content_type: watchData.content.content_type ?? watchData.content.contentType,
       cover,
       cover_resized: cover,
       banner,
@@ -312,7 +313,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     if (watchData) {
       el.contentTitle = watchData.content.title;
       el.contentSubtitle = watchData.episode?.title
-        ? `${watchData.content.content_type === 'TVSHOW' && currentSeasonNumber ? `T${currentSeasonNumber} · ` : ''}${watchData.episode.title}`
+        ? `${(watchData.content.content_type === 'TVSHOW' || watchData.content.contentType === 'TVSHOW') && currentSeasonNumber ? `T${currentSeasonNumber} · ` : ''}${watchData.episode.title}`
         : '';
     }
     if (allEpisodes.length > 0) {

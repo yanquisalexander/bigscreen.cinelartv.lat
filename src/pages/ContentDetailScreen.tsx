@@ -5,15 +5,16 @@ import { useSpatialNavInit } from '@/hooks/useSpatialNavInit';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
 import { getContentById, prefetchWatchData } from '@/features/content/api';
-import { resolveImageUrl } from '@/utils/helpers';
+import { DetailHero } from '@/components/detail/DetailHero';
+import { DetailOverview } from '@/components/detail/DetailOverview';
+import { DetailSeasonSelector } from '@/components/detail/DetailSeasonSelector';
+import { DetailEpisodeRail } from '@/components/detail/DetailEpisodeRail';
+import { DetailRecommendations } from '@/components/detail/DetailRecommendations';
 import { FocusableButton } from '@/components/tv/FocusableButton';
-import { Focusable } from '@/components/tv/Focusable';
-import { FocusableCard } from '@/components/tv/FocusableCard';
-import { FocusableRow } from '@/components/tv/FocusableRow';
-import type { ContentDetail, Season } from '@/types/content';
-import { M3eLoadingIndicator } from "@m3e/react/loading-indicator";
+import type { ContentDetail } from '@/types/content';
+import { isTVShow } from '@/types/content';
+import { M3eLoadingIndicator } from '@m3e/react/loading-indicator';
 
-// Teclas/códigos de "atrás" según plataforma (teclado, webOS, Tizen)
 const BACK_KEYS = new Set(['Escape', 'Backspace', 'GoBack', 'BrowserBack']);
 const BACK_KEYCODES = new Set([8, 27, 461, 10009]);
 
@@ -24,39 +25,43 @@ export function ContentDetailScreen() {
   const tokens = useAuthStore((s) => s.tokens);
   const isGuest = useAuthStore((s) => s.isGuest);
   const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
+
   const [content, setContent] = useState<ContentDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedSeason, setSelectedSeason] = useState(0);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const seasons = content?.seasons ?? [];
   const categories = content?.categories ?? [];
   const currentEpisodes = seasons[selectedSeason]?.episodes ?? [];
+  const relatedContent = content?.related_content ?? [];
+
   const firstEpisodeId = currentEpisodes[0]?.id;
   const firstEpisodeFocusKey = firstEpisodeId != null ? `detail-episode-${firstEpisodeId}` : undefined;
   const selectedSeasonFocusKey = seasons[selectedSeason]?.id != null
     ? `detail-season-${seasons[selectedSeason].id}`
     : undefined;
+
   const { ref: focusRootRef, focusKey } = useFocusable({
     focusKey: 'content-root',
     focusable: false,
     trackChildren: true,
     saveLastFocusedChild: true,
-    preferredChildFocusKey: 'detail-play',
+    preferredChildFocusKey: 'detail-hero-play',
   });
 
+  // ── Data fetching ──────────────────────────────────────────────
   useEffect(() => {
-    // Si es invitado, no necesitamos token para ver el detalle
     if (!contentId) return;
-    
     setLoading(true);
-    // Usamos token vacío si es invitado
     getContentById(tokens?.accessToken ?? '', contentId)
       .then(setContent)
       .finally(() => setLoading(false));
   }, [tokens, contentId]);
 
-  // Botón físico "Atrás" del control / Escape en teclado
+  // ── Back key ───────────────────────────────────────────────────
   useEffect(() => {
     const handleBack = (e: KeyboardEvent) => {
       if (BACK_KEYS.has(e.key) || BACK_KEYCODES.has(e.keyCode)) {
@@ -68,13 +73,14 @@ export function ContentDetailScreen() {
     return () => window.removeEventListener('keydown', handleBack);
   }, [navigate]);
 
-  // Cleanup pending prefetch timer on unmount
+  // ── Cleanup prefetch timer ─────────────────────────────────────
   useEffect(() => {
     return () => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
     };
   }, []);
 
+  // ── Vertical scroll-to-focus tracking ──────────────────────────
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -114,43 +120,47 @@ export function ContentDetailScreen() {
     };
   }, [content]);
 
+  // ── Derived state ──────────────────────────────────────────────
   const canPlay = useMemo(() => {
     if (!content) return false;
-    if (content.content_type !== 'TVSHOW') return true;
+    if (!isTVShow(content)) return true;
     if (content.continue_watching?.episode_id) return true;
     return (content.seasons?.[0]?.episodes?.length ?? 0) > 0;
   }, [content]);
 
+  // ── Initial focus: never leave the screen without focus ────────
+  useEffect(() => {
+    if (!content) return;
+    const id = requestAnimationFrame(() => {
+      if (canPlay) setFocus('detail-hero-play');
+    });
+    return () => cancelAnimationFrame(id);
+  }, [content, canPlay]);
+
+  // ── Handlers ───────────────────────────────────────────────────
   const handlePlay = useCallback(() => {
     if (!content || !canPlay) return;
-    
-    // Si es invitado y no hay token, redirigir a auth
-    if (!tokens && isGuest) {
-      navigate('/auth');
-      return;
-    }
+    if (!tokens && isGuest) { navigate('/auth'); return; }
 
     const episodeId = content.continue_watching?.episode_id;
-    if (episodeId) {
-      navigate(`/watch/${content.id}/${episodeId}`);
-      return;
-    }
+    if (episodeId) { navigate(`/watch/${content.id}/${episodeId}`); return; }
 
-    if (content.content_type !== 'TVSHOW') {
-      navigate(`/watch/${content.id}`);
-      return;
-    }
+    if (!isTVShow(content)) { navigate(`/watch/${content.id}`); return; }
 
-    const firstSeason = content.seasons?.[0];
-    const firstEpisode = firstSeason?.episodes?.[0];
-    if (firstEpisode) {
-      navigate(`/watch/${content.id}/${firstEpisode.id}`);
-    }
+    const firstEpisode = content.seasons?.[0]?.episodes?.[0];
+    if (firstEpisode) navigate(`/watch/${content.id}/${firstEpisode.id}`);
   }, [content, navigate, canPlay, tokens, isGuest]);
+
+  const handlePlayEpisode = useCallback(
+    (episodeId: string | number) => {
+      if (!tokens && isGuest) { navigate('/auth'); return; }
+      navigate(`/watch/${contentId}/${episodeId}`);
+    },
+    [contentId, navigate, tokens, isGuest],
+  );
 
   const handlePlayEpisodeFocus = useCallback(
     (episodeId: string | number) => {
-      // Si es invitado, no hacer prefetch porque requiere token
       if (!tokens || !contentId) return;
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
       prefetchTimerRef.current = setTimeout(() => {
@@ -161,37 +171,10 @@ export function ContentDetailScreen() {
     [tokens, contentId],
   );
 
-  const handlePlayEpisode = useCallback(
-    (episodeId: string | number) => {
-      // Si es invitado, redirigir a auth
-      if (!tokens && isGuest) {
-        navigate('/auth');
-        return;
-      }
-      navigate(`/watch/${contentId}/${episodeId}`);
-    },
-    [contentId, navigate, tokens, isGuest],
-  );
-
-  const focusSidebarFromLeftEdge = useCallback((direction: string) => {
-    if (direction !== 'left') return true;
-    setFocus('sidebar');
-    return false;
-  }, []);
-
-  const focusContentTarget = useCallback((focusKey?: string) => {
-    if (!focusKey) return true;
-    setFocus(focusKey);
-    return false;
-  }, []);
-
-  // Debounced prefetch for Play button (4s hold)
   const handlePlayFocus = useCallback(() => {
-    // Si es invitado o no hay token, no hacer prefetch
     if (!content || !tokens) return;
-    
     const episodeId = content.continue_watching?.episode_id
-      ?? (content.content_type === 'TVSHOW'
+      ?? (isTVShow(content)
         ? content.seasons?.[0]?.episodes?.[0]?.id
         : undefined);
     if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
@@ -201,27 +184,90 @@ export function ContentDetailScreen() {
     }, 4000);
   }, [content, tokens]);
 
-  const handlePlayArrow = useCallback((direction: string) => {
-    if (direction === 'left') return focusSidebarFromLeftEdge(direction);
-    if (direction === 'up') return false;
-    if (direction === 'down') return focusContentTarget(selectedSeasonFocusKey ?? firstEpisodeFocusKey);
-    return true;
-  }, [firstEpisodeFocusKey, focusContentTarget, focusSidebarFromLeftEdge, selectedSeasonFocusKey]);
+  const handleToggleList = useCallback(() => {
+    // TODO: implement toggle like
+  }, []);
 
-  const handleListArrow = useCallback((direction: string) => {
-    if (direction === 'up') return false;
-    if (direction === 'down') return focusContentTarget(selectedSeasonFocusKey ?? firstEpisodeFocusKey);
-    return true;
-  }, [firstEpisodeFocusKey, focusContentTarget, selectedSeasonFocusKey]);
+  const handleSelectRelated = useCallback(
+    (item: { id: string | number }) => {
+      navigate(`/content/${item.id}`);
+    },
+    [navigate],
+  );
 
+  const focusSidebarFromLeftEdge = useCallback((direction: string) => {
+    if (direction !== 'left') return true;
+    setFocus('sidebar');
+    return false;
+  }, []);
+
+  const focusContentTarget = useCallback((focusKey?: string) => {
+    if (!focusKey) {
+      console.log('focusContentTarget: no focusKey provided');
+      return true;
+    }
+    console.log('focusContentTarget: setting focus to', focusKey);
+    setFocus(focusKey);
+    return false;
+  }, []);
+
+  const handleSeasonArrowUp = useCallback(
+    (direction: string) => {
+      if (direction !== 'up') return true;
+      return focusContentTarget('detail-hero-play');
+    },
+    [focusContentTarget],
+  );
+
+  const handleSeasonArrowDown = useCallback(
+    (epFocusKey?: string) => (direction: string) => {
+      if (direction !== 'down') return true;
+      return focusContentTarget(epFocusKey);
+    },
+    [focusContentTarget],
+  );
+
+  const handleEpisodeArrowUp = useCallback(
+    (direction: string) => {
+      if (direction !== 'up') return true;
+      return focusContentTarget(selectedSeasonFocusKey ?? 'detail-hero-play');
+    },
+    [focusContentTarget, selectedSeasonFocusKey],
+  );
+
+  const handleEpisodeArrowLeft = useCallback(
+    (direction: string) => {
+      if (direction !== 'left') return true;
+      return focusSidebarFromLeftEdge(direction);
+    },
+    [focusSidebarFromLeftEdge],
+  );
+
+  const handleRelatedArrowUp = useCallback(
+    (direction: string) => {
+      if (direction !== 'up') return true;
+      return focusContentTarget(firstEpisodeFocusKey ?? selectedSeasonFocusKey ?? 'detail-hero-play');
+    },
+    [focusContentTarget, firstEpisodeFocusKey, selectedSeasonFocusKey],
+  );
+
+  const handleHeroFocus = useCallback(() => {
+    requestAnimationFrame(() => {
+      containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }, []);
+
+
+  // ── Loading state ──────────────────────────────────────────────
   if (loading) {
     return (
       <div className="w-full h-dvh bg-bg flex items-center justify-center">
-        <M3eLoadingIndicator style={{ "--m3e-loading-indicator-active-indicator-color": "#ddd" } as any} />
+        <M3eLoadingIndicator style={{ '--m3e-loading-indicator-active-indicator-color': '#ddd' } as any} />
       </div>
     );
   }
 
+  // ── Error state ────────────────────────────────────────────────
   if (!content) {
     return (
       <div className="w-full h-dvh bg-bg flex flex-col items-center justify-center gap-[clamp(0.75rem,2vh,1rem)]">
@@ -233,8 +279,7 @@ export function ContentDetailScreen() {
     );
   }
 
-  const backdropUrl = resolveImageUrl(content.banner ?? content.cover, clientEndpoint);
-
+  // ── Main render ────────────────────────────────────────────────
   return (
     <FocusContext.Provider value={focusKey}>
       <div
@@ -244,137 +289,77 @@ export function ContentDetailScreen() {
         }}
         className="w-full h-dvh overflow-y-auto hide-scrollbar bg-bg"
       >
-        <div className="relative w-full h-[clamp(320px,50vh,520px)]">
-          {backdropUrl ? (
-            <img src={backdropUrl} alt={content.title} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-accent/30 to-bg" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/70 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent" />
-        </div>
+        {/* Hero */}
+        <DetailHero
+          content={content}
+          clientEndpoint={clientEndpoint}
+          canPlay={canPlay}
+          onPlay={handlePlay}
+          onToggleList={handleToggleList}
+          onNavigateDown={(dir) => {
+            if (dir !== 'down') return true;
+            if (seasons.length > 0) {
+              return focusContentTarget(selectedSeasonFocusKey ?? firstEpisodeFocusKey);
+            }
+            return true;
+          }}
+          onNavigateLeft={focusSidebarFromLeftEdge}
+          onNavigateUp={() => true}
+          onPlayFocus={handlePlayFocus}
+          onHeroFocus={handleHeroFocus}
+          firstEpisodeFocusKey={firstEpisodeFocusKey}
+          firstSeasonFocusKey={selectedSeasonFocusKey}
+        />
 
-        <div className="px-[clamp(3rem,7.5vw,6rem)] -mt-[clamp(5rem,16vh,8rem)] relative z-10 pb-[clamp(3rem,8vh,4rem)]">
-          <h1 className="text-[clamp(2rem,3.2vw,2.5rem)] font-extrabold text-white mb-[clamp(0.75rem,2vh,1rem)]">{content.title}</h1>
+        {/* Content sections */}
+        <div className="px-[clamp(3rem,7.5vw,6rem)] pb-[clamp(4rem,10vh,6rem)] space-y-[clamp(2rem,5vh,3.5rem)]">
+          {/* Overview */}
+          <DetailOverview description={content.description} />
 
-          <div className="flex items-center gap-[clamp(0.75rem,1.5vw,1rem)] text-text-secondary text-[clamp(1rem,1.45vw,1.125rem)] mb-[clamp(1rem,3vh,1.5rem)]">
-            {content.year && <span>{content.year}</span>}
-            {content.liked && (
-              <span className="text-accent-light">&hearts;</span>
-            )}
-            {content.content_type && (
-              <span className="px-[clamp(0.375rem,0.8vw,0.5rem)] py-0.5 border border-text-secondary rounded text-[clamp(0.75rem,1.1vw,0.875rem)]">
-                {content.content_type === 'TVSHOW' ? 'Serie' : 'Película'}
-              </span>
-            )}
-          </div>
-
-          {categories.length > 0 && (
-            <div className="flex gap-[clamp(0.375rem,0.8vw,0.5rem)] mb-[clamp(1rem,3vh,1.5rem)]">
-              {categories.map((cat) => (
-                <span key={cat.id} className="px-[clamp(0.625rem,1.2vw,0.75rem)] py-[clamp(0.1875rem,0.7vh,0.25rem)] bg-surface rounded-full text-[clamp(0.75rem,1.1vw,0.875rem)] text-text-secondary">
-                  {cat.name}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {content.description && (
-            <p className="text-[clamp(1rem,1.45vw,1.125rem)] text-text-secondary max-w-3xl mb-[clamp(1.5rem,4vh,2rem)] leading-relaxed">
-              {content.description}
-            </p>
-          )}
-
-          <div className="flex gap-[clamp(0.75rem,1.5vw,1rem)] mb-[clamp(2rem,6vh,3rem)]">
-            {canPlay && (
-              <FocusableButton
-                focusKey="detail-play"
-                onEnterPress={handlePlay}
-                onFocus={handlePlayFocus}
-                onArrowPress={handlePlayArrow}
-                autoFocus
-                variant="primary"
-                size="lg"
-              >
-                {content.content_type === 'TVSHOW' && content.continue_watching ? 'Continuar viendo' : 'Reproducir'}
-              </FocusableButton>
-            )}
-            <FocusableButton
-              focusKey="detail-list"
-              onEnterPress={() => { }}
-              onArrowPress={handleListArrow}
-              variant="secondary"
-              size="lg"
-            >
-              + Mi Lista
-            </FocusableButton>
-          </div>
-
+          {/* Seasons & Episodes */}
           {seasons.length > 0 && (
-            <div className="mt-[clamp(1.5rem,4vh,2rem)]">
-              <h2 className="text-[clamp(1.25rem,2vw,1.5rem)] font-bold text-white mb-[clamp(1rem,3vh,1.5rem)] px-0">Temporadas</h2>
-              <div className="flex gap-[clamp(0.5rem,1vw,0.75rem)] mb-[clamp(1rem,3vh,1.5rem)]">
-                {seasons.map((season: Season, i: number) => (
-                  <Focusable
-                    key={season.id}
-                    focusKey={`detail-season-${season.id}`}
-                    onEnterPress={() => setSelectedSeason(i)}
-                    onArrowPress={(direction) => {
-                      if (direction === 'up') return focusContentTarget('detail-play');
-                      if (direction === 'down') return focusContentTarget(firstEpisodeFocusKey);
-                      if (direction === 'left' && i === 0) return focusSidebarFromLeftEdge(direction);
-                      return true;
-                    }}
-                    className={`px-[clamp(1rem,2vw,1.25rem)] py-[clamp(0.5rem,1.2vh,0.625rem)] rounded-full text-[clamp(0.9375rem,1.35vw,1.125rem)] font-medium transition-colors ${selectedSeason === i
-                      ? 'bg-white text-black'
-                      : 'bg-surface text-text-secondary'
-                      }`}
-                  >
-                    {season.title}
-                  </Focusable>
-                ))}
+            <section>
+              <h2 className="text-[clamp(1.125rem,1.6vw,1.375rem)] font-bold text-white mb-[clamp(0.75rem,2vh,1rem)]">
+                Episodios
+              </h2>
+
+              <div className="mb-[clamp(1rem,2.5vh,1.5rem)]">
+                <DetailSeasonSelector
+                  seasons={seasons}
+                  selectedIndex={selectedSeason}
+                  onSelect={setSelectedSeason}
+                  onArrowUp={handleSeasonArrowUp}
+                  onArrowDown={handleSeasonArrowDown(firstEpisodeFocusKey)}
+                />
               </div>
 
               {currentEpisodes.length > 0 && (
-                <FocusableRow
+                <DetailEpisodeRail
                   key={selectedSeason}
-                  title="Episodios"
-                  className="-mx-[clamp(3rem,7.5vw,6rem)]"
-                  focusKey={`episodes-season-${selectedSeason}`}
+                  episodes={currentEpisodes}
+                  seasonIndex={selectedSeason}
                   preferredChildFocusKey={firstEpisodeFocusKey}
-                >
-                  {currentEpisodes.map((episode, episodeIdx) => {
-                    const epThumb = resolveImageUrl(
-                      episode.thumbnail ?? episode.thumbnail_resized,
-                      clientEndpoint,
-                    );
-                    const progress = episode.continue_watching
-                      ? Math.round(
-                        (episode.continue_watching.progress / episode.continue_watching.duration) * 100,
-                      )
-                      : undefined;
-
-                    return (
-                      <FocusableCard
-                        key={episode.id}
-                        focusKey={`detail-episode-${episode.id}`}
-                        title={`${episodeIdx + 1}. ${episode.title}`}
-                        image={epThumb}
-                        subtitle={episode.description}
-                        progress={progress}
-                        onArrowPress={(direction) => {
-                          if (direction === 'up') return focusContentTarget(selectedSeasonFocusKey ?? 'detail-play');
-                          if (direction === 'left' && episodeIdx === 0) return focusSidebarFromLeftEdge(direction);
-                          return true;
-                        }}
-                        onEnterPress={() => handlePlayEpisode(episode.id)}
-                        onFocus={() => handlePlayEpisodeFocus(episode.id)}
-                      />
-                    );
-                  })}
-                </FocusableRow>
+                  onPlayEpisode={handlePlayEpisode}
+                  onFocusEpisode={handlePlayEpisodeFocus}
+                  onArrowUp={handleEpisodeArrowUp}
+                  onArrowLeft={handleEpisodeArrowLeft}
+                />
               )}
-            </div>
+            </section>
+          )}
+
+          {/* Recommendations */}
+          {relatedContent.length > 0 && (
+            <section>
+              <h2 className="text-[clamp(1.125rem,1.6vw,1.375rem)] font-bold text-white mb-[clamp(0.75rem,2vh,1rem)]">
+                También te puede gustar
+              </h2>
+              <DetailRecommendations
+                items={relatedContent}
+                onSelect={handleSelectRelated}
+                onArrowUp={handleRelatedArrowUp}
+              />
+            </section>
           )}
         </div>
       </div>

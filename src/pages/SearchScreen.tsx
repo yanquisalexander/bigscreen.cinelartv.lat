@@ -10,6 +10,7 @@ import { searchContent } from '@/features/content/search';
 import { resolveImageUrl, classNames } from '@/utils/helpers';
 import { LucideSearch, LucideX } from 'lucide-react';
 import type { ContentItem } from '@/types/content';
+import { isTVShow } from '@/types/content';
 
 const KEYBOARD_ROWS = [
   ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
@@ -241,7 +242,7 @@ export function SearchScreen() {
                 key={item.id}
                 title={item.title}
                 image={resolveImageUrl(item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover, clientEndpoint)}
-                subtitle={item.content_type === 'TVSHOW' ? 'Serie' : undefined}
+                subtitle={isTVShow(item) ? 'Serie' : undefined}
                 onEnterPress={() => handleInfo(item)}
                 focusKey={`search-result-${item.id}`}
               />

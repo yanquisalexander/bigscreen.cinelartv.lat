@@ -76,6 +76,7 @@ export interface AndroidTvHomeItem {
   poster_url?: string;
   logo_url?: string;
   content_type?: string;
+  contentType?: string;
   progress?: number;
   duration?: number;
   last_watched_at?: string;

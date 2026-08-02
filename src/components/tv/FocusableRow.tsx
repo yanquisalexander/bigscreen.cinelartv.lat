@@ -40,10 +40,17 @@ export function FocusableRow({ title, children, className = '', focusKey, prefer
         const focused = el.querySelector<HTMLElement>('[data-focused="true"]');
         if (!focused) return;
 
-        const cardRect = focused.getBoundingClientRect();
-        const containerRect = el.getBoundingClientRect();
-        const offset = cardRect.left - containerRect.left - (containerRect.width / 2) + (cardRect.width / 2);
-        el.scrollBy({ left: offset, behavior: 'auto' });
+        // Calculamos la posición central exacta dentro del contenedor
+        const containerWidth = el.clientWidth;
+        const cardWidth = focused.clientWidth;
+        const cardLeft = focused.offsetLeft;
+        
+        const scrollLeft = cardLeft - (containerWidth / 2) + (cardWidth / 2);
+        
+        el.scrollTo({
+          left: scrollLeft,
+          behavior: 'smooth',
+        });
       });
     };
 
@@ -65,7 +72,7 @@ export function FocusableRow({ title, children, className = '', focusKey, prefer
             (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
             (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
           }}
-          className="flex gap-[clamp(0.5rem,1vw,0.75rem)] px-[clamp(3rem,7.5vw,6rem)] overflow-x-auto hide-scrollbar py-[clamp(0.375rem,1vh,0.5rem)]"
+          className="flex gap-4 px-[clamp(3rem,7.5vw,6rem)] overflow-x-auto hide-scrollbar py-10 min-h-[350px]"
         >
           {children}
         </div>

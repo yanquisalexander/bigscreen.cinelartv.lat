@@ -13,6 +13,7 @@ export interface ContentItem {
   banner_resized?: string;
   cover_resized?: string;
   content_type?: string;
+  contentType?: string;
   year?: number | null;
   liked?: boolean;
   progress?: number;
@@ -108,6 +109,7 @@ export interface WatchContent {
   title: string;
   description?: string;
   content_type?: string;
+  contentType?: string;
   banner?: string;
   cover?: string;
   segments?: Segment[];
@@ -141,4 +143,12 @@ export interface WatchData {
   seasons?: WatchSeason[];
   continue_watching?: ContinueWatching;
   sources: ContentSource[];
+}
+
+export function getContentType(item: { content_type?: string; contentType?: string }): string | undefined {
+  return item.content_type ?? item.contentType;
+}
+
+export function isTVShow(item: { content_type?: string; contentType?: string }): boolean {
+  return getContentType(item) === 'TVSHOW';
 }

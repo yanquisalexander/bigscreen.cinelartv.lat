@@ -11,6 +11,7 @@ import { FocusableCard } from '@/components/tv/FocusableCard';
 import { FocusableRow } from '@/components/tv/FocusableRow';
 import { Focusable } from '@/components/tv/Focusable';
 import type { ContentItem, ExploreResponse } from '@/types/content';
+import { isTVShow } from '@/types/content';
 import { syncContinueWatching, syncRecommendations, exitApp } from '@/services/NativeBridge';
 import type { AndroidTvHomeItem } from '@/services/NativeBridge';
 
@@ -64,7 +65,7 @@ export function HomeScreen() {
           content_id: item.id,
           title: item.title,
           description: item.description,
-          content_type: item.content_type,
+          content_type: item.content_type ?? item.contentType,
           cover: resolveImageUrl(item.cover, clientEndpoint)!,
           cover_resized: resolveImageUrl(item.cover_resized, clientEndpoint)!,
           banner: resolveImageUrl(item.banner, clientEndpoint)!,
@@ -227,13 +228,20 @@ export function HomeScreen() {
                     {category.content?.map((item, itemIdx) => (
                       <FocusableCard
                         key={item.id}
+                        variant="row"
                         focusKey={`home-row-${catIdx}-item-${item.id}`}
                         title={item.title}
+                        description={item.description}
+                        year={item.year}
                         image={resolveImageUrl(
-                          item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover,
+                          item.cover_resized ?? item.cover,
                           clientEndpoint,
                         )}
-                        subtitle={item.content_type === 'TVSHOW' ? 'Serie' : undefined}
+                        bannerImage={resolveImageUrl(
+                          item.banner_resized ?? item.banner,
+                          clientEndpoint,
+                        )}
+                        subtitle={isTVShow(item) ? 'Serie' : 'Película'}
                         progress={progressPercent(item)}
                         onArrowPress={(direction) => {
                           if (catIdx === 0 && direction === 'up') return focusHeroFromFirstRow(direction);
