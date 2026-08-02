@@ -11,6 +11,7 @@ import { useToastStore } from '@/stores/toastStore';
 import { resolveImageUrl } from '@/utils/helpers';
 import { addContinueWatching, prefersNative as prefersNativePlayer, launchNativePlayer, setOnNativePlayerFinished } from '@/services/NativeBridge';
 import { fetchVast } from '@/services/player/vast-client';
+import { pdbg } from '@/services/player/playerDebug';
 import { M3eLoadingIndicator } from '@m3e/react/loading-indicator';
 import { inputManager } from '@/services/InputManager';
 import type { WatchData } from '@/types/content';
@@ -163,8 +164,10 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     }
     if (!tokens || !contentId) return;
     setWatchData(null);
+    pdbg('watch.watchdata', 'fetching', { contentId, episodeId });
     consumeWatchData(tokens.accessToken, contentId, episodeId)
       .then((data) => {
+        pdbg('watch.watchdata', 'resolved', { hasSources: !!data.sources?.length, title: data.content?.title });
         const isTVShow = data.content.content_type === 'TVSHOW';
         if (isTVShow && !episodeId && !data.episode) {
           const firstEpisode = data.seasons?.[0]?.episodes?.[0];
@@ -184,7 +187,8 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
         }
         setWatchData(data);
       })
-      .catch(() => {
+      .catch((err) => {
+        pdbg('watch.watchdata', 'REJECTED', err);
         useToastStore.getState().show('No se pudo cargar el contenido. Intenta de nuevo más tarde.', 'error', 4000);
         navigate('/home', { replace: true });
       });
@@ -193,15 +197,26 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
   // --- Preroll ---
   useEffect(() => {
     if (test || !streamUrl || prerollChecked || adPhase !== 'none') return;
+    pdbg('watch.preroll', 'fetching VAST');
     fetchVast(AD_PREROLL_TAG).then((ad) => {
+      pdbg('watch.preroll', 'vast settled', ad ? 'ad found' : 'no ad');
       setPrerollChecked(true);
       if (ad) {
         setAdPhase('preroll');
         setCurrentAd(ad);
       }
     }).catch(() => {
+      pdbg('watch.preroll', 'vast rejected');
       setPrerollChecked(true);
     });
+    // Safety net: the preroll gate must NEVER block the stream. Even if the
+    // VAST request stalls (ad-network unreachable on TV networks), open the
+    // gate so the load effect can start playback.
+    const safety = setTimeout(() => {
+      pdbg('watch.preroll', 'safety timeout — opening gate');
+      setPrerollChecked(true);
+    }, 9000);
+    return () => clearTimeout(safety);
   }, [test, streamUrl, prerollChecked, adPhase]);
 
   // --- Load stream ---
@@ -209,16 +224,19 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     if (!streamUrl || adPhase !== 'none' || !prerollChecked) return;
     let cancelled = false;
     const resume = watchData?.continue_watching?.progress ?? 0;
+    pdbg('watch.load', 'calling engine.load', { engineReady, url: streamUrl, resume });
     load(streamUrl, resume).then(() => {
       if (cancelled) return;
+      pdbg('watch.load', 'engine.load resolved → play()');
       play();
       applyPreferredAudioLanguage(userLang);
     }).catch(() => {
       if (cancelled) return;
+      pdbg('watch.load', 'engine.load rejected');
       useToastStore.getState().show('No se pudo reproducir el contenido.', 'error', 4000);
     });
     return () => { cancelled = true; };
-  }, [streamUrl, load, play, watchData, applyPreferredAudioLanguage, userLang, adPhase, prerollChecked]);
+  }, [streamUrl, load, play, watchData, applyPreferredAudioLanguage, userLang, adPhase, prerollChecked, engineReady]);
 
   // --- Progress reporting ---
   useEffect(() => {

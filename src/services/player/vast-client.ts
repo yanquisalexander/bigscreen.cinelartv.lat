@@ -159,6 +159,7 @@ function fireUrls(urls: string[]): void {
 export async function fetchVast(
   tagUrl: string,
   depth = 0,
+  timeoutMs = 7000,
 ): Promise<VastAd | null> {
   if (depth >= MAX_WRAPPER_DEPTH) return null;
 
@@ -169,9 +170,17 @@ export async function fetchVast(
 
   let xmlText: string;
   try {
-    const resp = await fetch(url);
-    if (!resp.ok) return null;
-    xmlText = await resp.text();
+    // Hard timeout: a hanging ad-network request must never block playback
+    // (the preroll gate waits on this promise before loading the stream).
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetch(url, { signal: controller.signal });
+      if (!resp.ok) return null;
+      xmlText = await resp.text();
+    } finally {
+      clearTimeout(timer);
+    }
   } catch {
     return null;
   }
@@ -186,7 +195,7 @@ export async function fetchVast(
 
   const wrapperUrl = (ad as any)._wrapperUrl;
   if (wrapperUrl && (!ad.mediaFiles || ad.mediaFiles.length === 0)) {
-    return fetchVast(wrapperUrl, depth + 1);
+    return fetchVast(wrapperUrl, depth + 1, timeoutMs);
   }
 
   if (!ad.mediaFiles || ad.mediaFiles.length === 0) {

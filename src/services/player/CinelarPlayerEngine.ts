@@ -1,4 +1,5 @@
 import { useToastStore } from '@/stores/toastStore';
+import { pdbg, instrumentVideo } from './playerDebug';
 
 function toast(msg: string) {
   try { useToastStore.getState().show(msg, 'error', 8000); } catch { /* ignore */ }
@@ -23,10 +24,21 @@ export class CinelarPlayerEngine {
   private player: any = null;
   private videoElement: HTMLVideoElement | null = null;
   private eventListeners: Map<PlayerEvent, EventCallback[]> = new Map();
-  private attachPromise: Promise<void> | null = null;
+
+  /** Resolves when `attach()` settles (never rejects); error stored in `attachError`. */
+  private attachState: Promise<void> | null = null;
+  private attachError: any = null;
+
+  /** Serializes load() calls: Shaka rejects a load while another is in flight. */
+  private loadQueue: Promise<void> = Promise.resolve();
+  private loadToken = 0;
+
+  private playRetried = false;
 
   constructor(videoElement: HTMLVideoElement) {
     this.videoElement = videoElement;
+    pdbg('engine.constructor', 'video element received');
+    instrumentVideo(videoElement);
     this.initShaka();
   }
 
@@ -38,18 +50,22 @@ export class CinelarPlayerEngine {
 
     if (!shaka || !shaka.Player) {
       toast('[Player] Shaka Player no se pudo cargar');
+      pdbg('engine.initShaka', 'shaka NOT resolved — playback will not work');
       return;
     }
 
+    pdbg('engine.initShaka', 'shaka resolved, version', shaka.Player.version ?? '?');
+
     try {
       shaka.polyfill.installAll();
+      pdbg('engine.initShaka', 'polyfills installed');
     } catch (e: any) {
       toast(`[Player] Polyfill: ${e?.message ?? String(e)}`);
+      pdbg('engine.initShaka', 'polyfill.installAll FAILED', e);
     }
 
     try {
       this.player = new shaka.Player();
-      this.attachPromise = this.player.attach(this.videoElement);
 
       this.player.configure({
         streaming: {
@@ -66,12 +82,33 @@ export class CinelarPlayerEngine {
         const code = event?.detail?.code ?? 'unknown';
         const message = event?.detail?.message ?? '';
         toast(`[Player] Error: ${code} ${message}`);
+        pdbg('engine.shaka-error', `code=${code}`, message, event?.detail);
         this.emit('error', event.detail);
       });
     } catch (e: any) {
       toast(`[Player] Init fallo: ${e?.message ?? String(e)}`);
+      pdbg('engine.initShaka', 'new shaka.Player() FAILED', e);
       this.player = null;
     }
+
+    if (!this.player) return;
+
+    pdbg('engine.initShaka', 'player created, calling attach()…');
+    this.attachState = (async () => {
+      try {
+        await this.player.attach(this.videoElement);
+        pdbg('engine.attach', 'attach() OK');
+      } catch (e: any) {
+        this.attachError = e;
+        const msg = e?.message ?? e?.code ?? String(e);
+        toast(`[Player] No se pudo preparar el reproductor (${msg}).`);
+        pdbg('engine.attach', 'attach() FAILED', e);
+        // Without a working attach, Shaka cannot drive the element: drop it
+        // so non-adaptive URLs fall back to native <video> playback.
+        try { await this.player?.detach(); } catch { /* ignore */ }
+        this.player = null;
+      }
+    })();
 
     this.videoElement.addEventListener('play', () => this.emit('playing'));
     this.videoElement.addEventListener('pause', () => this.emit('paused'));
@@ -89,33 +126,71 @@ export class CinelarPlayerEngine {
     return clean.endsWith('.m3u8') || clean.endsWith('.mpd');
   }
 
-  public async load(url: string, startTime?: number) {
-    if (!this.videoElement) return;
+  /**
+   * Serialized, last-wins load. Concurrent calls are queued so Shaka never
+   * sees a load while another is in flight (it rejects those), and a load
+   * superseded by a newer one before starting is skipped entirely.
+   */
+  public load(url: string, startTime?: number): Promise<void> {
+    const token = ++this.loadToken;
+    pdbg('engine.load', 'queued', { url, startTime, token });
+
+    const run = this.loadQueue.then(async () => {
+      if (token !== this.loadToken) {
+        pdbg('engine.load', 'skipped (superseded)', token);
+        return;
+      }
+      await this.doLoad(url, startTime);
+    });
+
+    this.loadQueue = run.catch(() => { /* keep the queue alive */ });
+    return run;
+  }
+
+  private async doLoad(url: string, startTime?: number): Promise<void> {
+    const video = this.videoElement;
+    if (!video) return;
+
+    if (this.attachState) {
+      await this.attachState;
+      if (this.attachError) {
+        // attach() failed: Shaka cannot play adaptive manifests here.
+        if (this.isAdaptiveManifest(url)) {
+          toast('[Player] No se pudo iniciar el reproductor (MSE no disponible?).');
+          pdbg('engine.load', 'ABORTED — attach failed and URL is adaptive');
+          this.emit('error', this.attachError);
+          return;
+        }
+      }
+    }
 
     if (this.player && this.isAdaptiveManifest(url)) {
+      pdbg('engine.load', 'starting shaka load', url);
       try {
-        if (this.attachPromise) await this.attachPromise;
         await this.player.load(url, startTime && startTime > 0 ? startTime : undefined);
+        pdbg('engine.load', 'shaka load OK');
         return;
       } catch (e: any) {
-        toast(`[Player] Load fallo: ${e?.message ?? String(e)}`);
+        const msg = e?.message ?? String(e);
+        toast(`[Player] Load fallo: ${msg}`);
+        pdbg('engine.load', 'shaka load FAILED', e);
         this.emit('error', e);
         return;
       }
     }
 
-    try {
-      if (this.player) {
+    // Native fallback (progressive MP4, or Shaka unavailable/attach failed).
+    if (this.player) {
+      try {
         await this.player.detach();
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
-
-    const video = this.videoElement;
+    pdbg('engine.load', 'native fallback (video.src)', url);
     if (startTime && startTime > 0) {
       const seekOnce = () => {
-        video.currentTime = startTime;
+        video.currentTime = startTime!;
         video.removeEventListener('loadedmetadata', seekOnce);
       };
       video.addEventListener('loadedmetadata', seekOnce);
@@ -125,9 +200,40 @@ export class CinelarPlayerEngine {
   }
 
   public play() {
-    this.videoElement?.play().catch((err) => {
-      toast(`[Player] Autoplay bloqueado: ${err?.message ?? String(err)}`);
-    });
+    const video = this.videoElement;
+    if (!video) return;
+    pdbg('engine.play', 'calling video.play()');
+
+    const doPlay = () => {
+      const p = video.play();
+      if (!p) return;
+      p.then(() => {
+        this.playRetried = false;
+      }).catch((err: any) => {
+        const name = err?.name ?? 'UnknownError';
+        pdbg('engine.play', 'rejected', name, err?.message);
+        // Readiness/autoplay races (AbortError/NotAllowedError) can occur right
+        // after load() on TV WebViews; retry once, driven by media events
+        // (no blind setTimeout), once metadata/canplay actually arrives.
+        if (!this.playRetried && (name === 'AbortError' || name === 'NotAllowedError')) {
+          this.playRetried = true;
+          toast(`[Player] Autoplay bloqueado: ${err?.message ?? String(err)}`);
+          const retry = () => {
+            video.removeEventListener('loadedmetadata', retry);
+            video.removeEventListener('canplay', retry);
+            pdbg('engine.play', 'retrying after media-ready event');
+            video.play().catch((e2: any) => {
+              toast(`[Player] Autoplay bloqueado: ${e2?.message ?? String(e2)}`);
+            });
+          };
+          video.addEventListener('loadedmetadata', retry);
+          video.addEventListener('canplay', retry);
+        } else {
+          toast(`[Player] Autoplay bloqueado: ${err?.message ?? String(err)}`);
+        }
+      });
+    };
+    doPlay();
   }
 
   public pause() {
@@ -227,6 +333,8 @@ export class CinelarPlayerEngine {
   }
 
   public destroy() {
+    pdbg('engine.destroy');
+    this.loadToken++; // invalidate any queued loads
     if (this.player) {
       this.player.destroy();
       this.player = null;

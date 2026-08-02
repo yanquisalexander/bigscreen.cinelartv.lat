@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { CinelarPlayerEngine } from './CinelarPlayerEngine';
+import { pdbg } from './playerDebug';
 
 export function usePlayerEngine() {
   const engineRef = useRef<CinelarPlayerEngine | null>(null);
@@ -18,9 +19,11 @@ export function usePlayerEngine() {
     videoRef.current = el;
 
     if (el && !engineRef.current) {
+      pdbg('hook.attachVideo', 'video mounted → creating engine');
       const engine = new CinelarPlayerEngine(el);
       engineRef.current = engine;
       setEngineReady(true);
+      pdbg('hook.attachVideo', 'engineReady=true');
 
       engine.on('playing', () => setIsPlaying(true));
       engine.on('paused', () => setIsPlaying(false));
@@ -32,16 +35,21 @@ export function usePlayerEngine() {
 
   useEffect(() => {
     return () => {
+      pdbg('hook.cleanup', 'destroying engine');
       engineRef.current?.destroy();
       engineRef.current = null;
     };
   }, []);
 
   const load = useCallback((url: string, startTime?: number) => {
+    pdbg('hook.load', { url, startTime, hasEngine: !!engineRef.current });
     return engineRef.current?.load(url, startTime) ?? Promise.resolve();
   }, []);
 
-  const play = useCallback(() => engineRef.current?.play(), []);
+  const play = useCallback(() => {
+    pdbg('hook.play', { hasEngine: !!engineRef.current });
+    engineRef.current?.play();
+  }, []);
   const pause = useCallback(() => engineRef.current?.pause(), []);
   const seek = useCallback((time: number) => engineRef.current?.seek(time), []);
   const setOnEnded = useCallback((fn: () => void) => { onEndedRef.current = fn; }, []);
