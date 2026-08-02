@@ -21,6 +21,7 @@ import type { VastAd } from '@/types/vast';
 import '@/components/tv/PlayerControlsElement';
 import '@/components/tv/FocusableElement';
 import '@/components/tv/FocusableCardElement';
+import '@/components/tv/AdOverlayElement';
 import { PlayerSettingsPanel } from '@/components/player/PlayerSettingsPanel';
 
 const AD_PREROLL_TAG = 'https://pubads.g.doubleclick.net/gampad/live/ads?iu=/22530741549/CTV_VAST_ADS&description_url=[DESCRIPTION_URL]&tfcd=0&npa=0&sz=400x300%7C640x480&gdfp_req=1&unviewed_position_start=1&output=vast&env=vp&impl=s&correlator=[CACHEBUSTER]';
@@ -376,6 +377,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     if (!el) return;
 
     const handleAdComplete = () => {
+      pdbg('watch.ad-complete', 'received');
       const pending = pendingNavigationRef.current;
       if (pending) {
         pendingNavigationRef.current = null;
@@ -396,12 +398,40 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     return () => el.removeEventListener('ad-complete', handleAdComplete);
   }, [currentAd, navigate]);
 
+  // --- Ad watchdog: an ad stuck in any phase must never block the stream ---
+  // The gate (load effect) waits for adPhase === 'none'. If the overlay fails
+  // silently (element missing, media error, autoplay blocked), force-release
+  // the gate after the ad duration plus a safety margin.
+  useEffect(() => {
+    if (adPhase === 'none' || !currentAd) return;
+    const graceMs = Math.max(25_000, (currentAd.duration || 0) * 1000 + 15_000);
+    pdbg('watch.ad-watchdog', 'armed', { adPhase, duration: currentAd.duration, graceMs });
+    const timer = setTimeout(() => {
+      pdbg('watch.ad-watchdog', 'FIRED — releasing gate', { adPhase });
+      const pending = pendingNavigationRef.current;
+      if (pending) {
+        pendingNavigationRef.current = null;
+        navigate(
+          pending.episodeId
+            ? `/watch/${pending.contentId}/${pending.episodeId}`
+            : `/watch/${pending.contentId}`,
+          { replace: true },
+        );
+        return;
+      }
+      setCurrentAd(null);
+      setAdPhase('none');
+    }, graceMs);
+    return () => clearTimeout(timer);
+  }, [adPhase, currentAd, navigate]);
+
   // --- Push current ad into the overlay element ---
   useEffect(() => {
     const el = adOverlayRef.current;
     if (el) {
       el.ad = currentAd;
       el.setAttribute('skip-offset', '5');
+      pdbg('watch.ad-overlay', currentAd ? 'ad pushed to overlay' : 'ad cleared');
     }
   }, [currentAd]);
 

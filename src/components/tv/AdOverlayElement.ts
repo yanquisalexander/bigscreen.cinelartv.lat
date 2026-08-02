@@ -1,6 +1,7 @@
 import { SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation';
 import { FocusableRegistrar } from './spatialFocus';
 import { trackImpression, trackEvent, trackError, selectMediaFile } from '@/services/player/vast-client';
+import { pdbg } from '@/services/player/playerDebug';
 import type { VastAd } from '@/types/vast';
 
 const FOCUS_KEY_ROOT = 'ad-overlay';
@@ -24,6 +25,7 @@ class AdOverlayElement extends HTMLElement {
   static get observedAttributes() { return ['skip-offset']; }
 
   set ad(value: VastAd | null) {
+    pdbg('ad-overlay.set-ad', value ? 'ad assigned' : 'ad cleared');
     this._ad = value;
     if (value) {
       this._canSkip = false;
@@ -83,6 +85,7 @@ class AdOverlayElement extends HTMLElement {
     this._spinnerEl = this.querySelector('[data-ad-spinner]');
 
     const video = this._video;
+    pdbg('ad-overlay.startPlayback', { url: mediaFile.url, type: mediaFile.type, dur: this._ad.duration });
     video.src = mediaFile.url;
     video.load();
 
@@ -99,7 +102,12 @@ class AdOverlayElement extends HTMLElement {
         this.handleSkip();
     });
 
-    video.play().catch(() => this.showSpinner(false));
+    video.play().then(() => {
+      pdbg('ad-overlay.play', 'ok');
+    }).catch((e: any) => {
+      pdbg('ad-overlay.play', 'rejected', e?.name, e?.message);
+      this.showSpinner(false);
+    });
 
     this.registerFocusables();
     this.installKeyHandler();
@@ -164,12 +172,15 @@ class AdOverlayElement extends HTMLElement {
   };
 
   private finishAd() {
+    pdbg('ad-overlay.finishAd', 'dispatching ad-complete');
     if (this._ad) trackEvent(this._ad, 'complete');
     this.teardown();
     this.dispatchEvent(new CustomEvent('ad-complete', { bubbles: true, composed: true }));
   }
 
   private onAdError() {
+    const code = this._video?.error?.code ?? 'unknown';
+    pdbg('ad-overlay.error', `media error code=${code}`);
     if (this._ad) trackError(this._ad);
     this.finishAd();
   }
