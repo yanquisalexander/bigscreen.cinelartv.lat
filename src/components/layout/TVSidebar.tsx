@@ -68,9 +68,22 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
     return profile.avatar_url ?? `${clientEndpoint}/assets/default/avatars/${profile.avatar_id ?? 'coolCat'}.png`;
   }, [profile, clientEndpoint]);
 
+  const collapsed = !hasFocusedChild;
+
+  const itemClasses = (isActive: boolean) => classNames(
+    'flex h-10 items-center gap-3 rounded-lg text-sm font-medium',
+    collapsed ? 'justify-center px-0' : 'justify-start px-2',
+    isActive ? 'text-white' : 'text-white/70',
+  );
+
+  const bottomItemClasses = classNames(
+    'flex h-10 items-center gap-3 rounded-lg text-sm font-medium mb-1',
+    collapsed ? 'justify-center px-0' : 'justify-start px-2',
+    'text-white/70',
+  );
+
   const labelStyle = (show: boolean): React.CSSProperties => ({
-    opacity: show ? 1 : 0,
-    transition: 'none',
+    display: show ? 'block' : 'none',
   });
 
   return (
@@ -78,11 +91,9 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
       <aside
         ref={ref as React.RefObject<HTMLElement>}
         style={{ gridArea: 'sidebar' }}
-        className="relative h-full w-full flex flex-col py-6 px-4 bg-surface/10"
+        className="relative h-full w-full flex flex-col py-4 bg-surface/10"
       >
-        <div className="flex items-center mb-12 h-8 px-2 justify-start" />
-
-        <nav className="flex-1 flex flex-col gap-2">
+        <nav className="flex-1 flex flex-col gap-1 mt-4">
           {NAV_ITEMS.map((item) => {
             const isActive = location.pathname.startsWith(item.path);
             return (
@@ -92,12 +103,9 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
                 onArrowPress={focusContent}
                 focusKey={`nav-${item.key}`}
                 focusedClassName="bg-white !text-black"
-                className={classNames(
-                  'flex h-12 items-center gap-4 rounded-xl px-3 text-base font-medium justify-start',
-                  isActive ? 'text-white' : 'text-white/70',
-                )}
+                className={itemClasses(isActive)}
               >
-                <item.icon className="text-2xl flex-shrink-0" />
+                <item.icon className="text-xl flex-shrink-0" />
                 <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
                   {item.label}
                 </span>
@@ -111,9 +119,9 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
           onArrowPress={focusContent}
           focusKey="nav-settings"
           focusedClassName="bg-white !text-black"
-          className="flex h-12 items-center gap-4 rounded-xl px-3 text-base font-medium mb-1 justify-start text-white/70"
+          className={bottomItemClasses}
         >
-          <SettingsRegular className="text-2xl flex-shrink-0" />
+          <SettingsRegular className="text-xl flex-shrink-0" />
           <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
             Ajustes
           </span>
@@ -125,9 +133,9 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
             onArrowPress={focusContent}
             focusKey="nav-login"
             focusedClassName="bg-white !text-black"
-            className="flex h-12 items-center gap-4 rounded-xl px-3 text-base font-medium mb-1 justify-start text-white/70"
+            className={bottomItemClasses}
           >
-            <LucideLogIn className="text-2xl flex-shrink-0" />
+            <LucideLogIn className="text-xl flex-shrink-0" />
             <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
               Iniciar sesión
             </span>
@@ -138,12 +146,15 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
             onArrowPress={focusContent}
             focusKey="nav-profile"
             focusedClassName="bg-white !text-black [&_span]:text-black"
-            className="flex h-12 items-center gap-3 rounded-xl px-2 justify-start"
+            className={classNames(
+              'flex h-10 items-center gap-2 rounded-lg',
+              collapsed ? 'justify-center px-0' : 'justify-start px-2',
+            )}
           >
             <img
               src={avatarUrl}
               alt={profile.name}
-              className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+              className="w-7 h-7 rounded-full object-cover flex-shrink-0"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';
@@ -152,7 +163,7 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
               }}
             />
             <div
-              className="w-9 h-9 rounded-full bg-accent items-center justify-center text-white font-bold text-sm flex-shrink-0"
+              className="w-7 h-7 rounded-full bg-accent items-center justify-center text-white font-bold text-xs flex-shrink-0"
               style={{ display: 'none' }}
             >
               {profile.name.charAt(0).toUpperCase()}

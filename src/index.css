@@ -29,6 +29,11 @@
   display: none;
 }
 
+/* POR DEFECTO, no mostrar los elementos de enfoque */
+*:focus {
+  outline: none;
+}
+
 *, ::before, ::after {
   --tw-translate-x: 0;
   --tw-translate-y: 0;

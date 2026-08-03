@@ -202,11 +202,7 @@ export function ContentDetailScreen() {
   }, []);
 
   const focusContentTarget = useCallback((focusKey?: string) => {
-    if (!focusKey) {
-      console.log('focusContentTarget: no focusKey provided');
-      return true;
-    }
-    console.log('focusContentTarget: setting focus to', focusKey);
+    if (!focusKey) return true;
     setFocus(focusKey);
     return false;
   }, []);

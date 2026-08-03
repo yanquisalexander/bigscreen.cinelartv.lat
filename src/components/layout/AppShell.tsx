@@ -13,9 +13,10 @@ export function AppShell() {
       className="grid h-dvh overflow-hidden bg-bg"
       style={{
         gridTemplateColumns: sidebarFocused
-          ? 'var(--sidebar-w, 260px) 1fr'
-          : 'var(--sidebar-w-collapsed, 88px) 1fr',
+          ? 'var(--sidebar-w, 200px) 1fr'
+          : 'var(--sidebar-w-collapsed, 72px) 1fr',
         gridTemplateAreas: '"sidebar main"',
+        transition: 'grid-template-columns 0.3s ease-out',
       }}
     >
       <TVSidebar onFocusChange={setSidebarFocused} />

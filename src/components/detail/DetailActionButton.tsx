@@ -39,9 +39,8 @@ export const DetailActionButton = memo(function DetailActionButton({
   });
 
   useEffect(() => {
-    console.log('ActionButton mounted/updated', label, focusKey, focused);
     if (autoFocus) focusSelf();
-  }, [autoFocus, focusSelf, label, focusKey]);
+  }, [autoFocus, focusSelf]);
 
   return (
     <div
