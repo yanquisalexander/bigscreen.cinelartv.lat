@@ -8,6 +8,7 @@ const PARENT_FOCUS_KEY = 'watch-root';
 const CONTROLS_HIDE_DELAY = 5000;
 const LOGIC_TICK_MS = 1000;
 const SEEK_STEP_SECONDS = 10;
+const SEEK_REPEAT_MS = 180;
 
 interface EngineLike {
   getVariantTracksInfo(): any;
@@ -50,6 +51,10 @@ class PlayerControlsElement extends HTMLElement {
   private _seekAccumulator = 0;
   private _seekApplyTimer: ReturnType<typeof setTimeout> | null = null;
   private _seekEndTimer: ReturnType<typeof setTimeout> | null = null;
+  private _seekKeyHeld = false;
+  private _seekDirection = 0;
+  private _seekHeldAt = 0;
+  private _lastSeekStepAt = 0;
 
   static get observedAttributes() {
     return ['content-id', 'client-endpoint'];
@@ -203,6 +208,7 @@ class PlayerControlsElement extends HTMLElement {
     this._renderEpisodesButton();
     this._renderEpisodesRail();
     this._setupGlobalKeyHandler();
+    this._setupSeekbarHoldHandler();
     this.addEventListener('enter-press', this._handleEnterPress);
     this.addEventListener('focus-gained', this._handleFocusGained);
     this.addEventListener('focus-lost', this._handleFocusLost);
@@ -223,6 +229,7 @@ class PlayerControlsElement extends HTMLElement {
       window.removeEventListener('keydown', keyHandler, true);
       (this as any)._keyHandler = null;
     }
+    this._teardownSeekbarHoldHandler();
     this.removeEventListener('enter-press', this._handleEnterPress);
     this.removeEventListener('focus-gained', this._handleFocusGained);
     this.removeEventListener('focus-lost', this._handleFocusLost);
@@ -1306,7 +1313,11 @@ class PlayerControlsElement extends HTMLElement {
         this._lastFocusedControlKey = 'watch-seekbar';
         seekbar.setAttribute('data-focused', 'true');
       },
-      onBlur: () => seekbar.setAttribute('data-focused', 'false'),
+      onBlur: () => {
+        seekbar.setAttribute('data-focused', 'false');
+        this._resetSeekHold();
+        if (this._isSeeking) this._endSeek();
+      },
     }]);
   }
 
@@ -1420,6 +1431,83 @@ class PlayerControlsElement extends HTMLElement {
     window.addEventListener('keydown', handleKey, true);
     (this as any)._keyHandler = handleKey;
   }
+
+  /* ─── Continuous seek while holding Left/Right ──────────────────────────
+     Norigin throttles repeated keydowns (80ms) and re-enters navigation on
+     each one, which makes holding an arrow key unreliable for scrubbing and
+     can steal focus from the seekbar. These handlers run in the capture
+     phase on window, BEFORE norigin's bubble-phase listeners, and swallow
+     Left/Right entirely while the seekbar is focused. The media is seeked
+     directly here, so focus never leaves the seekbar during a hold. */
+
+  private _setupSeekbarHoldHandler() {
+    window.addEventListener('keydown', this._handleSeekbarKeyDown, true);
+    window.addEventListener('keyup', this._handleSeekbarKeyUp, true);
+  }
+
+  private _teardownSeekbarHoldHandler() {
+    window.removeEventListener('keydown', this._handleSeekbarKeyDown, true);
+    window.removeEventListener('keyup', this._handleSeekbarKeyUp, true);
+    this._resetSeekHold();
+  }
+
+  private _resetSeekHold() {
+    this._seekKeyHeld = false;
+    this._seekDirection = 0;
+    this._seekHeldAt = 0;
+    this._lastSeekStepAt = 0;
+  }
+
+  private _seekbarHoldCanIntercept(): boolean {
+    if (this._settingsOpen || this._railExpanded) return false;
+    if (!this._showControls) return false;
+    return (getCurrentFocusKey() ?? '') === 'watch-seekbar';
+  }
+
+  private _handleSeekbarKeyDown = (e: KeyboardEvent) => {
+    const code = e.keyCode || e.key;
+    const dir = code === 37 || code === 'ArrowLeft' ? -1 : code === 39 || code === 'ArrowRight' ? 1 : 0;
+    if (!dir) return;
+    if (!this._seekbarHoldCanIntercept()) return;
+
+    // Norigin (and anything else) must never see these: focus stays on the seekbar.
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    const now = performance.now();
+    if (!this._seekKeyHeld) {
+      // Initial press: seek immediately.
+      this._seekKeyHeld = true;
+      this._seekDirection = dir;
+      this._seekHeldAt = now;
+      this._lastSeekStepAt = now;
+      this._seekBy(dir * SEEK_STEP_SECONDS);
+      return;
+    }
+    // Key repeat while held: one step per SEEK_REPEAT_MS for continuous scrubbing.
+    if (dir !== this._seekDirection) {
+      this._seekDirection = dir;
+      this._lastSeekStepAt = now;
+      this._seekBy(dir * SEEK_STEP_SECONDS);
+      return;
+    }
+    if (now - this._lastSeekStepAt < SEEK_REPEAT_MS) return;
+    this._lastSeekStepAt = now;
+    this._seekBy(dir * SEEK_STEP_SECONDS);
+  };
+
+  private _handleSeekbarKeyUp = (e: KeyboardEvent) => {
+    if (!this._seekKeyHeld) return;
+    const code = e.keyCode || e.key;
+    if (code !== 37 && code !== 'ArrowLeft' && code !== 39 && code !== 'ArrowRight') return;
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    const wasHold = performance.now() - this._seekHeldAt >= SEEK_REPEAT_MS;
+    this._resetSeekHold();
+    if (wasHold) this._endSeek();
+  };
 
   private _handleEnterPress = (e: Event) => {
     const source = e.composedPath().find(
