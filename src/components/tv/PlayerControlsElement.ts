@@ -54,7 +54,7 @@ class PlayerControlsElement extends HTMLElement {
   private _seekKeyHeld = false;
   private _seekDirection = 0;
   private _seekHeldAt = 0;
-  private _lastSeekStepAt = 0;
+  private _seekRepeatTimer: ReturnType<typeof setInterval> | null = null;
 
   static get observedAttributes() {
     return ['content-id', 'client-endpoint'];
@@ -1315,6 +1315,7 @@ class PlayerControlsElement extends HTMLElement {
       },
       onBlur: () => {
         seekbar.setAttribute('data-focused', 'false');
+        this._stopSeekRepeat();
         this._resetSeekHold();
         if (this._isSeeking) this._endSeek();
       },
@@ -1437,8 +1438,13 @@ class PlayerControlsElement extends HTMLElement {
      each one, which makes holding an arrow key unreliable for scrubbing and
      can steal focus from the seekbar. These handlers run in the capture
      phase on window, BEFORE norigin's bubble-phase listeners, and swallow
-     Left/Right entirely while the seekbar is focused. The media is seeked
-     directly here, so focus never leaves the seekbar during a hold. */
+     Left/Right entirely while the seekbar is active. The media is seeked
+     directly here, so focus never leaves the seekbar during a hold.
+
+     We cannot rely on the OS delivering repeated keydown events: IR remotes
+     and some TV WebViews only send a single press. So the first keydown
+     starts a self-driven repeat timer (SEEK_REPEAT_MS) that keeps stepping
+     until the key is released (or focus leaves the seekbar). */
 
   private _setupSeekbarHoldHandler() {
     window.addEventListener('keydown', this._handleSeekbarKeyDown, true);
@@ -1448,6 +1454,7 @@ class PlayerControlsElement extends HTMLElement {
   private _teardownSeekbarHoldHandler() {
     window.removeEventListener('keydown', this._handleSeekbarKeyDown, true);
     window.removeEventListener('keyup', this._handleSeekbarKeyUp, true);
+    this._stopSeekRepeat();
     this._resetSeekHold();
   }
 
@@ -1455,11 +1462,39 @@ class PlayerControlsElement extends HTMLElement {
     this._seekKeyHeld = false;
     this._seekDirection = 0;
     this._seekHeldAt = 0;
-    this._lastSeekStepAt = 0;
+  }
+
+  private _startSeekRepeat(dir: number) {
+    this._stopSeekRepeat();
+    this._seekRepeatTimer = setInterval(() => {
+      // Self-healing: stop if the key was released, the video vanished or the
+      // seekbar is no longer active (focus moved, controls hidden, rail open).
+      if (!this._seekKeyHeld || !this.video || !this._seekbarHoldCanIntercept()) {
+        this._stopSeekRepeat();
+        this._resetSeekHold();
+        if (this._isSeeking) this._endSeek();
+        return;
+      }
+      this._seekBy(dir * SEEK_STEP_SECONDS);
+    }, SEEK_REPEAT_MS);
+  }
+
+  private _stopSeekRepeat() {
+    if (this._seekRepeatTimer) {
+      clearInterval(this._seekRepeatTimer);
+      this._seekRepeatTimer = null;
+    }
   }
 
   private _seekbarHoldCanIntercept(): boolean {
     if (this._settingsOpen || this._railExpanded) return false;
+    // Desktop path: clicking the seekbar puts DOM focus on it while norigin's
+    // focus key stays elsewhere. If the seekbar (or a child) has DOM focus we
+    // intercept regardless of norigin state.
+    const seekbar = this.shadow.querySelector('[data-seekbar-focusable]') as HTMLElement | null;
+    if (seekbar && (document.activeElement === seekbar || seekbar.contains(document.activeElement))) {
+      return true;
+    }
     if (!this._showControls) return false;
     return (getCurrentFocusKey() ?? '') === 'watch-seekbar';
   }
@@ -1474,26 +1509,21 @@ class PlayerControlsElement extends HTMLElement {
     e.preventDefault();
     e.stopImmediatePropagation();
 
-    const now = performance.now();
     if (!this._seekKeyHeld) {
-      // Initial press: seek immediately.
+      // Initial press: seek immediately and start the self-driven repeat.
       this._seekKeyHeld = true;
       this._seekDirection = dir;
-      this._seekHeldAt = now;
-      this._lastSeekStepAt = now;
+      this._seekHeldAt = performance.now();
       this._seekBy(dir * SEEK_STEP_SECONDS);
+      this._startSeekRepeat(dir);
       return;
     }
-    // Key repeat while held: one step per SEEK_REPEAT_MS for continuous scrubbing.
+    // Direction flipped mid-hold (rare): reseed the repeat with the new direction.
     if (dir !== this._seekDirection) {
       this._seekDirection = dir;
-      this._lastSeekStepAt = now;
       this._seekBy(dir * SEEK_STEP_SECONDS);
-      return;
+      this._startSeekRepeat(dir);
     }
-    if (now - this._lastSeekStepAt < SEEK_REPEAT_MS) return;
-    this._lastSeekStepAt = now;
-    this._seekBy(dir * SEEK_STEP_SECONDS);
   };
 
   private _handleSeekbarKeyUp = (e: KeyboardEvent) => {
@@ -1505,6 +1535,7 @@ class PlayerControlsElement extends HTMLElement {
     e.stopImmediatePropagation();
 
     const wasHold = performance.now() - this._seekHeldAt >= SEEK_REPEAT_MS;
+    this._stopSeekRepeat();
     this._resetSeekHold();
     if (wasHold) this._endSeek();
   };
