@@ -61,7 +61,7 @@ export function IncompatibleBrowserScreen({ result }: Props) {
         }}
       >
         Tu dispositivo necesita una versión más reciente de Android WebView para
-        ejecutar CinelarT.
+        ejecutar CinelarTV.
       </p>
       <div
         style={{
