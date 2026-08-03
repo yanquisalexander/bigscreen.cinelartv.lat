@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
 import { useToastStore } from '@/stores/toastStore';
 import { getExplore } from '@/features/content/explore';
-import { resolveImageUrl } from '@/utils/helpers';
+import { resolveImageUrl, isBackKey } from '@/utils/helpers';
 import { HeroSection } from '@/components/home/HeroSection';
 import { FocusableCard } from '@/components/tv/FocusableCard';
 import { FocusableRow } from '@/components/tv/FocusableRow';
@@ -153,7 +153,7 @@ export function HomeScreen() {
   // Back key: focus sidebar or show exit dialog
   useEffect(() => {
     const handleBack = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'XF86Back' || e.key === 'GoBack' || e.key === 'BrowserBack') {
+      if (isBackKey(e)) {
         e.preventDefault();
         if (showExitDialog) {
           setShowExitDialog(false);

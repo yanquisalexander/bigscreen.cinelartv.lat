@@ -25,3 +25,11 @@ export function formatUserCode(code: string): string {
 export function classNames(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(' ');
 }
+
+const BACK_KEYS = new Set(['Escape', 'Backspace', 'XF86Back', 'GoBack', 'BrowserBack', 'Back']);
+const BACK_KEYCODES = new Set([8, 27, 461, 10009]);
+
+export function isBackKey(e: Pick<KeyboardEvent, 'key' | 'keyCode'>): boolean {
+  if (BACK_KEYS.has(e.key)) return true;
+  return BACK_KEYCODES.has(e.keyCode);
+}

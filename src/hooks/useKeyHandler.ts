@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import { isBackKey } from '@/utils/helpers';
 
 export function useKeyHandler(handlers: {
   onBack?: () => void;
@@ -8,7 +9,7 @@ export function useKeyHandler(handlers: {
   handlersRef.current = handlers;
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'XF86Back' || e.key === 'Back') {
+    if (isBackKey(e)) {
       e.preventDefault();
       handlersRef.current.onBack?.();
     }

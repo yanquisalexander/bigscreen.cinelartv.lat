@@ -25,7 +25,7 @@ import {
   type LiveChannelInfo,
 } from '@/services/NativeBridge';
 import { getLiveTvChannels, type LiveTvChannel } from '@/api/live';
-import { classNames } from '@/utils/helpers';
+import { classNames, isBackKey } from '@/utils/helpers';
 
 /* ─── helpers ──────────────────────────────────────────────────── */
 
@@ -321,11 +321,7 @@ export function LiveTVScreen() {
 
   useEffect(() => {
     const handleBack = (e: KeyboardEvent) => {
-      if (
-        ['Escape', 'Backspace', 'XF86Back', 'GoBack', 'BrowserBack'].includes(
-          e.key,
-        )
-      ) {
+      if (isBackKey(e)) {
         e.preventDefault();
         if (searchOpen) {
           setSearchOpen(false);

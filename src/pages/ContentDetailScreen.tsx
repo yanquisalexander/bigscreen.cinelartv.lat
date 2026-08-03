@@ -14,9 +14,7 @@ import { FocusableButton } from '@/components/tv/FocusableButton';
 import type { ContentDetail } from '@/types/content';
 import { isTVShow } from '@/types/content';
 import { M3eLoadingIndicator } from '@m3e/react/loading-indicator';
-
-const BACK_KEYS = new Set(['Escape', 'Backspace', 'GoBack', 'BrowserBack']);
-const BACK_KEYCODES = new Set([8, 27, 461, 10009]);
+import { isBackKey } from '@/utils/helpers';
 
 export function ContentDetailScreen() {
   useSpatialNavInit();
@@ -64,7 +62,7 @@ export function ContentDetailScreen() {
   // ── Back key ───────────────────────────────────────────────────
   useEffect(() => {
     const handleBack = (e: KeyboardEvent) => {
-      if (BACK_KEYS.has(e.key) || BACK_KEYCODES.has(e.keyCode)) {
+      if (isBackKey(e)) {
         e.preventDefault();
         navigate(-1);
       }

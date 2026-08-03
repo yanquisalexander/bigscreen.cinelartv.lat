@@ -89,7 +89,7 @@ export function SearchScreen() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.altKey || e.metaKey) return;
-      if (['XF86Back', 'GoBack', 'BrowserBack', 'Escape'].includes(e.key)) {
+      if (['XF86Back', 'GoBack', 'BrowserBack', 'Escape', 'Back'].includes(e.key) || e.keyCode === 461 || e.keyCode === 10009) {
         e.preventDefault();
         navigate('/home');
         return;

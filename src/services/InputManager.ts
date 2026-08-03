@@ -1,7 +1,8 @@
+import { isBackKey } from '@/utils/helpers';
+
 type InputHandler = (e: KeyboardEvent) => void;
 type InputEventType = 'back' | 'playpause' | 'arrow-up' | 'arrow-down' | 'arrow-left' | 'arrow-right' | 'enter' | 'space';
 
-const BACK_KEYS = new Set(['Escape', 'Backspace', 'XF86Back', 'GoBack', 'BrowserBack', 'Back']);
 const ENTER_KEYS = new Set(['Enter', ' ']);
 
 export class InputManager {
@@ -21,7 +22,7 @@ export class InputManager {
   }
 
   private handleKeyDown(e: KeyboardEvent) {
-    if (BACK_KEYS.has(e.key)) {
+    if (isBackKey(e)) {
       this.dispatch('back', e);
     }
     if (ENTER_KEYS.has(e.key)) {
