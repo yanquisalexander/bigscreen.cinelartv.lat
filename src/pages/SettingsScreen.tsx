@@ -1,23 +1,38 @@
-import { useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { getPlatform, getAppVersion, getDeviceName, getModel, getNativeVersion, getNativeVersionName } from '@/services/NativeBridge';
+import {
+  getPlatform,
+  getAppVersion,
+  getDeviceName,
+  getModel,
+  getNativeVersion,
+  getNativeVersionName,
+} from '@/services/NativeBridge';
 import { Focusable } from '@/components/tv/Focusable';
 import { classNames } from '@/utils/helpers';
 import { inputManager } from '@/services/InputManager';
-import { Play, Volume2, Palette, Shield, Info } from 'lucide-react';
+import { Play, Volume2, Palette, Shield, Info, LucideRotateCcw } from 'lucide-react';
+
+/* ─── Section definitions ──────────────────────────────────────── */
 
 const SECTIONS = [
-  { key: 'reproduccion', label: 'Reproducción', icon: Play, focusKey: 'settings-section-reproduccion-first' },
+  { key: 'reproduccion', label: 'Reproducción', icon: Play },
   { key: 'audio', label: 'Audio', icon: Volume2 },
   { key: 'apariencia', label: 'Apariencia', icon: Palette },
   { key: 'privacidad', label: 'Privacidad', icon: Shield },
   { key: 'informacion', label: 'Información', icon: Info },
-];
+  { key: 'reiniciar', label: 'Reiniciar', icon: LucideRotateCcw },
+] as const;
+
+type SectionKey = (typeof SECTIONS)[number]['key'];
+
+/* ─── Main screen ──────────────────────────────────────────────── */
 
 export function SettingsScreen() {
   const navigate = useNavigate();
+  const [activeSection, setActiveSection] = useState<SectionKey>('reproduccion');
 
   const { ref, focusKey } = useFocusable({
     focusKey: 'settings-root',
@@ -54,25 +69,52 @@ export function SettingsScreen() {
     <FocusContext.Provider value={focusKey}>
       <div
         ref={ref as React.RefObject<HTMLDivElement>}
-        className="w-full h-dvh bg-[#0a0a0a] flex overflow-hidden"
+        className="w-full h-dvh bg-bg flex overflow-hidden"
       >
-        <SettingsSidebar />
-        <SettingsContent
-          prefersModernPlayback={prefersModernPlayback}
-          setPrefersModernPlayback={setPrefersModernPlayback}
-          platform={platform}
-          appVersion={appVersion}
-          deviceName={deviceName}
-          model={model}
-          nativeVersion={nativeVersion}
-          nativeVersionName={nativeVersionName}
+        {/* left panel */}
+        <SettingsSidebar
+          activeSection={activeSection}
+          onSectionFocus={setActiveSection}
         />
+
+        {/* right panel */}
+        <div className="flex-1 overflow-y-auto hide-scrollbar py-[clamp(3rem,8vh,4rem)] px-[clamp(3rem,7.5vw,6rem)]">
+          {activeSection === 'reproduccion' && (
+            <ReproduccionContent
+              prefersModernPlayback={prefersModernPlayback}
+              setPrefersModernPlayback={setPrefersModernPlayback}
+              onBackToSidebar={() => setFocus('settings-nav-reproduccion')}
+            />
+          )}
+          {activeSection === 'audio' && <AudioContent />}
+          {activeSection === 'apariencia' && <AparienciaContent />}
+          {activeSection === 'privacidad' && <PrivacidadContent />}
+          {activeSection === 'reiniciar' && <ReiniciarContent />}
+          {activeSection === 'informacion' && (
+            <InformacionContent
+              platform={platform}
+              appVersion={appVersion}
+              deviceName={deviceName!}
+              model={model}
+              nativeVersion={nativeVersion}
+              nativeVersionName={nativeVersionName}
+            />
+          )}
+        </div>
       </div>
     </FocusContext.Provider>
   );
 }
 
-function SettingsSidebar() {
+/* ─── Sidebar ──────────────────────────────────────────────────── */
+
+function SettingsSidebar({
+  activeSection,
+  onSectionFocus,
+}: {
+  activeSection: SectionKey;
+  onSectionFocus: (key: SectionKey) => void;
+}) {
   const focusSidebar = useCallback(() => {
     setFocus('sidebar');
     return false;
@@ -80,54 +122,65 @@ function SettingsSidebar() {
 
   return (
     <nav className="flex-shrink-0 min-w-[clamp(140px,25vw,300px)] py-[clamp(3rem,8vh,4rem)] pl-[clamp(4rem,8vw,6rem)] pr-[clamp(2rem,4vw,3rem)] flex flex-col gap-[clamp(0.25rem,0.4vh,0.35rem)] overflow-y-auto scrollbar-none">
+      {/* header */}
       <div className="flex items-center gap-[clamp(0.75rem,1.5vw,1rem)] px-[clamp(0.75rem,1.2vw,1rem)] mb-[clamp(1.5rem,4vh,2rem)]">
-        <div className="w-[clamp(2.25rem,3.5vw,3rem)] h-[clamp(2.25rem,3.5vw,3rem)] rounded-full bg-[#1c1c1e] flex items-center justify-center text-[#8e8e93] text-[clamp(1.15rem,1.8vw,1.5rem)]">
+        <div className="w-[clamp(2.25rem,3.5vw,3rem)] h-[clamp(2.25rem,3.5vw,3rem)] rounded-full bg-surface flex items-center justify-center text-text-secondary text-[clamp(1.15rem,1.8vw,1.5rem)]">
           ⚙
         </div>
-        <h1 className="text-[clamp(1.35rem,2.6vw,2rem)] font-semibold text-white">Ajustes</h1>
+        <h1 className="text-[clamp(1.35rem,2.6vw,2rem)] font-semibold text-white">
+          Configuración
+        </h1>
       </div>
 
-      {SECTIONS.map((section, idx) => (
-        <Focusable
-          key={section.key}
-          focusKey={`settings-nav-${section.key}`}
-          onEnterPress={() => {
-            if (section.focusKey) setFocus(section.focusKey);
-          }}
-          onArrowPress={(direction) => {
-            if (direction === 'right' && section.focusKey) {
-              setFocus(section.focusKey);
-              return false;
-            }
-            if (direction === 'left' && idx === 0) {
-              return focusSidebar();
-            }
-            return true;
-          }}
-          focusedClassName="bg-white/10 !text-white"
-          className={classNames(
-            'flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] px-[clamp(0.75rem,1.2vw,1rem)] py-[clamp(0.5rem,0.8vh,0.65rem)] rounded-xl text-[clamp(0.85rem,1.1vw,0.95rem)] font-medium',
-            'text-[#8e8e93] transition-colors cursor-pointer',
-          )}
-        >
-          <section.icon className="text-[clamp(1.15rem,1.5vw,1.3rem)]" />
-          <span className="whitespace-nowrap">{section.label}</span>
-        </Focusable>
-      ))}
+      {/* categories */}
+      {SECTIONS.map((section, idx) => {
+        const isActive = activeSection === section.key;
+        return (
+          <Focusable
+            key={section.key}
+            focusKey={`settings-nav-${section.key}`}
+            onFocus={() => onSectionFocus(section.key)}
+            onEnterPress={() => {
+              const firstItem = document.querySelector(
+                `[data-settings-section="${section.key}"] [data-focusable]`,
+              ) as HTMLElement | null;
+              if (firstItem) {
+                const fk = firstItem.getAttribute('data-focus-key');
+                if (fk) setFocus(fk);
+              }
+            }}
+            onArrowPress={(direction) => {
+              if (direction === 'left' && idx === 0) {
+                return focusSidebar();
+              }
+              return true;
+            }}
+            focusedClassName={classNames(
+              'bg-white/10 !text-white',
+              isActive && 'bg-white/10 !text-white',
+            )}
+            className={classNames(
+              'flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] px-[clamp(0.75rem,1.2vw,1rem)] py-[clamp(0.5rem,0.8vh,0.65rem)] rounded-xl text-[clamp(0.85rem,1.1vw,0.95rem)] font-medium cursor-pointer',
+              isActive ? 'text-white bg-white/10' : 'text-text-secondary',
+            )}
+          >
+            <section.icon className="text-[clamp(1.15rem,1.5vw,1.3rem)]" />
+            <span className="whitespace-nowrap">{section.label}</span>
+          </Focusable>
+        );
+      })}
 
+      {/* back */}
       <Focusable
         onEnterPress={() => setFocus('settings-back')}
         onArrowPress={(direction) => {
-          if (direction === 'right') {
-            setFocus('settings-back');
-            return false;
-          }
+          if (direction === 'left') return focusSidebar();
           return true;
         }}
         focusedClassName="bg-white/10 !text-white"
         className={classNames(
           'flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] px-[clamp(0.75rem,1.2vw,1rem)] py-[clamp(0.5rem,0.8vh,0.65rem)] mt-[clamp(2rem,4vh,3rem)] rounded-xl text-[clamp(0.85rem,1.1vw,0.95rem)] font-medium',
-          'text-[#8e8e93] transition-colors cursor-pointer',
+          'text-text-secondary cursor-pointer',
         )}
       >
         <span className="text-[clamp(1.1rem,1.4vw,1.3rem)]">←</span>
@@ -137,67 +190,11 @@ function SettingsSidebar() {
   );
 }
 
-interface SettingsContentProps {
-  prefersModernPlayback: boolean;
-  setPrefersModernPlayback: (value: boolean) => void;
-  platform: string;
-  appVersion: string;
-  deviceName: string | null;
-  model: string;
-  nativeVersion: string;
-  nativeVersionName: string | null;
-}
-
-function SettingsContent({
-  prefersModernPlayback,
-  setPrefersModernPlayback,
-  platform,
-  appVersion,
-  deviceName,
-  model,
-  nativeVersion,
-  nativeVersionName,
-}: SettingsContentProps) {
-  return (
-    <div className="flex-1 overflow-y-auto scrollbar-none py-[clamp(3rem,8vh,4rem)] px-[clamp(3rem,7.5vw,6rem)]">
-      <ReproducionSection
-        prefersModernPlayback={prefersModernPlayback}
-        setPrefersModernPlayback={setPrefersModernPlayback}
-      />
-      <AudioSection />
-      <AparienciaSection />
-      <PrivacidadSection />
-      <InformacionSection
-        platform={platform}
-        appVersion={appVersion}
-        deviceName={deviceName}
-        model={model}
-        nativeVersion={nativeVersion}
-        nativeVersionName={nativeVersionName}
-      />
-
-      <Focusable
-        onEnterPress={() => setFocus('settings-nav-reproduccion')}
-        onArrowPress={(direction) => {
-          if (direction === 'left') {
-            setFocus('settings-nav-reproduccion');
-            return false;
-          }
-          return true;
-        }}
-        focusedClassName="bg-white text-black scale-105"
-        className="inline-flex items-center gap-[clamp(0.5rem,1vw,0.75rem)] h-[clamp(2.25rem,3.5vh,2.75rem)] px-[clamp(1.25rem,2.5vw,2rem)] rounded-full bg-[#1c1c1e] text-white text-[clamp(0.85rem,1.1vw,0.95rem)] font-medium transition-all mt-[clamp(2rem,4vh,3rem)] cursor-pointer"
-      >
-        <span className="text-lg">→</span>
-        Volver al inicio
-      </Focusable>
-    </div>
-  );
-}
+/* ─── Shared helpers ───────────────────────────────────────────── */
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-[clamp(0.65rem,0.85vw,0.75rem)] font-bold uppercase tracking-wider text-[#8e8e93] mb-[clamp(0.75rem,1.2vh,1rem)]">
+    <h3 className="text-[clamp(0.65rem,0.85vw,0.75rem)] font-bold uppercase tracking-wider text-text-secondary mb-[clamp(0.75rem,1.2vh,1rem)]">
       {children}
     </h3>
   );
@@ -205,31 +202,27 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-[#1c1c1e] rounded-[clamp(0.75rem,1.5vw,1rem)] p-[clamp(1rem,2vw,1.5rem)] mb-[clamp(1.5rem,4vh,2rem)]">
+    <div className="bg-surface rounded-[clamp(0.75rem,1.5vw,1rem)] p-[clamp(1rem,2vw,1.5rem)]">
       {children}
     </div>
   );
 }
 
-function SettingsRow({
+function Toggle({
+  checked,
+  onChange,
   focusKey,
-  label,
-  description,
-  children,
-  onEnterPress,
   onArrowLeft,
 }: {
-  focusKey: string;
-  label: string;
-  description?: string;
-  children?: React.ReactNode;
-  onEnterPress?: () => void;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  focusKey?: string;
   onArrowLeft?: () => void;
 }) {
   return (
     <Focusable
       focusKey={focusKey}
-      onEnterPress={onEnterPress}
+      onEnterPress={() => onChange(!checked)}
       onArrowPress={(direction) => {
         if (direction === 'left' && onArrowLeft) {
           onArrowLeft();
@@ -237,70 +230,61 @@ function SettingsRow({
         }
         return true;
       }}
-      focusedClassName="bg-white/5"
-      className="flex items-center justify-between py-[clamp(0.5rem,1vh,0.75rem)] border-b border-white/5 last:border-b-0 cursor-pointer rounded-lg px-2 -mx-2 transition-colors"
+      focusedClassName="!bg-white/5"
+      className="relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full flex-shrink-0 cursor-pointer"
     >
-      <div className="flex flex-col flex-1 min-w-0">
-        <span className="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">{label}</span>
-        {description && (
-          <span className="text-[#8e8e93] text-[clamp(0.75rem,1vw,0.85rem)] mt-0.5">{description}</span>
+      <div
+        className={classNames(
+          'absolute top-1/2 -translate-y-1/2 w-[clamp(1.1rem,1.8vw,1.3rem)] h-[clamp(1.1rem,1.8vw,1.3rem)] rounded-full bg-white transition-all',
+          checked ? 'left-[clamp(1.4rem,2.3vw,1.7rem)] bg-accent' : 'left-[clamp(0.2rem,0.35vw,0.3rem)] bg-white/40',
         )}
-      </div>
-      {children}
+      />
     </Focusable>
   );
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
-  return (
-    <div
-      className={classNames(
-        'relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full transition-colors flex-shrink-0 cursor-pointer',
-        checked ? 'bg-[#181881]' : 'bg-white/20',
-      )}
-      onClick={() => onChange(!checked)}
-    >
-      <div
-        className={classNames(
-          'absolute top-1/2 -translate-y-1/2 w-[clamp(1.1rem,1.8vw,1.3rem)] h-[clamp(1.1rem,1.8vw,1.3rem)] rounded-full bg-white shadow-lg transition-all',
-          checked ? 'left-[clamp(1.4rem,2.3vw,1.7rem)]' : 'left-[clamp(0.2rem,0.35vw,0.3rem)]',
-        )}
-      />
-    </div>
-  );
-}
+/* ─── Section content panels ───────────────────────────────────── */
 
-function ReproducionSection({
+function ReproduccionContent({
   prefersModernPlayback,
   setPrefersModernPlayback,
+  onBackToSidebar,
 }: {
   prefersModernPlayback: boolean;
-  setPrefersModernPlayback: (value: boolean) => void;
+  setPrefersModernPlayback: (v: boolean) => void;
+  onBackToSidebar: () => void;
 }) {
   return (
-    <div>
+    <div data-settings-section="reproduccion">
       <SectionTitle>Reproducción</SectionTitle>
       <SectionCard>
-        <SettingsRow
-          focusKey="settings-section-reproduccion-first"
-          label="Reproductor moderno"
-          description="Usa el reproductor web en lugar del nativo del dispositivo."
-          onEnterPress={() => setPrefersModernPlayback(!prefersModernPlayback)}
-          onArrowLeft={() => setFocus('settings-nav-reproduccion')}
-        >
-          <Toggle checked={prefersModernPlayback} onChange={setPrefersModernPlayback} />
-        </SettingsRow>
+        <div className="flex items-center justify-between py-[clamp(0.5rem,1vh,0.75rem)]">
+          <div className="flex flex-col flex-1 min-w-0">
+            <span className="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">
+              Reproductor moderno
+            </span>
+            <span className="text-text-secondary text-[clamp(0.75rem,1vw,0.85rem)] mt-0.5">
+              Usa el reproductor web en lugar del nativo del dispositivo.
+            </span>
+          </div>
+          <Toggle
+            checked={prefersModernPlayback}
+            onChange={setPrefersModernPlayback}
+            focusKey="settings-toggle-modern"
+            onArrowLeft={onBackToSidebar}
+          />
+        </div>
       </SectionCard>
     </div>
   );
 }
 
-function AudioSection() {
+function AudioContent() {
   return (
-    <div>
+    <div data-settings-section="audio">
       <SectionTitle>Audio</SectionTitle>
       <SectionCard>
-        <p className="text-[#8e8e93] text-[clamp(0.8rem,1.1vw,0.95rem)] text-center py-[clamp(1rem,2vh,1.25rem)]">
+        <p className="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)] text-center py-[clamp(1rem,2vh,1.25rem)]">
           Próximamente
         </p>
       </SectionCard>
@@ -308,12 +292,12 @@ function AudioSection() {
   );
 }
 
-function AparienciaSection() {
+function AparienciaContent() {
   return (
-    <div>
+    <div data-settings-section="apariencia">
       <SectionTitle>Apariencia</SectionTitle>
       <SectionCard>
-        <p className="text-[#8e8e93] text-[clamp(0.8rem,1.1vw,0.95rem)] text-center py-[clamp(1rem,2vh,1.25rem)]">
+        <p className="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)] text-center py-[clamp(1rem,2vh,1.25rem)]">
           Próximamente
         </p>
       </SectionCard>
@@ -321,12 +305,48 @@ function AparienciaSection() {
   );
 }
 
-function PrivacidadSection() {
+function ReiniciarContent() {
+  const navigate = useNavigate();
+
   return (
-    <div>
+    <div data-settings-section="reiniciar" className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+      <div className="w-[clamp(4rem,7vw,5.5rem)] h-[clamp(4rem,7vw,5.5rem)] rounded-2xl bg-accent/20 flex items-center justify-center mb-[clamp(1.5rem,3vh,2.5rem)]">
+        <LucideRotateCcw className="w-[clamp(2rem,3.5vw,3rem)] h-[clamp(2rem,3.5vw,3rem)] text-accent-light" />
+      </div>
+
+      <h2 className="text-white text-[clamp(1.5rem,3vw,2.25rem)] font-bold mb-[clamp(0.75rem,1.5vh,1rem)]">
+        Reiniciar app
+      </h2>
+
+      <p className="text-text-secondary text-[clamp(0.85rem,1.2vw,1.05rem)] leading-relaxed max-w-[clamp(300px,40vw,500px)] mb-[clamp(2rem,4vh,3rem)]">
+        Vuelve a cargar la aplicación y regresa a la pantalla de inicio. Esto puede ayudar a corregir problemas temporales.
+      </p>
+
+      <Focusable
+        focusKey="settings-reiniciar-btn"
+        onEnterPress={() => window.location.href = '/'}
+        onArrowPress={(direction) => {
+          if (direction === 'left') {
+            setFocus('settings-nav-reiniciar');
+            return false;
+          }
+          return true;
+        }}
+        focusedClassName="!bg-white !text-black"
+        className="inline-flex items-center justify-center px-[clamp(2rem,4vw,3rem)] py-[clamp(0.625rem,1.4vh,0.875rem)] rounded-full bg-surface text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-semibold border border-white/10 cursor-pointer"
+      >
+        Reiniciar app
+      </Focusable>
+    </div>
+  );
+}
+
+function PrivacidadContent() {
+  return (
+    <div data-settings-section="privacidad">
       <SectionTitle>Privacidad</SectionTitle>
       <SectionCard>
-        <p className="text-[#8e8e93] text-[clamp(0.8rem,1.1vw,0.95rem)] text-center py-[clamp(1rem,2vh,1.25rem)]">
+        <p className="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)] text-center py-[clamp(1rem,2vh,1.25rem)]">
           Próximamente
         </p>
       </SectionCard>
@@ -334,7 +354,7 @@ function PrivacidadSection() {
   );
 }
 
-function InformacionSection({
+function InformacionContent({
   platform,
   appVersion,
   deviceName,
@@ -349,21 +369,34 @@ function InformacionSection({
   nativeVersion: string;
   nativeVersionName: string | null;
 }) {
-  const rows = useMemo(() => [
-    { label: 'Versión', value: appVersion },
-    { label: 'Dispositivo', value: deviceName ?? '—' },
-    { label: 'Modelo', value: model },
-    { label: 'Plataforma', value: platform },
-    { label: 'Versión Nativa', value: nativeVersionName ? `${nativeVersionName} (${nativeVersion})` : '—' },
-  ], [appVersion, deviceName, model, platform, nativeVersion, nativeVersionName]);
+  const rows = useMemo(
+    () => [
+      { label: 'Versión', value: appVersion },
+      { label: 'Dispositivo', value: deviceName ?? '—' },
+      { label: 'Modelo', value: model },
+      { label: 'Plataforma', value: platform },
+      {
+        label: 'Versión Nativa',
+        value: nativeVersionName
+          ? `${nativeVersionName} (${nativeVersion})`
+          : '—',
+      },
+    ],
+    [appVersion, deviceName, model, platform, nativeVersion, nativeVersionName],
+  );
 
   return (
-    <div>
+    <div data-settings-section="informacion">
       <SectionTitle>Información</SectionTitle>
       <SectionCard>
         {rows.map((row, i) => (
-          <div key={i} className="flex items-center justify-between py-[clamp(0.5rem,1vh,0.75rem)] border-b border-white/5 last:border-b-0">
-            <span className="text-[#8e8e93] text-[clamp(0.8rem,1.1vw,0.95rem)]">{row.label}</span>
+          <div
+            key={i}
+            className="flex items-center justify-between py-[clamp(0.5rem,1vh,0.75rem)] border-b border-white/5 last:border-b-0"
+          >
+            <span className="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)]">
+              {row.label}
+            </span>
             <span className="text-white text-[clamp(0.8rem,1.1vw,0.95rem)] font-medium text-right max-w-[clamp(10rem,22vw,18rem)] overflow-hidden text-ellipsis">
               {row.value}
             </span>
