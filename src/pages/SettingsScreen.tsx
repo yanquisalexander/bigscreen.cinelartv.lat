@@ -170,22 +170,7 @@ function SettingsSidebar({
         );
       })}
 
-      {/* back */}
-      <Focusable
-        onEnterPress={() => setFocus('settings-back')}
-        onArrowPress={(direction) => {
-          if (direction === 'left') return focusSidebar();
-          return true;
-        }}
-        focusedClassName="bg-white/10 !text-white"
-        className={classNames(
-          'flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] px-[clamp(0.75rem,1.2vw,1rem)] py-[clamp(0.5rem,0.8vh,0.65rem)] mt-[clamp(2rem,4vh,3rem)] rounded-xl text-[clamp(0.85rem,1.1vw,0.95rem)] font-medium',
-          'text-text-secondary cursor-pointer',
-        )}
-      >
-        <span className="text-[clamp(1.1rem,1.4vw,1.3rem)]">←</span>
-        <span className="whitespace-nowrap">Volver al inicio</span>
-      </Focusable>
+
     </nav>
   );
 }
