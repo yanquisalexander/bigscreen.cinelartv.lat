@@ -224,15 +224,17 @@ export function HomeScreen() {
 
               <div className={`mt-[clamp(1.5rem,4vh,3rem)] relative z-10 pb-[clamp(3rem,8vh,4rem)] transition-all duration-700 will-change-opacity ${heroImmersive ? 'opacity-0 pointer-events-none' : ''}`}>
                 {data?.content?.map((category, catIdx) => {
+                  const preferredChild = category.content?.[0]?.id != null
+                    ? `home-row-${catIdx}-item-${category.content[0].id}`
+                    : undefined;
+
                   const rowContent = (
                     <FocusableRow
                       key={catIdx}
                       title={category.title}
                       focusKey={`home-row-${catIdx}`}
                       className=""
-                      preferredChildFocusKey={
-                        category.content?.[0]?.id != null ? `home-row-${catIdx}-item-${category.content[0].id}` : undefined
-                      }
+                      preferredChildFocusKey={preferredChild}
                     >
                       {category.content?.map((item, itemIdx) => (
                         <MemoizedCard
@@ -252,7 +254,16 @@ export function HomeScreen() {
 
                   // First 2 rows always rendered, rest lazy
                   if (catIdx < 2) return rowContent;
-                  return <LazyRow key={`lazy-${catIdx}`}>{rowContent}</LazyRow>;
+                  if (!category.content?.length) return null;
+                  return (
+                    <LazyRow
+                      key={`lazy-${catIdx}`}
+                      focusKey={`home-lazy-${catIdx}`}
+                      preferredChildFocusKey={preferredChild}
+                    >
+                      {rowContent}
+                    </LazyRow>
+                  );
                 })}
               </div>
             </>
@@ -270,32 +281,85 @@ export function HomeScreen() {
   );
 }
 
-// Lazy rendering: only mount row content when near the viewport
-function LazyRow({ children, rootMargin = '600px' }: { children: React.ReactNode; rootMargin?: string }) {
+// Lazy rendering: only mount row content when near the viewport.
+// The sentinel doubles as a spatial-navigation target so arrow-key users can
+// descend into unrendered rows: norigin focuses the sentinel, the row mounts
+// and focus is handed to its first card. Without this, rows below the last
+// rendered one are unreachable on TV (no mouse wheel to trigger the observer).
+function LazyRow({
+  children,
+  focusKey,
+  preferredChildFocusKey,
+  rootMargin = '600px',
+}: {
+  children: React.ReactNode;
+  focusKey: string;
+  preferredChildFocusKey?: string;
+  rootMargin?: string;
+}) {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = useState(false);
+  const focusOnMountRef = useRef(false);
 
+  // Pre-mount when the row approaches the viewport (mouse scroll / image preloading)
   useEffect(() => {
     const el = sentinelRef.current;
-    if (!el) return;
+    if (!el || shouldRender) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setShouldRender(true);
-          observer.disconnect();
-        }
+        if (entry.isIntersecting) setShouldRender(true);
       },
       { rootMargin },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [rootMargin]);
+  }, [shouldRender, rootMargin]);
+
+  // If the row mounted because spatial navigation focused the sentinel,
+  // hand focus to the real row's first card (retry until it registers).
+  // We do NOT guard on getCurrentFocusKey: when the sentinel unmounts its
+  // useFocusable cleanup triggers Norigin's autoRestoreFocus, which
+  // redirects focus to home-root's preferredChildFocusKey (hero) before this
+  // effect runs. Calling setFocus here corrects that immediately.
+  useEffect(() => {
+    if (!shouldRender || !focusOnMountRef.current || !preferredChildFocusKey) return;
+    let attempts = 0;
+    const tryFocus = () => {
+      attempts += 1;
+      if (doesFocusableExist(preferredChildFocusKey)) {
+        focusOnMountRef.current = false;
+        setFocus(preferredChildFocusKey);
+        return;
+      }
+      if (attempts < 20) requestAnimationFrame(tryFocus);
+    };
+    requestAnimationFrame(tryFocus);
+  }, [shouldRender, preferredChildFocusKey]);
 
   return (
     <div ref={sentinelRef}>
-      {shouldRender ? children : <div className="h-[300px]" />}
+      {shouldRender ? (
+        children
+      ) : (
+        <LazySentinel
+          focusKey={focusKey}
+          onActivate={() => {
+            focusOnMountRef.current = true;
+            setShouldRender(true);
+          }}
+        />
+      )}
     </div>
   );
+}
+
+function LazySentinel({ focusKey, onActivate }: { focusKey: string; onActivate: () => void }) {
+  const { ref, focused } = useFocusable({
+    focusKey,
+    onFocus: onActivate,
+  });
+
+  return <div ref={ref} data-focused={focused} className="h-[300px] w-full" />;
 }
 
 // Memoized card wrapper — resolves image URLs once per item change
