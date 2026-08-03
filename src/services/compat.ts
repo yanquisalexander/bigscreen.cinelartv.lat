@@ -1,4 +1,4 @@
-const MINIMUM_CHROME_VERSION = 79;
+const MINIMUM_CHROME_VERSION = 80;
 
 export interface CompatResult {
   compatible: boolean;
