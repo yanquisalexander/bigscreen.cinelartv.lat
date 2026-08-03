@@ -197,6 +197,16 @@ html, body, #root {
   backdrop-filter: blur(40px);
 }
 
+/* Hero banner crossfade: runs automatically when the img mounts */
+@keyframes hero-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.hero-fade-in {
+  animation: hero-fade-in 0.5s ease-out;
+}
+
 /* Pulse animation for skeletons */
 @keyframes pulse {
   0%, 100% { opacity: 0.4; }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { Focusable } from '@/components/tv/Focusable';
 import { resolveImageUrl } from '@/utils/helpers';
@@ -33,6 +33,40 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
   const currentItem = items[currentIndex];
   const hasTrailer = !!(currentItem?.trailer_sources?.length);
   const trailerUrl = hasTrailer ? currentItem.trailer_sources![0].url : null;
+
+  // Resolve banner URL (always full size for hero)
+  const currentBannerUrl = useMemo(() => {
+    if (!currentItem) return null;
+    return resolveImageUrl(currentItem.banner ?? currentItem.cover, clientEndpoint);
+  }, [currentItem, clientEndpoint]);
+
+  // Crossfade: keep previous banner visible underneath while the new one fades in
+  const prevBannerUrlRef = useRef<string | null>(null);
+  const [prevBannerUrl, setPrevBannerUrl] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    if (!currentBannerUrl) return;
+
+    // Preload next banner
+    if (items.length > 1) {
+      const nextItem = items[(currentIndex + 1) % items.length];
+      if (nextItem) {
+        const url = resolveImageUrl(nextItem.banner ?? nextItem.cover, clientEndpoint);
+        if (url) {
+          const img = new Image();
+          img.src = url;
+        }
+      }
+    }
+
+    // Keep the previous banner visible underneath while the new one fades in.
+    // The fade itself is pure CSS (hero-fade-in) and starts on img mount.
+    const oldUrl = prevBannerUrlRef.current;
+    if (oldUrl && oldUrl !== currentBannerUrl) {
+      setPrevBannerUrl(oldUrl);
+    }
+    prevBannerUrlRef.current = currentBannerUrl;
+  }, [currentBannerUrl, currentIndex, items, clientEndpoint]);
 
   const goTo = useCallback(
     (index: number) => {
@@ -156,26 +190,41 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
         className={`relative w-full overflow-hidden transition-all duration-700 ease-in-out ${immersiveMode ? 'h-screen' : 'h-[clamp(360px,70vh,680px)]'}`}
         style={{ willChange: 'height' }}
       >
-        {/* Capa 1: Banner images */}
-        {items.map((item, i) => (
-          <div
-            key={item.id}
-            className="absolute inset-0 transition-opacity duration-1000 ease-in-out will-change-opacity"
-            style={{ opacity: i === currentIndex && !showTrailer ? 1 : 0 }}
-          >
-            {item.banner || item.cover ? (
+        {/* Capa 1: Banner images (crossfade) */}
+        <div className="absolute inset-0">
+          {/* Previous banner: stays visible underneath while the new one fades in */}
+          {prevBannerUrl && prevBannerUrl !== currentBannerUrl && (
+            <img
+              src={prevBannerUrl}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+              width={1920}
+              height={680}
+            />
+          )}
+          {/* Current banner (wrapper opacity handles trailer fade) */}
+          {currentBannerUrl ? (
+            <div
+              className="absolute inset-0 transition-opacity duration-500 ease-in-out will-change-opacity"
+              style={{ opacity: showTrailer ? 0 : 1 }}
+            >
               <img
-                src={resolveImageUrl(item.banner ?? item.cover, clientEndpoint)!}
-                alt={item.title}
-                className="w-full h-full object-cover"
-                loading="lazy"
+                key={currentBannerUrl}
+                src={currentBannerUrl}
+                alt={currentItem.title}
+                className={`absolute inset-0 w-full h-full object-cover ${prevBannerUrl ? 'hero-fade-in' : ''}`}
+                onAnimationEnd={() => setPrevBannerUrl(null)}
+                loading="eager"
                 decoding="async"
+                fetchPriority="high"
+                width={1920}
+                height={680}
               />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-accent/30 to-bg" />
-            )}
-          </div>
-        ))}
+            </div>
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-accent/30 to-bg" />
+          )}
+        </div>
 
         {/* Capa 2: Trailer video */}
         {hasTrailer && (

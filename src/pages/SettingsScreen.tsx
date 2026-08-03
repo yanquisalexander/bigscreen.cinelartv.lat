@@ -214,13 +214,15 @@ function Toggle({
         }
         return true;
       }}
-      focusedClassName="!bg-white/5"
-      className="relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full flex-shrink-0 cursor-pointer"
+      className={classNames(
+        'relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full flex-shrink-0 cursor-pointer',
+        checked ? 'bg-white' : 'bg-white/20',
+      )}
     >
       <div
         className={classNames(
-          'absolute top-1/2 -translate-y-1/2 w-[clamp(1.1rem,1.8vw,1.3rem)] h-[clamp(1.1rem,1.8vw,1.3rem)] rounded-full bg-white transition-all',
-          checked ? 'left-[clamp(1.4rem,2.3vw,1.7rem)] bg-accent' : 'left-[clamp(0.2rem,0.35vw,0.3rem)] bg-white/40',
+          'absolute top-1/2 -translate-y-1/2 w-[clamp(1.1rem,1.8vw,1.3rem)] h-[clamp(1.1rem,1.8vw,1.3rem)] rounded-full bg-black transition-all',
+          checked ? 'left-[clamp(1.4rem,2.3vw,1.7rem)]' : 'left-[clamp(0.2rem,0.35vw,0.3rem)]',
         )}
       />
     </Focusable>

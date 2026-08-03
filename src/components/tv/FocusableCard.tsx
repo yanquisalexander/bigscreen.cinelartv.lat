@@ -1,6 +1,6 @@
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { classNames } from '@/utils/helpers';
-import { memo } from 'react';
+import { memo, useRef, useEffect } from 'react';
 
 interface FocusableCardProps {
   title: string;
@@ -25,7 +25,15 @@ const PosterView = memo(({ title, image, subtitle, progress, variant }: { title:
     variant === 'row' ? 'aspect-[2/3]' : 'aspect-video'
   )}>
     {image ? (
-      <img src={image} alt={title} className="w-full h-full object-cover" loading="lazy" />
+      <img
+        src={image}
+        alt={title}
+        className="w-full h-full object-cover"
+        loading="lazy"
+        decoding="async"
+        width={variant === 'row' ? 180 : 230}
+        height={variant === 'row' ? 270 : 130}
+      />
     ) : (
       <div className="w-full h-full flex items-center justify-center bg-surface-elevated">
         <span className="text-text-secondary text-xl font-bold">{title.charAt(0)}</span>
@@ -46,7 +54,17 @@ const PosterView = memo(({ title, image, subtitle, progress, variant }: { title:
 
 const BannerView = memo(({ title, image, description, year, subtitle }: { title: string; image?: string | null; description?: string; year?: number; subtitle?: string }) => (
   <div className="relative w-full h-full bg-surface rounded-xl overflow-hidden flex items-end p-6">
-    {image && <img src={image} alt={title} className="absolute inset-0 w-full h-full object-cover" loading="eager" />}
+    {image && (
+      <img
+        src={image}
+        alt={title}
+        className="absolute inset-0 w-full h-full object-cover"
+        loading="eager"
+        decoding="async"
+        width={500}
+        height={281}
+      />
+    )}
     <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent" />
     <div className="relative z-10 max-w-[50%]">
       <h2 className="text-2xl font-bold text-white mb-1">{title}</h2>
@@ -75,10 +93,20 @@ export function FocusableCard({
   autoFocus = false,
   variant = 'row',
 }: FocusableCardProps) {
+  const bannerPreloaded = useRef(false);
+
   const { ref, focused } = useFocusable({
     onEnterPress,
     onArrowPress,
-    onFocus,
+    onFocus: () => {
+      // Preload banner image on first focus
+      if (!bannerPreloaded.current && bannerImage) {
+        bannerPreloaded.current = true;
+        const img = new Image();
+        img.src = bannerImage;
+      }
+      onFocus?.();
+    },
     focusKey,
     autoFocus,
   });

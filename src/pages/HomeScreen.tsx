@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FocusContext, setFocus, useFocusable, getCurrentFocusKey, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation';
 import { useAuthStore } from '@/stores/authStore';
@@ -19,6 +19,14 @@ const progressPercent = (item: ContentItem) => {
   if (!item.progress || !item.duration) return 0;
   return Math.min(100, Math.round((item.progress / item.duration) * 100));
 };
+
+// Memoized image URL resolution per item
+function useItemImages(item: ContentItem, clientEndpoint: string) {
+  return useMemo(() => ({
+    image: resolveImageUrl(item.cover_resized ?? item.cover, clientEndpoint),
+    bannerImage: resolveImageUrl(item.banner_resized ?? item.banner, clientEndpoint),
+  }), [item.cover_resized, item.cover, item.banner_resized, item.banner, clientEndpoint]);
+}
 
 
 export function HomeScreen() {
@@ -215,44 +223,37 @@ export function HomeScreen() {
               )}
 
               <div className={`mt-[clamp(1.5rem,4vh,3rem)] relative z-10 pb-[clamp(3rem,8vh,4rem)] transition-all duration-700 will-change-opacity ${heroImmersive ? 'opacity-0 pointer-events-none' : ''}`}>
-                {data?.content?.map((category, catIdx) => (
-                  <FocusableRow
-                    key={catIdx}
-                    title={category.title}
-                    focusKey={`home-row-${catIdx}`}
-                    className=""
-                    preferredChildFocusKey={
-                      category.content?.[0]?.id != null ? `home-row-${catIdx}-item-${category.content[0].id}` : undefined
-                    }
-                  >
-                    {category.content?.map((item, itemIdx) => (
-                      <FocusableCard
-                        key={item.id}
-                        variant="row"
-                        focusKey={`home-row-${catIdx}-item-${item.id}`}
-                        title={item.title}
-                        description={item.description}
-                        year={item.year}
-                        image={resolveImageUrl(
-                          item.cover_resized ?? item.cover,
-                          clientEndpoint,
-                        )}
-                        bannerImage={resolveImageUrl(
-                          item.banner_resized ?? item.banner,
-                          clientEndpoint,
-                        )}
-                        subtitle={undefined}
-                        progress={progressPercent(item)}
-                        onArrowPress={(direction) => {
-                          if (catIdx === 0 && direction === 'up') return focusHeroFromFirstRow(direction);
-                          if (itemIdx === 0 && direction === 'left') return focusSidebarFromRowStart(direction);
-                          return true;
-                        }}
-                        onEnterPress={() => handleInfo(item)}
-                      />
-                    ))}
-                  </FocusableRow>
-                ))}
+                {data?.content?.map((category, catIdx) => {
+                  const rowContent = (
+                    <FocusableRow
+                      key={catIdx}
+                      title={category.title}
+                      focusKey={`home-row-${catIdx}`}
+                      className=""
+                      preferredChildFocusKey={
+                        category.content?.[0]?.id != null ? `home-row-${catIdx}-item-${category.content[0].id}` : undefined
+                      }
+                    >
+                      {category.content?.map((item, itemIdx) => (
+                        <MemoizedCard
+                          key={item.id}
+                          item={item}
+                          clientEndpoint={clientEndpoint}
+                          focusKey={`home-row-${catIdx}-item-${item.id}`}
+                          catIdx={catIdx}
+                          itemIdx={itemIdx}
+                          focusHeroFromFirstRow={focusHeroFromFirstRow}
+                          focusSidebarFromRowStart={focusSidebarFromRowStart}
+                          onEnterPress={() => handleInfo(item)}
+                        />
+                      ))}
+                    </FocusableRow>
+                  );
+
+                  // First 2 rows always rendered, rest lazy
+                  if (catIdx < 2) return rowContent;
+                  return <LazyRow key={`lazy-${catIdx}`}>{rowContent}</LazyRow>;
+                })}
               </div>
             </>
           )}
@@ -268,6 +269,77 @@ export function HomeScreen() {
     </>
   );
 }
+
+// Lazy rendering: only mount row content when near the viewport
+function LazyRow({ children, rootMargin = '600px' }: { children: React.ReactNode; rootMargin?: string }) {
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [shouldRender, setShouldRender] = useState(false);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldRender(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [rootMargin]);
+
+  return (
+    <div ref={sentinelRef}>
+      {shouldRender ? children : <div className="h-[300px]" />}
+    </div>
+  );
+}
+
+// Memoized card wrapper — resolves image URLs once per item change
+const MemoizedCard = memo(function MemoizedCard({
+  item,
+  clientEndpoint,
+  focusKey,
+  catIdx,
+  itemIdx,
+  focusHeroFromFirstRow,
+  focusSidebarFromRowStart,
+  onEnterPress,
+}: {
+  item: ContentItem;
+  clientEndpoint: string;
+  focusKey: string;
+  catIdx: number;
+  itemIdx: number;
+  focusHeroFromFirstRow: (d: string) => boolean;
+  focusSidebarFromRowStart: (d: string) => boolean;
+  onEnterPress: () => void;
+}) {
+  const { image, bannerImage } = useItemImages(item, clientEndpoint);
+
+  return (
+    <FocusableCard
+      variant="row"
+      focusKey={focusKey}
+      title={item.title}
+      description={item.description}
+      year={item.year}
+      image={image}
+      bannerImage={bannerImage}
+      subtitle={undefined}
+      progress={progressPercent(item)}
+      onArrowPress={(direction) => {
+        if (catIdx === 0 && direction === 'up') return focusHeroFromFirstRow(direction);
+        if (itemIdx === 0 && direction === 'left') return focusSidebarFromRowStart(direction);
+        return true;
+      }}
+      onEnterPress={onEnterPress}
+    />
+  );
+});
 
 function ExitDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   const { ref, focusKey } = useFocusable({
