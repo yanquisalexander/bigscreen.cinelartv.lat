@@ -91,9 +91,12 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
       <aside
         ref={ref as React.RefObject<HTMLElement>}
         style={{ gridArea: 'sidebar' }}
-        className="relative h-full w-full flex flex-col py-4 bg-surface/10"
+        className={classNames(
+          'relative h-full w-full flex flex-col py-4 bg-surface/10',
+          collapsed ? 'px-0' : 'px-2',
+        )}
       >
-        <nav className="flex-1 flex flex-col gap-1 mt-4">
+        <nav className="flex-1 flex flex-col gap-1 justify-center">
           {NAV_ITEMS.map((item) => {
             const isActive = location.pathname.startsWith(item.path);
             return (

@@ -48,6 +48,8 @@ interface LiveChannelCardProps {
   onPlay: (ch: LiveTvChannel) => void;
   onToggleFavorite: (id: string) => void;
   onLeftEdge?: () => void;
+  onArrowUp?: () => void;
+  itemIndex: number;
   focusKey?: string;
 }
 
@@ -57,14 +59,20 @@ function LiveChannelCard({
   onPlay,
   onToggleFavorite,
   onLeftEdge,
+  onArrowUp,
+  itemIndex,
   focusKey,
 }: LiveChannelCardProps) {
   const { ref, focused } = useFocusable({
     focusKey,
     onEnterPress: () => onPlay(channel),
     onArrowPress: (direction) => {
-      if (direction === 'left' && onLeftEdge) {
+      if (direction === 'left' && itemIndex === 0 && onLeftEdge) {
         onLeftEdge();
+        return false;
+      }
+      if (direction === 'up' && onArrowUp) {
+        onArrowUp();
         return false;
       }
       return true;
@@ -403,6 +411,15 @@ export function LiveTVScreen() {
 
   const focusSidebar = useCallback(() => setFocus('sidebar'), []);
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleHeroFocus = useCallback(() => {
+    setFocus('live-hero-play');
+    requestAnimationFrame(() => {
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }, []);
+
   /* ── not supported ── */
 
   if (!nativeSupported) {
@@ -579,7 +596,7 @@ export function LiveTVScreen() {
         />
 
         {/* scrollable content */}
-        <div className="flex-1 overflow-y-auto hide-scrollbar pb-8">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto hide-scrollbar pb-8">
           {/* hero */}
           {featuredChannel && (
             <div className="px-0 pt-2 pb-6">
@@ -603,7 +620,7 @@ export function LiveTVScreen() {
                   : undefined
               }
             >
-              {favoriteChannels.slice(1).map((ch) => (
+              {favoriteChannels.slice(1).map((ch, idx) => (
                 <LiveChannelCard
                   key={ch.id}
                   channel={ch}
@@ -611,6 +628,8 @@ export function LiveTVScreen() {
                   onPlay={handlePlayChannel}
                   onToggleFavorite={toggleFavorite}
                   onLeftEdge={focusSidebar}
+                  onArrowUp={handleHeroFocus}
+                  itemIndex={idx}
                   focusKey={`live-ch-${ch.id}`}
                 />
               ))}
@@ -625,7 +644,7 @@ export function LiveTVScreen() {
               focusKey={`live-cat-${category}`}
               preferredChildFocusKey={`live-ch-${cats[0].id}`}
             >
-              {cats.map((ch) => (
+              {cats.map((ch, idx) => (
                 <LiveChannelCard
                   key={ch.id}
                   channel={ch}
@@ -633,6 +652,8 @@ export function LiveTVScreen() {
                   onPlay={handlePlayChannel}
                   onToggleFavorite={toggleFavorite}
                   onLeftEdge={focusSidebar}
+                  onArrowUp={handleHeroFocus}
+                  itemIndex={idx}
                   focusKey={`live-ch-${ch.id}`}
                 />
               ))}
@@ -681,7 +702,13 @@ function LiveHeader({
         <Focusable
           focusKey="live-search-toggle"
           onEnterPress={onSearchOpen}
-          onArrowPress={(direction) => direction !== 'up'}
+          onArrowPress={(direction) => {
+            if (direction === 'down') {
+              setFocus('live-hero-play');
+              return false;
+            }
+            return direction !== 'up';
+          }}
           focusedClassName="!bg-white !text-black"
           className="w-[clamp(2rem,3.5vh,2.5rem)] h-[clamp(2rem,3.5vh,2.5rem)] rounded-full bg-surface flex items-center justify-center cursor-pointer shrink-0"
         >
