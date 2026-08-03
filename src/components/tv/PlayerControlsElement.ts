@@ -45,6 +45,11 @@ class PlayerControlsElement extends HTMLElement {
   private _lastEnterKey = '';
   private _lastEnterTime = 0;
   private _lastFocusedControlKey = 'watch-playpause';
+  private _isSeeking = false;
+  private _wasPlayingBeforeSeek = false;
+  private _seekAccumulator = 0;
+  private _seekApplyTimer: ReturnType<typeof setTimeout> | null = null;
+  private _seekEndTimer: ReturnType<typeof setTimeout> | null = null;
 
   static get observedAttributes() {
     return ['content-id', 'client-endpoint'];
@@ -211,6 +216,8 @@ class PlayerControlsElement extends HTMLElement {
     if (this.logicTimer) clearInterval(this.logicTimer);
     if (this._nextTimer) clearInterval(this._nextTimer);
     if (this.rafId) cancelAnimationFrame(this.rafId);
+    if (this._seekApplyTimer) clearTimeout(this._seekApplyTimer);
+    if (this._seekEndTimer) clearTimeout(this._seekEndTimer);
     const keyHandler = (this as any)._keyHandler;
     if (keyHandler) {
       window.removeEventListener('keydown', keyHandler, true);
@@ -484,7 +491,7 @@ class PlayerControlsElement extends HTMLElement {
         }
 
         .seekbar-time-end {
-          color: rgba(255,255,255,0.4);
+          color: rgba(255,255,255,0.7);
           font-size: clamp(0.8rem, 1vw, 0.9rem);
           font-variant-numeric: tabular-nums;
           width: clamp(2.5rem, 4vw, 3rem);
@@ -970,11 +977,18 @@ class PlayerControlsElement extends HTMLElement {
     const video = this.video;
     const FRAME_MS = 100;
     let lastPct = -1;
+    let lastDur = 0;
 
     const update = () => {
       const dur = video.duration || 0;
       const ct = video.currentTime;
       const pct = dur > 0 ? (ct / dur) * 100 : 0;
+
+      if (dur !== lastDur && isFinite(dur) && dur > 0) {
+        lastDur = dur;
+        this._duration = dur;
+        this._updateDuration();
+      }
 
       if (Math.abs(pct - lastPct) > 0.5) {
         lastPct = pct;
@@ -1004,11 +1018,65 @@ class PlayerControlsElement extends HTMLElement {
 
   private _seekBy(seconds: number) {
     if (!this.video) return;
+
+    if (!this._isSeeking) {
+      this._isSeeking = true;
+      this._wasPlayingBeforeSeek = !this.video.paused;
+      if (!this.video.paused) this.video.pause();
+    }
+
+    this._seekAccumulator += seconds;
+
+    if (this._seekEndTimer) clearTimeout(this._seekEndTimer);
+    this._seekEndTimer = setTimeout(() => this._endSeek(), 300);
+
+    if (this._seekApplyTimer) return;
+    this._seekApplyTimer = setTimeout(() => {
+      this._seekApplyTimer = null;
+      this._applySeek();
+    }, 200);
+  }
+
+  private _applySeek() {
+    if (!this.video || !this._isSeeking) return;
     const video = this.video;
     const duration = video.duration || 0;
-    video.currentTime = Math.max(0, Math.min(video.currentTime + seconds, duration));
-    this._showControlsTemporarily(false);
+    const delta = this._seekAccumulator;
+    this._seekAccumulator = 0;
+
+    let target = Math.max(0, Math.min(video.currentTime + delta, duration));
+
+    if (video.seekable.length > 0) {
+      const seekStart = video.seekable.start(0);
+      const seekEnd = video.seekable.end(video.seekable.length - 1);
+      target = Math.max(seekStart, Math.min(target, seekEnd));
+    }
+
+    video.currentTime = target;
+
+    this._showControls = true;
+    this._updateControlsVisibility();
+    this._syncOverlayFocusability();
+    this._restartControlsHideTimer();
     this._updateSeekbar();
+  }
+
+  private _endSeek() {
+    if (!this._isSeeking) return;
+
+    if (this._seekApplyTimer) {
+      clearTimeout(this._seekApplyTimer);
+      this._seekApplyTimer = null;
+      this._applySeek();
+    }
+
+    this._isSeeking = false;
+    this._seekAccumulator = 0;
+
+    if (this._wasPlayingBeforeSeek && this.video && this.video.paused) {
+      this.video.play().catch(() => {});
+    }
+    this._wasPlayingBeforeSeek = false;
   }
 
   private _startLogicTimer() {
@@ -1071,7 +1139,13 @@ class PlayerControlsElement extends HTMLElement {
 
   private _updateDuration() {
     const el = this.shadow.querySelector('[data-duration-time]') as HTMLElement;
-    if (el) el.textContent = formatTime(this._duration);
+    if (!el) return;
+    const dur = this._duration;
+    if (!dur || !isFinite(dur) || dur <= 0) {
+      el.textContent = '0:00';
+    } else {
+      el.textContent = formatTime(dur);
+    }
   }
 
   private _updateSeekbar() {
@@ -1571,6 +1645,10 @@ class PlayerControlsElement extends HTMLElement {
   }
 
   togglePlayPause() {
+    if (this._isSeeking) {
+      this._endSeek();
+      return;
+    }
     if (this.video) {
       if (this._isPlaying) {
         this.video.pause();
@@ -1582,6 +1660,7 @@ class PlayerControlsElement extends HTMLElement {
 
   handleSkip() {
     if (!this._skipSegment) return;
+    if (this._isSeeking) this._endSeek();
     const end = this._skipSegment.end ?? this._skipSegment.end_time ?? 0;
     if (this.video) this.video.currentTime = end;
     this._skipSegment = null;
@@ -1591,6 +1670,7 @@ class PlayerControlsElement extends HTMLElement {
 
   playNextEpisode() {
     if (!this._nextEpisode || !this._contentId) return;
+    if (this._isSeeking) this._endSeek();
     if (this._nextTimer) clearInterval(this._nextTimer);
     this._hideNextCard();
     this.dispatchEvent(new CustomEvent('next-episode', {
