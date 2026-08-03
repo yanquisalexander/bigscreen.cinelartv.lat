@@ -1027,6 +1027,11 @@ class PlayerControlsElement extends HTMLElement {
 
     this._seekAccumulator += seconds;
 
+    this._showControls = true;
+    this._updateControlsVisibility();
+    this._syncOverlayFocusability();
+    this._restartControlsHideTimer();
+
     if (this._seekEndTimer) clearTimeout(this._seekEndTimer);
     this._seekEndTimer = setTimeout(() => this._endSeek(), 300);
 
