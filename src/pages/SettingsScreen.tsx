@@ -156,8 +156,7 @@ function SettingsSidebar({
               return true;
             }}
             focusedClassName={classNames(
-              'bg-white/10 !text-white',
-              isActive && 'bg-white/10 !text-white',
+              '!bg-white !text-black',
             )}
             className={classNames(
               'flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] px-[clamp(0.75rem,1.2vw,1rem)] py-[clamp(0.5rem,0.8vh,0.65rem)] rounded-xl text-[clamp(0.85rem,1.1vw,0.95rem)] font-medium cursor-pointer',
