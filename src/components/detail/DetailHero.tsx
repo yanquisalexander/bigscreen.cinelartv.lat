@@ -46,7 +46,7 @@ export const DetailHero = memo(function DetailHero({
   onHeroFocus,
 }: DetailHeroProps) {
   const backdropUrl = resolveBackdrop(content.images, content.banner ?? content.cover, clientEndpoint);
-  const logoUrl = resolveLogo(content.images);
+  const logoUrl = resolveLogo(content.images, clientEndpoint);
 
   const { ref: heroRef, focusKey: heroFocusKey } = useFocusable({
     focusKey: 'detail-hero',

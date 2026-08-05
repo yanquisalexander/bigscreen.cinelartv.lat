@@ -43,8 +43,8 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
   // Resolve logo URL
   const currentLogoUrl = useMemo(() => {
     if (!currentItem) return null;
-    return resolveLogo(currentItem.images);
-  }, [currentItem]);
+    return resolveLogo(currentItem.images, clientEndpoint);
+  }, [currentItem, clientEndpoint]);
 
   // Crossfade: keep previous banner visible underneath while the new one fades in
   const prevBannerUrlRef = useRef<string | null>(null);

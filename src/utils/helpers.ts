@@ -7,32 +7,32 @@ export function resolveImageUrl(path?: string | null, baseUrl?: string): string 
   return path;
 }
 
-function pickWebpUrl(variants: ImageVariants | undefined): string | null {
+function pickWebpUrl(variants: ImageVariants | undefined, baseUrl?: string): string | null {
   if (!variants) return null;
   const preferred = [variants.medium, variants.large, variants.original, variants.small, variants.thumbnail];
   for (const v of preferred) {
-    if (v?.webp) return v.webp;
+    if (v?.webp) return resolveImageUrl(v.webp, baseUrl);
   }
   return null;
 }
 
 export function resolveBackdrop(images: ContentImages | undefined, fallback?: string | null, baseUrl?: string): string | null {
-  return pickWebpUrl(images?.backdrop) ?? resolveImageUrl(fallback, baseUrl);
+  return pickWebpUrl(images?.backdrop, baseUrl) ?? resolveImageUrl(fallback, baseUrl);
 }
 
 export function resolvePoster(images: ContentImages | undefined, fallback?: string | null, baseUrl?: string): string | null {
-  return pickWebpUrl(images?.poster) ?? resolveImageUrl(fallback, baseUrl);
+  return pickWebpUrl(images?.poster, baseUrl) ?? resolveImageUrl(fallback, baseUrl);
 }
 
 export function resolveEpisodeThumbnail(images: EpisodeImages | undefined, fallback?: string | null, baseUrl?: string): string | null {
-  return pickWebpUrl(images?.episode_thumbnail) ?? resolveImageUrl(fallback, baseUrl);
+  return pickWebpUrl(images?.episode_thumbnail, baseUrl) ?? resolveImageUrl(fallback, baseUrl);
 }
 
-export function resolveLogo(images: ContentImages | undefined): string | null {
+export function resolveLogo(images: ContentImages | undefined, baseUrl?: string): string | null {
   if (!images?.logo) return null;
   const preferred = [images.logo.original, images.logo.medium, images.logo.small];
   for (const v of preferred) {
-    if (v?.webp) return v.webp;
+    if (v?.webp) return resolveImageUrl(v.webp, baseUrl);
   }
   return null;
 }
