@@ -1,6 +1,6 @@
 import { memo, useRef, useEffect } from 'react';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
-import { resolveImageUrl, classNames } from '@/utils/helpers';
+import { classNames, resolvePoster } from '@/utils/helpers';
 import { useConfigStore } from '@/stores/configStore';
 import type { ContentItem } from '@/types/content';
 import { isTVShow } from '@/types/content';
@@ -99,7 +99,7 @@ const RecommendationCard = memo(function RecommendationCard({
   onArrowUp,
 }: RecommendationCardProps) {
   const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
-  const coverUrl = resolveImageUrl(item.cover_resized ?? item.cover, clientEndpoint);
+  const coverUrl = resolvePoster(item.images, item.cover_resized ?? item.cover, clientEndpoint);
 
   const { ref, focused } = useFocusable({
     focusKey: `detail-related-${item.id}`,

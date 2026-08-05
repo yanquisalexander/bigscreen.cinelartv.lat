@@ -8,7 +8,7 @@ import { consumeWatchData, updateProgress } from '@/features/content/api';
 import { usePlayerEngine } from '@/services/player/usePlayerEngine';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useToastStore } from '@/stores/toastStore';
-import { resolveImageUrl } from '@/utils/helpers';
+import { resolveImageUrl, resolveBackdrop, resolvePoster } from '@/utils/helpers';
 import { addContinueWatching, prefersNative as prefersNativePlayer, launchNativePlayer, setOnNativePlayerFinished } from '@/services/NativeBridge';
 import { fetchVast } from '@/services/player/vast-client';
 import { pdbg } from '@/services/player/playerDebug';
@@ -244,8 +244,8 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
   useEffect(() => {
     if (test || !tokens || !contentId || !watchData) return;
 
-    const cover = resolveImageUrl(watchData.content.cover, clientEndpoint) ?? undefined;
-    const banner = resolveImageUrl(watchData.content.banner, clientEndpoint) ?? undefined;
+    const cover = resolvePoster(watchData.content.images, watchData.content.cover, clientEndpoint) ?? undefined;
+    const banner = resolveBackdrop(watchData.content.images, watchData.content.banner, clientEndpoint) ?? undefined;
     const cwItemBase = {
       content_id: contentId,
       episode_id: episodeId,
@@ -256,7 +256,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
       cover_resized: cover,
       banner,
       banner_resized: banner,
-      image_url: resolveImageUrl(watchData.content.banner ?? watchData.content.cover, clientEndpoint) ?? undefined,
+      image_url: resolveBackdrop(watchData.content.images, watchData.content.banner ?? watchData.content.cover, clientEndpoint) ?? undefined,
       url: `/watch/${contentId}${episodeId ? `/${episodeId}` : ''}`,
       episode_title: watchData.season?.title && watchData.episode?.title
         ? `${watchData.season.title} - ${watchData.episode.title}`

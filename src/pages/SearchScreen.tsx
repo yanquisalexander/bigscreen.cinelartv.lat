@@ -7,7 +7,7 @@ import { FocusableCard } from '@/components/tv/FocusableCard';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
 import { searchContent } from '@/features/content/search';
-import { resolveImageUrl, classNames } from '@/utils/helpers';
+import { classNames, resolveBackdrop } from '@/utils/helpers';
 import { LucideSearch, LucideX } from 'lucide-react';
 import type { ContentItem } from '@/types/content';
 import { isTVShow } from '@/types/content';
@@ -241,7 +241,7 @@ export function SearchScreen() {
               <FocusableCard
                 key={item.id}
                 title={item.title}
-                image={resolveImageUrl(item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover, clientEndpoint)}
+                image={resolveBackdrop(item.images, item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover, clientEndpoint)}
                 subtitle={isTVShow(item) ? 'Serie' : undefined}
                 onEnterPress={() => handleInfo(item)}
                 focusKey={`search-result-${item.id}`}

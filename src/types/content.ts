@@ -4,6 +4,30 @@ export interface TrailerSource {
   quality: string;
 }
 
+export interface ImageVariantSet {
+  avif?: string;
+  webp: string;
+}
+
+export interface ImageVariants {
+  original: ImageVariantSet;
+  thumbnail?: ImageVariantSet;
+  small?: ImageVariantSet;
+  medium?: ImageVariantSet;
+  large?: ImageVariantSet;
+  xlarge?: ImageVariantSet;
+}
+
+export interface ContentImages {
+  poster?: ImageVariants;
+  backdrop?: ImageVariants;
+  logo?: ImageVariants;
+}
+
+export interface EpisodeImages {
+  episode_thumbnail?: ImageVariants;
+}
+
 export interface ContentItem {
   id: string;
   title: string;
@@ -12,6 +36,7 @@ export interface ContentItem {
   cover?: string;
   banner_resized?: string;
   cover_resized?: string;
+  images?: ContentImages;
   content_type?: string;
   contentType?: string;
   year?: number | null;
@@ -65,6 +90,7 @@ export interface Episode {
   description?: string;
   thumbnail?: string;
   thumbnail_resized?: string;
+  images?: EpisodeImages;
   position: number | null;
   premium?: boolean;
   continue_watching?: EpisodeContinueWatching;
@@ -112,6 +138,7 @@ export interface WatchContent {
   contentType?: string;
   banner?: string;
   cover?: string;
+  images?: ContentImages;
   segments?: Segment[];
 }
 
@@ -121,6 +148,7 @@ export interface WatchEpisode {
   description?: string;
   thumbnail?: string;
   thumbnail_resized?: string;
+  images?: EpisodeImages;
   position: number | null;
   premium?: boolean;
   season_id?: string;

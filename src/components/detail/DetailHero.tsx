@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
-import { resolveImageUrl, formatTime, classNames } from '@/utils/helpers';
+import { formatTime, classNames, resolveBackdrop, resolveLogo } from '@/utils/helpers';
 import { DetailActionButton } from './DetailActionButton';
 import { DetailMetadataBadge } from './DetailMetadataBadge';
 import type { ContentDetail } from '@/types/content';
@@ -45,7 +45,8 @@ export const DetailHero = memo(function DetailHero({
   firstSeasonFocusKey,
   onHeroFocus,
 }: DetailHeroProps) {
-  const backdropUrl = resolveImageUrl(content.banner ?? content.cover, clientEndpoint);
+  const backdropUrl = resolveBackdrop(content.images, content.banner ?? content.cover, clientEndpoint);
+  const logoUrl = resolveLogo(content.images);
 
   const { ref: heroRef, focusKey: heroFocusKey } = useFocusable({
     focusKey: 'detail-hero',
@@ -91,16 +92,24 @@ export const DetailHero = memo(function DetailHero({
       >
         <FocusContext.Provider value={heroFocusKey}>
           {/* Title */}
-          <h1
-            className={classNames(
-              'font-extrabold text-white leading-tight',
-              'text-[clamp(2.5rem,5vw,4rem)]',
-              'mb-[clamp(0.5rem,1.5vh,1rem)]',
-              'max-w-[70%]',
-            )}
-          >
-            {content.title}
-          </h1>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={content.title}
+              className="h-[clamp(3rem,7vh,5rem)] max-w-[70%] object-contain mb-[clamp(0.5rem,1.5vh,1rem)] drop-shadow-lg"
+            />
+          ) : (
+            <h1
+              className={classNames(
+                'font-extrabold text-white leading-tight',
+                'text-[clamp(2.5rem,5vw,4rem)]',
+                'mb-[clamp(0.5rem,1.5vh,1rem)]',
+                'max-w-[70%]',
+              )}
+            >
+              {content.title}
+            </h1>
+          )}
 
           {/* Metadata row */}
           <div className="flex items-center gap-[clamp(0.5rem,1vw,0.75rem)] mb-[clamp(0.75rem,2vh,1.25rem)] flex-wrap">

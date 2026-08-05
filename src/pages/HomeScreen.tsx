@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
 import { useToastStore } from '@/stores/toastStore';
 import { getExplore } from '@/features/content/explore';
-import { resolveImageUrl, isBackKey } from '@/utils/helpers';
+import { resolveImageUrl, isBackKey, resolveBackdrop, resolvePoster } from '@/utils/helpers';
 import { HeroSection } from '@/components/home/HeroSection';
 import { FocusableCard } from '@/components/tv/FocusableCard';
 import { FocusableRow } from '@/components/tv/FocusableRow';
@@ -23,9 +23,9 @@ const progressPercent = (item: ContentItem) => {
 // Memoized image URL resolution per item
 function useItemImages(item: ContentItem, clientEndpoint: string) {
   return useMemo(() => ({
-    image: resolveImageUrl(item.cover_resized ?? item.cover, clientEndpoint),
-    bannerImage: resolveImageUrl(item.banner_resized ?? item.banner, clientEndpoint),
-  }), [item.cover_resized, item.cover, item.banner_resized, item.banner, clientEndpoint]);
+    image: resolvePoster(item.images, item.cover_resized ?? item.cover, clientEndpoint),
+    bannerImage: resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint),
+  }), [item.images, item.cover_resized, item.cover, item.banner_resized, item.banner, clientEndpoint]);
 }
 
 
@@ -69,20 +69,22 @@ export function HomeScreen() {
     const items: AndroidTvHomeItem[] = [];
     for (const cat of data.content ?? []) {
       for (const item of cat.content ?? []) {
+        const poster = resolvePoster(item.images, item.cover_resized ?? item.cover, clientEndpoint);
+        const backdrop = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint);
         items.push({
           content_id: item.id,
           title: item.title,
           description: item.description,
           content_type: item.content_type ?? item.contentType,
           cover: resolveImageUrl(item.cover, clientEndpoint)!,
-          cover_resized: resolveImageUrl(item.cover_resized, clientEndpoint)!,
+          cover_resized: poster ?? resolveImageUrl(item.cover_resized, clientEndpoint)!,
           banner: resolveImageUrl(item.banner, clientEndpoint)!,
-          banner_resized: resolveImageUrl(item.banner_resized, clientEndpoint)!,
+          banner_resized: backdrop ?? resolveImageUrl(item.banner_resized, clientEndpoint)!,
           progress: item.progress,
           duration: item.duration,
           year: item.year,
           url: `/content/${item.id}`,
-          image_url: resolveImageUrl(item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover, clientEndpoint)!,
+          image_url: backdrop ?? poster ?? resolveImageUrl(item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover, clientEndpoint)!,
         });
       }
     }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { Focusable } from '@/components/tv/Focusable';
-import { resolveImageUrl } from '@/utils/helpers';
+import { resolveBackdrop, resolveLogo } from '@/utils/helpers';
 import type { ContentItem } from '@/types/content';
 
 interface HeroSectionProps {
@@ -37,8 +37,14 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
   // Resolve banner URL (always full size for hero)
   const currentBannerUrl = useMemo(() => {
     if (!currentItem) return null;
-    return resolveImageUrl(currentItem.banner ?? currentItem.cover, clientEndpoint);
+    return resolveBackdrop(currentItem.images, currentItem.banner ?? currentItem.cover, clientEndpoint);
   }, [currentItem, clientEndpoint]);
+
+  // Resolve logo URL
+  const currentLogoUrl = useMemo(() => {
+    if (!currentItem) return null;
+    return resolveLogo(currentItem.images);
+  }, [currentItem]);
 
   // Crossfade: keep previous banner visible underneath while the new one fades in
   const prevBannerUrlRef = useRef<string | null>(null);
@@ -51,7 +57,7 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
     if (items.length > 1) {
       const nextItem = items[(currentIndex + 1) % items.length];
       if (nextItem) {
-        const url = resolveImageUrl(nextItem.banner ?? nextItem.cover, clientEndpoint);
+        const url = resolveBackdrop(nextItem.images, nextItem.banner ?? nextItem.cover, clientEndpoint);
         if (url) {
           const img = new Image();
           img.src = url;
@@ -249,12 +255,21 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
 
         {/* Capa 4: Contenido (título, descripción, botón) */}
         <div className="absolute bottom-[clamp(3rem,9vh,5rem)] left-[clamp(3rem,7.5vw,6rem)] max-w-[clamp(28rem,46vw,36rem)] z-10">
-          <h2
-            className="text-[clamp(2rem,3.2vw,2.5rem)] font-extrabold text-white leading-tight mb-[clamp(0.75rem,2vh,1rem)] drop-shadow-lg transition-all duration-700 will-change-transform"
-            style={{ transform: immersiveMode && descSpace > 0 ? `translateY(${descSpace}px)` : undefined }}
-          >
-            {currentItem.title}
-          </h2>
+          {currentLogoUrl ? (
+            <img
+              src={currentLogoUrl}
+              alt={currentItem.title}
+              className="h-[clamp(3rem,6vh,5rem)] max-w-[70%] object-contain mb-[clamp(0.75rem,2vh,1rem)] drop-shadow-lg transition-all duration-700 will-change-transform"
+              style={{ transform: immersiveMode && descSpace > 0 ? `translateY(${descSpace}px)` : undefined }}
+            />
+          ) : (
+            <h2
+              className="text-[clamp(2rem,3.2vw,2.5rem)] font-extrabold text-white leading-tight mb-[clamp(0.75rem,2vh,1rem)] drop-shadow-lg transition-all duration-700 will-change-transform"
+              style={{ transform: immersiveMode && descSpace > 0 ? `translateY(${descSpace}px)` : undefined }}
+            >
+              {currentItem.title}
+            </h2>
+          )}
           {currentItem.description && (
             <p ref={descRef} className={`text-[clamp(1rem,1.45vw,1.125rem)] text-text-secondary line-clamp-3 mb-[clamp(1rem,3vh,1.5rem)] transition-all duration-700 will-change-transform will-change-opacity ${immersiveMode ? 'opacity-0 translate-y-4 pointer-events-none' : ''}`}>
               {currentItem.description}

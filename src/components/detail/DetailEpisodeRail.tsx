@@ -1,6 +1,6 @@
 import { memo, useCallback, useRef, useEffect } from 'react';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
-import { resolveImageUrl, classNames } from '@/utils/helpers';
+import { classNames, resolveEpisodeThumbnail } from '@/utils/helpers';
 import { useConfigStore } from '@/stores/configStore';
 import type { Episode } from '@/types/content';
 
@@ -114,7 +114,7 @@ const EpisodeCard = memo(function EpisodeCard({
   onArrowLeft,
 }: EpisodeCardProps) {
   const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
-  const thumbUrl = resolveImageUrl(episode.thumbnail ?? episode.thumbnail_resized, clientEndpoint);
+  const thumbUrl = resolveEpisodeThumbnail(episode.images, episode.thumbnail ?? episode.thumbnail_resized, clientEndpoint);
 
   const progress = episode.continue_watching
     ? Math.round(

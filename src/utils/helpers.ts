@@ -1,8 +1,40 @@
+import type { ImageVariants, ContentImages, EpisodeImages } from '@/types/content';
+
 export function resolveImageUrl(path?: string | null, baseUrl?: string): string | null {
   if (!path) return null;
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
   if (path.startsWith('/')) return `${baseUrl ?? ''}${path}`;
   return path;
+}
+
+function pickWebpUrl(variants: ImageVariants | undefined): string | null {
+  if (!variants) return null;
+  const preferred = [variants.medium, variants.large, variants.original, variants.small, variants.thumbnail];
+  for (const v of preferred) {
+    if (v?.webp) return v.webp;
+  }
+  return null;
+}
+
+export function resolveBackdrop(images: ContentImages | undefined, fallback?: string | null, baseUrl?: string): string | null {
+  return pickWebpUrl(images?.backdrop) ?? resolveImageUrl(fallback, baseUrl);
+}
+
+export function resolvePoster(images: ContentImages | undefined, fallback?: string | null, baseUrl?: string): string | null {
+  return pickWebpUrl(images?.poster) ?? resolveImageUrl(fallback, baseUrl);
+}
+
+export function resolveEpisodeThumbnail(images: EpisodeImages | undefined, fallback?: string | null, baseUrl?: string): string | null {
+  return pickWebpUrl(images?.episode_thumbnail) ?? resolveImageUrl(fallback, baseUrl);
+}
+
+export function resolveLogo(images: ContentImages | undefined): string | null {
+  if (!images?.logo) return null;
+  const preferred = [images.logo.original, images.logo.medium, images.logo.small];
+  for (const v of preferred) {
+    if (v?.webp) return v.webp;
+  }
+  return null;
 }
 
 export function formatTime(seconds: number): string {
