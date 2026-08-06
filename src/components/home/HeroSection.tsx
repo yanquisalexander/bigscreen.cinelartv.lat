@@ -37,7 +37,7 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
   // Resolve banner URL
   const currentBannerUrl = useMemo(() => {
     if (!currentItem) return null;
-    return resolveBackdrop(currentItem.images, currentItem.banner_resized ?? currentItem.banner ?? currentItem.cover_resized ?? currentItem.cover, clientEndpoint);
+    return resolveBackdrop(currentItem.images, currentItem.banner_resized ?? currentItem.banner ?? currentItem.cover_resized ?? currentItem.cover, clientEndpoint, 'xlarge');
   }, [currentItem, clientEndpoint]);
 
   // Resolve logo URL
@@ -57,7 +57,7 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
     if (items.length > 1) {
       const nextItem = items[(currentIndex + 1) % items.length];
       if (nextItem) {
-        const url = resolveBackdrop(nextItem.images, nextItem.banner_resized ?? nextItem.banner ?? nextItem.cover_resized ?? nextItem.cover, clientEndpoint);
+        const url = resolveBackdrop(nextItem.images, nextItem.banner_resized ?? nextItem.banner ?? nextItem.cover_resized ?? nextItem.cover, clientEndpoint, 'xlarge');
         if (url) {
           const img = new Image();
           img.src = url;

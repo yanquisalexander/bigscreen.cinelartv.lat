@@ -1,4 +1,4 @@
-import type { ImageVariants, ContentImages, EpisodeImages } from '@/types/content';
+import type { ImageVariantSet, ImageVariants, ContentImages, EpisodeImages, ImageSize } from '@/types/content';
 
 export function resolveImageUrl(path?: string | null, baseUrl?: string): string | null {
   if (!path) return null;
@@ -7,18 +7,22 @@ export function resolveImageUrl(path?: string | null, baseUrl?: string): string 
   return path;
 }
 
-function pickWebpUrl(variants: ImageVariants | undefined, baseUrl?: string): string | null {
+const DEFAULT_SIZE_ORDER: ImageSize[] = ['medium', 'large', 'small', 'thumbnail', 'original'];
+
+function pickWebpUrl(variants: ImageVariants | undefined, baseUrl?: string, preferredSize?: ImageSize): string | null {
   if (!variants) return null;
-  const preferred = [variants.medium, variants.large, variants.small, variants.thumbnail, variants.original];
-  for (const v of preferred) {
-    if (v?.avif) return resolveImageUrl(v.avif, baseUrl);
-    if (v?.webp) return resolveImageUrl(v.webp, baseUrl);
+  const fallbacks = DEFAULT_SIZE_ORDER.filter(s => s !== preferredSize);
+  const ordered = preferredSize ? [preferredSize, ...fallbacks] : DEFAULT_SIZE_ORDER;
+  const candidates = ordered.map(s => variants[s]).filter(Boolean) as ImageVariantSet[];
+  for (const v of candidates) {
+    if (v.avif) return resolveImageUrl(v.avif, baseUrl);
+    if (v.webp) return resolveImageUrl(v.webp, baseUrl);
   }
   return null;
 }
 
-export function resolveBackdrop(images: ContentImages | undefined, fallback?: string | null, baseUrl?: string): string | null {
-  return pickWebpUrl(images?.backdrop, baseUrl) ?? resolveImageUrl(fallback, baseUrl);
+export function resolveBackdrop(images: ContentImages | undefined, fallback?: string | null, baseUrl?: string, preferredSize?: ImageSize): string | null {
+  return pickWebpUrl(images?.backdrop, baseUrl, preferredSize) ?? resolveImageUrl(fallback, baseUrl);
 }
 
 export function resolvePoster(images: ContentImages | undefined, fallback?: string | null, baseUrl?: string): string | null {

@@ -246,7 +246,7 @@ export function SearchScreen() {
               <FocusableCard
                 key={item.id}
                 title={item.title}
-                image={resolveBackdrop(item.images, item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover, clientEndpoint)}
+                image={resolveBackdrop(item.images, item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover, clientEndpoint, 'medium')}
                 subtitle={isTVShow(item) ? 'Serie' : undefined}
                 onEnterPress={() => handleInfo(item)}
                 focusKey={`search-result-${item.id}`}

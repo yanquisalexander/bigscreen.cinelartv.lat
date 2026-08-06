@@ -45,7 +45,7 @@ export const DetailHero = memo(function DetailHero({
   onPlayFocus,
   onHeroFocus,
 }: DetailHeroProps) {
-  const backdropUrl = resolveBackdrop(content.images, content.banner_resized ?? content.banner ?? content.cover_resized ?? content.cover, clientEndpoint);
+  const backdropUrl = resolveBackdrop(content.images, content.banner_resized ?? content.banner ?? content.cover_resized ?? content.cover, clientEndpoint, 'xlarge');
   const posterUrl = resolvePoster(content.images, content.cover_resized ?? content.cover, clientEndpoint);
   const logoUrl = resolveLogo(content.images, clientEndpoint);
 

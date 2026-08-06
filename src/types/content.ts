@@ -18,6 +18,8 @@ export interface ImageVariants {
   xlarge?: ImageVariantSet;
 }
 
+export type ImageSize = 'original' | 'thumbnail' | 'small' | 'medium' | 'large' | 'xlarge';
+
 export interface ContentImages {
   poster?: ImageVariants;
   backdrop?: ImageVariants;

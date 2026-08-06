@@ -24,7 +24,7 @@ const progressPercent = (item: ContentItem) => {
 function useItemImages(item: ContentItem, clientEndpoint: string) {
   return useMemo(() => ({
     image: resolvePoster(item.images, item.cover_resized ?? item.cover, clientEndpoint),
-    bannerImage: resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint),
+    bannerImage: resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint, 'medium'),
   }), [item.images, item.cover_resized, item.cover, item.banner_resized, item.banner, clientEndpoint]);
 }
 
@@ -46,6 +46,7 @@ export function HomeScreen() {
     try {
       const explore = await getExplore(tokens?.accessToken, {
         include_trailers: true,
+        img_variants: ['xlarge', 'large', 'medium'],
       });
       setData(explore);
     } catch (e) {
@@ -70,7 +71,7 @@ export function HomeScreen() {
     for (const cat of data.content ?? []) {
       for (const item of cat.content ?? []) {
         const poster = resolvePoster(item.images, item.cover_resized ?? item.cover, clientEndpoint);
-        const backdrop = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint);
+        const backdrop = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint, 'medium');
         items.push({
           content_id: item.id,
           title: item.title,

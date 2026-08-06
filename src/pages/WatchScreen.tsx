@@ -249,7 +249,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     if (test || !tokens || !contentId || !watchData) return;
 
     const cover = resolvePoster(watchData.content.images, watchData.content.cover_resized ?? watchData.content.cover, clientEndpoint) ?? undefined;
-    const banner = resolveBackdrop(watchData.content.images, watchData.content.banner_resized ?? watchData.content.banner, clientEndpoint) ?? undefined;
+    const banner = resolveBackdrop(watchData.content.images, watchData.content.banner_resized ?? watchData.content.banner, clientEndpoint, 'medium') ?? undefined;
     const cwItemBase = {
       content_id: contentId,
       episode_id: episodeId,
@@ -260,7 +260,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
       cover_resized: cover,
       banner,
       banner_resized: banner,
-      image_url: resolveBackdrop(watchData.content.images, watchData.content.banner_resized ?? watchData.content.banner ?? watchData.content.cover_resized ?? watchData.content.cover, clientEndpoint) ?? undefined,
+      image_url: resolveBackdrop(watchData.content.images, watchData.content.banner_resized ?? watchData.content.banner ?? watchData.content.cover_resized ?? watchData.content.cover, clientEndpoint, 'medium') ?? undefined,
       url: `/watch/${contentId}${episodeId ? `/${episodeId}` : ''}`,
       episode_title: watchData.season?.title && watchData.episode?.title
         ? `${watchData.season.title} - ${watchData.episode.title}`
