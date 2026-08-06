@@ -55,24 +55,10 @@ export default function App() {
 
   if (!isReady) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center gap-[clamp(1rem,3vh,1.75rem)] bg-bg">
-        {/* Single opacity-only keyframe — no transform, no blur, no layout cost */}
-        <style>{`
-          @keyframes splashPulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
-          .splash-dot { animation: splashPulse 1.1s ease-in-out infinite; }
-          .splash-dot:nth-child(2) { animation-delay: .15s; }
-          .splash-dot:nth-child(3) { animation-delay: .3s; }
-        `}</style>
-
+      <div className="w-full h-full flex flex-col items-center justify-center bg-bg">
         <h1 className="font-medium tracking-tight text-[clamp(2rem,6vw,3.25rem)] leading-none">
           <span className="text-white">CinelarTV</span>
         </h1>
-
-        <div className="flex items-center gap-[clamp(0.375rem,0.8vw,0.5rem)]" aria-hidden>
-          <span className="splash-dot w-[clamp(0.375rem,0.6vw,0.5rem)] h-[clamp(0.375rem,0.6vw,0.5rem)] rounded-full bg-white/60" />
-          <span className="splash-dot w-[clamp(0.375rem,0.6vw,0.5rem)] h-[clamp(0.375rem,0.6vw,0.5rem)] rounded-full bg-white/60" />
-          <span className="splash-dot w-[clamp(0.375rem,0.6vw,0.5rem)] h-[clamp(0.375rem,0.6vw,0.5rem)] rounded-full bg-white/60" />
-        </div>
       </div>
     );
   }
