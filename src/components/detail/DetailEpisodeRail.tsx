@@ -1,5 +1,6 @@
 import { memo, useCallback, useRef, useEffect } from 'react';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import { LucideLock, LucidePlay } from 'lucide-react';
 import { classNames, resolveEpisodeThumbnail } from '@/utils/helpers';
 import { useConfigStore } from '@/stores/configStore';
 import type { Episode } from '@/types/content';
@@ -27,7 +28,6 @@ export const DetailEpisodeRail = memo(function DetailEpisodeRail({
 }: DetailEpisodeRailProps) {
   const { ref, focusKey: resolvedKey } = useFocusable({
     focusKey: `${focusKey}-${seasonIndex}`,
-    // focusable: false, // Probando sin esto
     trackChildren: true,
     saveLastFocusedChild: true,
     preferredChildFocusKey,
@@ -42,6 +42,7 @@ export const DetailEpisodeRail = memo(function DetailEpisodeRail({
               key={episode.id}
               episode={episode}
               index={idx}
+              seasonIndex={seasonIndex}
               onPlay={() => onPlayEpisode(episode.id)}
               onFocus={() => onFocusEpisode?.(episode.id)}
               onArrowUp={onArrowUp}
@@ -87,11 +88,17 @@ function EpisodeScrollContainer({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div
-      ref={scrollRef}
-      className="flex gap-[clamp(0.75rem,1.5vw,1.25rem)] overflow-x-auto hide-scrollbar py-[clamp(0.5rem,1vh,0.75rem)]"
-    >
-      {children}
+    <div className="relative">
+      {/* Edge fade hints — signals more content off-screen */}
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-[clamp(1.5rem,4vw,3rem)] bg-gradient-to-r from-bg to-transparent z-10" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-[clamp(1.5rem,4vw,3rem)] bg-gradient-to-l from-bg to-transparent z-10" />
+
+      <div
+        ref={scrollRef}
+        className="flex gap-[clamp(1rem,1.8vw,1.5rem)] overflow-x-auto hide-scrollbar py-[clamp(0.875rem,1.6vh,1.25rem)]"
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -99,6 +106,7 @@ function EpisodeScrollContainer({ children }: { children: React.ReactNode }) {
 interface EpisodeCardProps {
   episode: Episode;
   index: number;
+  seasonIndex: number;
   onPlay: () => void;
   onFocus: () => void;
   onArrowUp?: (direction: string) => boolean;
@@ -108,6 +116,7 @@ interface EpisodeCardProps {
 const EpisodeCard = memo(function EpisodeCard({
   episode,
   index,
+  seasonIndex,
   onPlay,
   onFocus,
   onArrowUp,
@@ -118,14 +127,13 @@ const EpisodeCard = memo(function EpisodeCard({
 
   const progress = episode.continue_watching
     ? Math.round(
-        (episode.continue_watching.progress / episode.continue_watching.duration) * 100,
-      )
+      (episode.continue_watching.progress / episode.continue_watching.duration) * 100,
+    )
     : undefined;
 
   const handleArrow = useCallback(
     (direction: string) => {
       if (direction === 'up' && onArrowUp) return onArrowUp(direction);
-      // Solo llamar a onArrowLeft si es el primer elemento (índice 0)
       if (direction === 'left' && index === 0 && onArrowLeft) return onArrowLeft(direction);
       return true;
     },
@@ -139,79 +147,103 @@ const EpisodeCard = memo(function EpisodeCard({
     onArrowPress: handleArrow,
   });
 
+  const episodeNum = episode.position ?? index + 1;
+
   return (
     <div
       ref={ref}
       data-focused={focused}
       className={classNames(
-        'tv-no-select shrink-0 cursor-pointer',
-        'w-[clamp(14rem,20vw,18rem)]',
-        'rounded-xl overflow-hidden',
-        'transition-all duration-300 ease-out',
-        'will-change-transform',
-        focused
-          ? 'scale-105 ring-2 ring-white shadow-2xl shadow-black/60 z-10'
-          : 'scale-100 opacity-80',
+        'tv-no-select relative shrink-0 cursor-pointer rounded-2xl',
+        'w-[clamp(17rem,23vw,21rem)]',
+        'transition-all duration-300 ease-out will-change-transform',
+        focused ? 'scale-[1.045] z-10' : '',
       )}
     >
-      {/* Thumbnail */}
-      <div className="relative aspect-video bg-surface overflow-hidden">
-        {thumbUrl ? (
-          <img
-            src={thumbUrl}
-            alt={episode.title}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-surface-elevated">
-            <span className="text-text-tertiary text-3xl font-bold">{index + 1}</span>
-          </div>
+      {/* Focus glow border */}
+      <div
+        className={classNames(
+          'pointer-events-none absolute -inset-[2px] rounded-2xl transition-opacity duration-300',
+          focused ? 'opacity-100 bg-gradient-to-br from-accent to-accent/25' : 'opacity-0',
         )}
+      />
 
-        {/* Episode number overlay */}
-        <div className="absolute top-[clamp(0.375rem,0.8vh,0.5rem)] left-[clamp(0.375rem,0.8vw,0.5rem)] bg-black/70 rounded px-[clamp(0.375rem,0.6vw,0.5rem)] py-[clamp(0.125rem,0.3vh,0.1875rem)]">
-          <span className="text-[clamp(0.6875rem,0.9vw,0.8125rem)] font-semibold text-white">
-            {index + 1}
+      <div
+        className={classNames(
+          'relative rounded-2xl overflow-hidden bg-surface ring-1',
+          focused ? 'ring-transparent shadow-[0_20px_45px_-10px_rgba(0,0,0,0.65)]' : 'ring-white/[0.07]',
+        )}
+      >
+        {/* Thumbnail */}
+        <div className="relative aspect-video overflow-hidden">
+          {thumbUrl ? (
+            <img
+              src={thumbUrl}
+              alt={episode.title}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full bg-surface-elevated" />
+          )}
+
+          {/* Ghost episode numeral */}
+          <span className="absolute -bottom-[0.3em] -left-[0.04em] text-white/10 font-black leading-none text-[clamp(3.25rem,5.5vw,4.75rem)] select-none pointer-events-none">
+            {String(episodeNum).padStart(2, '0')}
           </span>
+
+          {/* Bottom gradient for readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent" />
+
+          {/* Premium lock badge */}
+          {episode.premium && (
+            <div className="absolute top-[clamp(0.5rem,1vh,0.75rem)] right-[clamp(0.5rem,1vw,0.75rem)] w-[clamp(1.5rem,2.5vh,1.875rem)] h-[clamp(1.5rem,2.5vh,1.875rem)] rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
+              <LucideLock size={12} className="text-amber-400" />
+            </div>
+          )}
+
+          {/* Episode label bottom-left */}
+          <span className="absolute bottom-[clamp(0.625rem,1.2vh,0.875rem)] left-[clamp(0.625rem,1.2vw,0.875rem)] text-white text-[clamp(0.8125rem,1.05vw,0.9375rem)] font-bold tracking-wide drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]">
+            T{seasonIndex + 1} · E{episodeNum}
+          </span>
+
+          {/* Play icon on focus */}
+          {focused && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-[clamp(2.75rem,5.5vh,3.75rem)] h-[clamp(2.75rem,5.5vh,3.75rem)] rounded-full bg-white flex items-center justify-center shadow-[0_6px_20px_rgba(0,0,0,0.5)]">
+                <LucidePlay size={20} className="text-black ml-0.5" fill="currentColor" />
+              </div>
+            </div>
+          )}
+
+          {/* Progress bar */}
+          {progress != null && progress > 0 && (
+            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/15">
+              <div
+                className="h-full bg-accent"
+                style={{ width: `${Math.min(progress, 100)}%` }}
+              />
+            </div>
+          )}
         </div>
 
-        {/* Play icon on focus */}
-        {focused && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-            <div className="w-[clamp(2.5rem,5vh,3.5rem)] h-[clamp(2.5rem,5vh,3.5rem)] rounded-full bg-white/90 flex items-center justify-center">
-              <span className="text-black text-[clamp(1rem,2vh,1.5rem)] ml-0.5">▶</span>
-            </div>
-          </div>
-        )}
-
-        {/* Progress bar */}
-        {progress != null && progress > 0 && (
-          <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/20">
-            <div
-              className="h-full bg-white"
-              style={{ width: `${Math.min(progress, 100)}%` }}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="p-[clamp(0.5rem,1vh,0.75rem)] bg-surface">
-        <p
-          className={classNames(
-            'font-semibold truncate',
-            'text-[clamp(0.8125rem,1.1vw,0.9375rem)]',
-            focused ? 'text-white' : 'text-text-primary',
-          )}
-        >
-          {episode.title}
-        </p>
-        {episode.description && (
-          <p className="text-[clamp(0.6875rem,0.9vw,0.8125rem)] text-text-secondary mt-[clamp(0.125rem,0.3vh,0.25rem)] line-clamp-2">
-            {episode.description}
+        {/* Info */}
+        <div className="px-[clamp(0.75rem,1.3vh,1rem)] pt-[clamp(0.75rem,1.3vh,1rem)] pb-[clamp(0.875rem,1.5vh,1.125rem)]">
+          <p
+            className={classNames(
+              'font-semibold truncate',
+              'text-[clamp(0.9375rem,1.25vw,1.0625rem)]',
+              focused ? 'text-white' : 'text-white/85',
+            )}
+          >
+            {episode.title}
           </p>
-        )}
+          {episode.description && (
+            <p className="text-[clamp(0.75rem,1vw,0.875rem)] text-white/40 mt-[clamp(0.25rem,0.4vh,0.375rem)] line-clamp-2 leading-relaxed">
+              {episode.description}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

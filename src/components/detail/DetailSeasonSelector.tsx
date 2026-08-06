@@ -43,7 +43,7 @@ export const DetailSeasonSelector = memo(function DetailSeasonSelector({
   return (
     <FocusContext.Provider value={resolvedKey}>
       <div ref={ref as React.RefObject<HTMLDivElement>}>
-        <div className="flex items-center gap-[clamp(0.5rem,1vw,0.75rem)]">
+        <div className="flex items-center gap-[clamp(0.375rem,0.8vw,0.625rem)]">
           {seasons.map((season, i) => (
             <SeasonTab
               key={season.id}
@@ -96,16 +96,17 @@ const SeasonTab = memo(function SeasonTab({
     <div
       ref={ref}
       data-focused={focused}
-        className={classNames(
-        'tv-no-select cursor-pointer border-2 border-transparent',
-        'px-[clamp(1.25rem,2.5vw,1.75rem)] py-[clamp(0.5rem,1.2vh,0.75rem)]',
-        'rounded-full font-medium',
+      className={classNames(
+        'tv-no-select cursor-pointer border',
+        'px-[clamp(1rem,2vw,1.5rem)] py-[clamp(0.375rem,0.9vh,0.625rem)]',
+        'rounded-lg font-medium',
         'transition-all duration-200 ease-out',
-        'text-[clamp(0.875rem,1.3vw,1.0625rem)]',
+        'text-[clamp(0.8125rem,1.2vw,1rem)]',
         isSelected
-          ? 'bg-white text-black font-semibold'
-          : 'bg-white/10 text-text-secondary',
-        focused && '!border-white scale-110 shadow-lg shadow-white/10',
+          ? 'bg-white text-black font-semibold border-white'
+          : 'bg-white/5 text-white/60 border-white/10',
+        focused && !isSelected && 'bg-white/15 text-white border-white/30 scale-105',
+        focused && isSelected && 'scale-105 shadow-[0_0_16px_rgba(255,255,255,0.15)]',
       )}
     >
       {season.title}

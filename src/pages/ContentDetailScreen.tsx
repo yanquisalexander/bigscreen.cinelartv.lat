@@ -11,10 +11,25 @@ import { DetailSeasonSelector } from '@/components/detail/DetailSeasonSelector';
 import { DetailEpisodeRail } from '@/components/detail/DetailEpisodeRail';
 import { DetailRecommendations } from '@/components/detail/DetailRecommendations';
 import { FocusableButton } from '@/components/tv/FocusableButton';
+import { useToastStore } from '@/stores/toastStore';
 import type { ContentDetail } from '@/types/content';
 import { isTVShow } from '@/types/content';
 import { M3eLoadingIndicator } from '@m3e/react/loading-indicator';
 import { isBackKey } from '@/utils/helpers';
+
+// ── Local presentational helper ─────────────────────────────────
+// Editorial-style heading: title + trailing gradient rule, replaces
+// the old uppercase micro-label pattern used for every section.
+function SectionHeading({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-[clamp(1rem,2vw,1.5rem)] mb-[clamp(1.25rem,3vh,2rem)]">
+      <h2 className="shrink-0 text-white font-bold tracking-tight text-[clamp(1.125rem,1.6vw,1.5rem)]">
+        {title}
+      </h2>
+      <div className="flex-1 h-px bg-gradient-to-r from-white/15 via-white/5 to-transparent" />
+    </div>
+  );
+}
 
 export function ContentDetailScreen() {
   useSpatialNavInit();
@@ -32,7 +47,6 @@ export function ContentDetailScreen() {
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const seasons = content?.seasons ?? [];
-  const categories = content?.categories ?? [];
   const currentEpisodes = seasons[selectedSeason]?.episodes ?? [];
   const relatedContent = content?.related_content ?? [];
 
@@ -92,8 +106,8 @@ export function ContentDetailScreen() {
         if (!focused) return;
         const rect = focused.getBoundingClientRect();
         const containerRect = el.getBoundingClientRect();
-        const topSafeArea = Math.min(96, window.innerHeight * 0.12);
-        const bottomSafeArea = Math.min(48, window.innerHeight * 0.07);
+        const topSafeArea = Math.min(80, window.innerHeight * 0.1);
+        const bottomSafeArea = Math.min(40, window.innerHeight * 0.06);
 
         if (rect.top < containerRect.top + topSafeArea) {
           el.scrollBy({
@@ -126,7 +140,7 @@ export function ContentDetailScreen() {
     return (content.seasons?.[0]?.episodes?.length ?? 0) > 0;
   }, [content]);
 
-  // ── Initial focus: never leave the screen without focus ────────
+  // ── Initial focus ──────────────────────────────────────────────
   useEffect(() => {
     if (!content) return;
     const id = requestAnimationFrame(() => {
@@ -181,6 +195,15 @@ export function ContentDetailScreen() {
       prefetchWatchData(tokens?.accessToken ?? '', content.id, episodeId);
     }, 4000);
   }, [content, tokens]);
+
+  const handlePlayTrailer = useCallback(() => {
+    const trailerUrl = content?.trailer_sources?.[0]?.url ?? content?.trailer_video_sources?.[0]?.url;
+    if (trailerUrl) {
+      navigate(`/watch/${content?.id}`);
+    } else {
+      useToastStore.getState().show('Tráiler no disponible', 'info', 3000);
+    }
+  }, [content, navigate]);
 
   const handleToggleList = useCallback(() => {
     // TODO: implement toggle like
@@ -251,7 +274,6 @@ export function ContentDetailScreen() {
     });
   }, []);
 
-
   // ── Loading state ──────────────────────────────────────────────
   if (loading) {
     return (
@@ -264,8 +286,11 @@ export function ContentDetailScreen() {
   // ── Error state ────────────────────────────────────────────────
   if (!content) {
     return (
-      <div className="w-full h-dvh bg-bg flex flex-col items-center justify-center gap-[clamp(0.75rem,2vh,1rem)]">
-        <p className="text-text-secondary text-[clamp(1rem,1.6vw,1.25rem)]">Contenido no encontrado</p>
+      <div className="w-full h-dvh bg-bg flex flex-col items-center justify-center gap-[clamp(1rem,2.5vh,1.5rem)]">
+        <div className="w-[clamp(3rem,6vh,4rem)] h-[clamp(3rem,6vh,4rem)] rounded-full bg-white/5 ring-1 ring-white/10 flex items-center justify-center">
+          <span className="text-white/30 text-[clamp(1.25rem,2vh,1.5rem)] font-bold">!</span>
+        </div>
+        <p className="text-white/50 text-[clamp(1rem,1.6vw,1.25rem)]">Contenido no encontrado</p>
         <FocusableButton onEnterPress={() => navigate('/home')} autoFocus playSound>
           Volver al inicio
         </FocusableButton>
@@ -289,6 +314,7 @@ export function ContentDetailScreen() {
           clientEndpoint={clientEndpoint}
           canPlay={canPlay}
           onPlay={handlePlay}
+          onPlayTrailer={handlePlayTrailer}
           onToggleList={handleToggleList}
           onNavigateDown={(dir) => {
             if (dir !== 'down') return true;
@@ -305,17 +331,18 @@ export function ContentDetailScreen() {
           firstSeasonFocusKey={selectedSeasonFocusKey}
         />
 
-        {/* Content sections */}
-        <div className="px-[clamp(3rem,7.5vw,6rem)] pb-[clamp(4rem,10vh,6rem)] space-y-[clamp(2rem,5vh,3.5rem)]">
+        {/* Content sections — generous rhythm instead of hairline dividers */}
+        <div className="px-[clamp(3rem,7.5vw,6rem)] pb-[clamp(5rem,12vh,7.5rem)] flex flex-col gap-[clamp(2.5rem,6vh,4.5rem)]">
           {/* Overview */}
-          <DetailOverview description={content.description} />
+          <DetailOverview
+            description={content.description}
+            className="pt-[clamp(1.5rem,3vh,2.5rem)]"
+          />
 
           {/* Seasons & Episodes */}
           {seasons.length > 0 && (
             <section>
-              <h2 className="text-[clamp(1.125rem,1.6vw,1.375rem)] font-bold text-white mb-[clamp(0.75rem,2vh,1rem)]">
-                Episodios
-              </h2>
+              <SectionHeading title="Episodios" />
 
               <div className="mb-[clamp(1rem,2.5vh,1.5rem)]">
                 <DetailSeasonSelector
@@ -345,9 +372,7 @@ export function ContentDetailScreen() {
           {/* Recommendations */}
           {relatedContent.length > 0 && (
             <section>
-              <h2 className="text-[clamp(1.125rem,1.6vw,1.375rem)] font-bold text-white mb-[clamp(0.75rem,2vh,1rem)]">
-                También te puede gustar
-              </h2>
+              <SectionHeading title="También te puede gustar" />
               <DetailRecommendations
                 items={relatedContent}
                 onSelect={handleSelectRelated}

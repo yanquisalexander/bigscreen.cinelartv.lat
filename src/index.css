@@ -4,7 +4,7 @@
   --color-bg: #0a0a0a;
   --color-surface: #1C1C1E;
   --color-surface-elevated: #2C2C2E;
-  --color-accent: #181881FF;
+  --color-accent: #555555;
   --color-accent-light: #0084F0;
   --color-gold: #F5D081;
   --color-live: #FF3B30;
@@ -114,7 +114,7 @@
 }
 
 .bg-gradient-to-br.from-accent.to-accent-light {
-  background-image: linear-gradient(to bottom right, #181881, #0084f0) !important;
+  background-image: linear-gradient(to bottom right, #181818, #0084f0) !important;
 }
 
 .bg-gradient-to-br.from-accent\/30.to-bg {
@@ -253,4 +253,9 @@ html, body, #root {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+}
+
+/* Detail section separator */
+.detail-section + .detail-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
