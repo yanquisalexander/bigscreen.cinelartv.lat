@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode, type KeyboardEvent } from 'react';
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { classNames } from '@/utils/helpers';
+import { useFocusSound } from '@/hooks/useNavigationSound';
 
 interface FocusableProps {
   children: ReactNode;
@@ -16,6 +17,7 @@ interface FocusableProps {
   preferredChildFocusKey?: string;
   focusable?: boolean;
   tabIndex?: number;
+  playSound?: boolean;
 }
 
 export function Focusable({
@@ -32,13 +34,15 @@ export function Focusable({
   preferredChildFocusKey,
   focusable = true,
   tabIndex = 0,
+  playSound = false,
 }: FocusableProps) {
+  const wrapFocus = useFocusSound();
   const { focusKey: resolvedKey, ref, focused, focusSelf } = useFocusable({
     focusKey,
     focusable,
     onEnterPress: onEnterPress ? () => { onEnterPress(); } : undefined,
     onArrowPress: onArrowPress ? (direction, _props, details) => onArrowPress(direction, details) : undefined,
-    onFocus: onFocus ? () => { onFocus(); } : undefined,
+    onFocus: playSound ? wrapFocus(onFocus) : onFocus,
     trackChildren,
     saveLastFocusedChild,
     preferredChildFocusKey,

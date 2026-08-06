@@ -40,6 +40,7 @@ export function FallbackScreen() {
           focusKey="fallback-retry"
           focusedClassName="!bg-white !text-black scale-105"
           className="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(2rem,3vw,3rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
+          playSound
         >
           Reintentar
         </Focusable>

@@ -154,6 +154,7 @@ function SettingsItem({
       onEnterPress={onSelect}
       className="flex items-center justify-between p-3 my-1 rounded-xl cursor-pointer transition-all duration-200"
       focusedClassName="bg-white/10 scale-105"
+      playSound
     >
       <div className="flex items-center gap-4 text-white">
         <div className="text-[#8e8e93]">{icon}</div>

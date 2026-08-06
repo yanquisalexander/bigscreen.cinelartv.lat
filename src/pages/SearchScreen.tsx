@@ -137,6 +137,7 @@ export function SearchScreen() {
                 focusKey="sk-clear-btn"
                 focusedClassName="bg-white/20"
                 className="w-9 h-9 rounded-full flex items-center justify-center text-white/50 flex-shrink-0"
+                playSound
               >
                 <LucideX size={18} />
               </Focusable>
@@ -164,6 +165,7 @@ export function SearchScreen() {
                       'bg-white/15 text-white',
                       'cursor-pointer select-none',
                     )}
+                    playSound
                   >
                     {char}
                   </Focusable>
@@ -188,6 +190,7 @@ export function SearchScreen() {
                   'bg-white/15 text-white/70',
                   'cursor-pointer select-none',
                 )}
+                playSound
               >
                 Espacio
               </Focusable>
@@ -202,6 +205,7 @@ export function SearchScreen() {
                   'bg-white/15 text-white',
                   'cursor-pointer select-none',
                 )}
+                playSound
               >
                 ⌫
               </Focusable>
@@ -216,6 +220,7 @@ export function SearchScreen() {
                   'bg-white/15 text-white/50',
                   'cursor-pointer select-none',
                 )}
+                playSound
               >
                 Limpiar
               </Focusable>
@@ -245,6 +250,7 @@ export function SearchScreen() {
                 subtitle={isTVShow(item) ? 'Serie' : undefined}
                 onEnterPress={() => handleInfo(item)}
                 focusKey={`search-result-${item.id}`}
+                playSound
               />
             ))}
           </FocusableRow>

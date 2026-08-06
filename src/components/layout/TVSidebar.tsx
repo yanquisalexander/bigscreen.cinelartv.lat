@@ -107,6 +107,7 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
                 focusKey={`nav-${item.key}`}
                 focusedClassName="bg-white !text-black"
                 className={itemClasses(isActive)}
+                playSound
               >
                 <item.icon className="text-xl flex-shrink-0" />
                 <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
@@ -123,6 +124,7 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
           focusKey="nav-settings"
           focusedClassName="bg-white !text-black"
           className={bottomItemClasses}
+          playSound
         >
           <SettingsRegular className="text-xl flex-shrink-0" />
           <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
@@ -137,6 +139,7 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
             focusKey="nav-login"
             focusedClassName="bg-white !text-black"
             className={bottomItemClasses}
+            playSound
           >
             <LucideLogIn className="text-xl flex-shrink-0" />
             <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
@@ -153,6 +156,7 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
               'flex h-10 items-center gap-2 rounded-lg',
               collapsed ? 'justify-center px-0' : 'justify-start px-2',
             )}
+            playSound
           >
             <img
               src={avatarUrl}

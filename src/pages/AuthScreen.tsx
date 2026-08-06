@@ -171,7 +171,7 @@ export function AuthScreen() {
                 <span className="text-red-400 text-[clamp(1.5rem,2.4vw,1.875rem)]">!</span>
               </div>
               <p className="text-red-400 text-[clamp(1rem,1.45vw,1.125rem)]">{error}</p>
-              <FocusableButton onEnterPress={handleRetry} autoFocus>
+              <FocusableButton onEnterPress={handleRetry} autoFocus playSound>
                 Reintentar
               </FocusableButton>
             </>
@@ -201,6 +201,7 @@ export function AuthScreen() {
           focusKey="guest-mode"
           focusedClassName="!bg-white/10 !border-white/40 scale-105"
           className="mt-[clamp(1.5rem,4vh,2.5rem)]"
+          playSound
         >
           Echaré un vistazo primero
         </FocusableButton>

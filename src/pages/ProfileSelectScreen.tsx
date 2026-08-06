@@ -77,6 +77,7 @@ export function ProfileSelectScreen() {
                 'flex flex-col items-center gap-4',
                 isSelecting && 'opacity-50 [&_div]:bg-black/50 [&_div]:cursor-wait',
               )}
+              playSound
             >
               <div className="relative w-32 h-32 rounded-full overflow-hidden bg-surface border-4 border-transparent">
                 <img
@@ -112,6 +113,7 @@ export function ProfileSelectScreen() {
         onEnterPress={handleLogout}
         focusedClassName="text-white"
         className="text-text-secondary text-lg"
+        playSound
       >
         Cerrar sesión
       </Focusable>

@@ -44,6 +44,8 @@ export function SettingsScreen() {
 
   const prefersModernPlayback = useSettingsStore((s) => s.prefersModernPlayback);
   const setPrefersModernPlayback = useSettingsStore((s) => s.setPrefersModernPlayback);
+  const navigationSoundEnabled = useSettingsStore((s) => s.navigationSoundEnabled);
+  const setNavigationSoundEnabled = useSettingsStore((s) => s.setNavigationSoundEnabled);
 
   const platform = getPlatform();
   const appVersion = getAppVersion();
@@ -86,7 +88,13 @@ export function SettingsScreen() {
               onBackToSidebar={() => setFocus('settings-nav-reproduccion')}
             />
           )}
-          {activeSection === 'audio' && <AudioContent />}
+          {activeSection === 'audio' && (
+            <AudioContent
+              navigationSoundEnabled={navigationSoundEnabled}
+              setNavigationSoundEnabled={setNavigationSoundEnabled}
+              onBackToSidebar={() => setFocus('settings-nav-audio')}
+            />
+          )}
           {activeSection === 'apariencia' && <AparienciaContent />}
           {activeSection === 'privacidad' && <PrivacidadContent />}
           {activeSection === 'reiniciar' && <ReiniciarContent />}
@@ -265,14 +273,35 @@ function ReproduccionContent({
   );
 }
 
-function AudioContent() {
+function AudioContent({
+  navigationSoundEnabled,
+  setNavigationSoundEnabled,
+  onBackToSidebar,
+}: {
+  navigationSoundEnabled: boolean;
+  setNavigationSoundEnabled: (v: boolean) => void;
+  onBackToSidebar: () => void;
+}) {
   return (
     <div data-settings-section="audio">
       <SectionTitle>Audio</SectionTitle>
       <SectionCard>
-        <p className="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)] text-center py-[clamp(1rem,2vh,1.25rem)]">
-          Próximamente
-        </p>
+        <div className="flex items-center justify-between py-[clamp(0.5rem,1vh,0.75rem)]">
+          <div className="flex flex-col flex-1 min-w-0">
+            <span className="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">
+              Sonido de navegación
+            </span>
+            <span className="text-text-secondary text-[clamp(0.75rem,1vw,0.85rem)] mt-0.5">
+              Reproduce un sonido al cambiar el foco entre elementos.
+            </span>
+          </div>
+          <Toggle
+            checked={navigationSoundEnabled}
+            onChange={setNavigationSoundEnabled}
+            focusKey="settings-toggle-nav-sound"
+            onArrowLeft={onBackToSidebar}
+          />
+        </div>
       </SectionCard>
     </div>
   );

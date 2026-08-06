@@ -1,9 +1,10 @@
 import { SpatialNavigation, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
 import { FocusableRegistrar } from './spatialFocus';
+import { playFocusSound } from '@/hooks/useNavigationSound';
 
 class FocusableElement extends HTMLElement {
   static get observedAttributes() {
-    return ['focus-key', 'open', 'disabled', 'focusable'];
+    return ['focus-key', 'open', 'disabled', 'focusable', 'play-sound'];
   }
 
   private registrar = new FocusableRegistrar();
@@ -88,6 +89,9 @@ class FocusableElement extends HTMLElement {
           return notCancelled; // true si nadie llamó preventDefault()
         },
         onFocus: () => {
+          if (this.getAttribute('play-sound') === 'true') {
+            playFocusSound();
+          }
           this.dispatchEvent(new CustomEvent('focus-gained', { bubbles: true, composed: true }));
           this.setAttribute('data-focused', 'true');
         },

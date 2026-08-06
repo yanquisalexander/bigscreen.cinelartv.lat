@@ -206,6 +206,7 @@ export function HomeScreen() {
                 focusKey="home-retry"
                 focusedClassName="!bg-white !text-black scale-105"
                 className="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(2rem,3vw,3rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
+                playSound
               >
                 Reintentar
               </Focusable>
@@ -403,6 +404,7 @@ const MemoizedCard = memo(function MemoizedCard({
         return true;
       }}
       onEnterPress={onEnterPress}
+      playSound
     />
   );
 });
@@ -437,6 +439,7 @@ function ExitDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: 
               focusKey="exit-cancel"
               focusedClassName="!bg-white !text-black scale-105"
               className="h-[clamp(3rem,5.5vh,3.75rem)] px-[clamp(2.5rem,5vw,4rem)] rounded-full bg-white/10 text-white text-[clamp(1rem,1.5vw,1.25rem)] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
+              playSound
             >
               Cancelar
             </Focusable>
@@ -445,6 +448,7 @@ function ExitDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: 
               focusKey="exit-confirm"
               focusedClassName="!bg-white !text-black scale-105"
               className="h-[clamp(3rem,5.5vh,3.75rem)] px-[clamp(2.5rem,5vw,4rem)] rounded-full bg-live text-white text-[clamp(1rem,1.5vw,1.25rem)] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
+              playSound
             >
               Salir
             </Focusable>

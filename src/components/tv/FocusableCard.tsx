@@ -1,6 +1,7 @@
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { classNames } from '@/utils/helpers';
-import { memo, useRef, useEffect } from 'react';
+import { memo, useRef } from 'react';
+import { useFocusSound } from '@/hooks/useNavigationSound';
 
 interface FocusableCardProps {
   title: string;
@@ -17,6 +18,7 @@ interface FocusableCardProps {
   focusKey?: string;
   autoFocus?: boolean;
   variant?: 'row' | 'episode';
+  playSound?: boolean;
 }
 
 const PosterView = memo(({ title, image, subtitle, progress, variant }: { title: string; image?: string | null; subtitle?: string; progress?: number; variant: 'row' | 'episode' }) => (
@@ -92,14 +94,22 @@ export function FocusableCard({
   focusKey,
   autoFocus = false,
   variant = 'row',
+  playSound = false,
 }: FocusableCardProps) {
   const bannerPreloaded = useRef(false);
+  const wrapFocus = useFocusSound();
 
   const { ref, focused } = useFocusable({
     onEnterPress,
     onArrowPress,
-    onFocus: () => {
-      // Preload banner image on first focus
+    onFocus: playSound ? wrapFocus(() => {
+      if (!bannerPreloaded.current && bannerImage) {
+        bannerPreloaded.current = true;
+        const img = new Image();
+        img.src = bannerImage;
+      }
+      onFocus?.();
+    }) : () => {
       if (!bannerPreloaded.current && bannerImage) {
         bannerPreloaded.current = true;
         const img = new Image();
@@ -120,8 +130,11 @@ export function FocusableCard({
       className={classNames(
         'shrink-0 rounded-xl overflow-hidden border-2 transition-all duration-300 ease-out focus:outline-none will-change-transform snap-start',
         isRowVariant
-          ? (focused ? 'w-[500px] h-[281px] border-white opacity-100' : 'w-[180px] h-[270px] border-transparent opacity-80')
-          : 'w-[230px] h-[130px] border-transparent scale-100',
+          ? (focused 
+              ? 'w-[clamp(340px,26vw,500px)] h-[clamp(195px,15vw,288px)] border-white opacity-100 shadow-lg shadow-black/50' 
+              : 'w-[clamp(130px,10vw,192px)] h-[clamp(195px,15vw,288px)] border-transparent opacity-80'
+            )
+          : 'w-[230px] h-[130px] border-transparent',
         className,
       )}
     >

@@ -12,6 +12,7 @@ interface FocusableButtonProps {
   focusKey?: string;
   onArrowPress?: (direction: string) => boolean;
   onFocus?: () => void;
+  playSound?: boolean;
 }
 
 const variantStyles = {
@@ -37,6 +38,7 @@ export function FocusableButton({
   focusKey,
   onArrowPress,
   onFocus,
+  playSound = false,
 }: FocusableButtonProps) {
   return (
     <Focusable
@@ -45,6 +47,7 @@ export function FocusableButton({
       onFocus={onFocus}
       autoFocus={autoFocus}
       focusKey={focusKey}
+      playSound={playSound}
       focusedClassName={focusedClassName}
       className={classNames(
         'inline-flex items-center justify-center rounded-full font-semibold',

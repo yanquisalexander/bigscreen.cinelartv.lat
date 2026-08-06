@@ -250,6 +250,7 @@ function LiveFeaturedHero({
             onEnterPress={() => onPlay(channel)}
             focusedClassName="!bg-white !text-black"
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white/10 text-white text-[clamp(0.875rem,1.2vw,1rem)] font-semibold border border-white/20 cursor-pointer"
+            playSound
           >
             <LucidePlay className="w-5 h-5" />
             Ver ahora
@@ -446,6 +447,7 @@ export function LiveTVScreen() {
               }}
               focusedClassName="!bg-white !text-black"
               className="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium flex items-center justify-center cursor-pointer"
+              playSound
             >
               Volver al inicio
             </Focusable>
@@ -511,6 +513,7 @@ export function LiveTVScreen() {
             }}
             focusedClassName="!bg-white !text-black"
             className="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium flex items-center gap-2 cursor-pointer"
+            playSound
           >
             <LucideRefreshCw className="w-4 h-4" />
             Reintentar
@@ -707,6 +710,7 @@ function LiveHeader({
           }}
           focusedClassName="!bg-white !text-black"
           className="w-[clamp(2rem,3.5vh,2.5rem)] h-[clamp(2rem,3.5vh,2.5rem)] rounded-full bg-surface flex items-center justify-center cursor-pointer shrink-0"
+          playSound
         >
           <LucideSearch className="w-4 h-4 text-text-secondary" />
         </Focusable>

@@ -266,7 +266,7 @@ export function ContentDetailScreen() {
     return (
       <div className="w-full h-dvh bg-bg flex flex-col items-center justify-center gap-[clamp(0.75rem,2vh,1rem)]">
         <p className="text-text-secondary text-[clamp(1rem,1.6vw,1.25rem)]">Contenido no encontrado</p>
-        <FocusableButton onEnterPress={() => navigate('/home')} autoFocus>
+        <FocusableButton onEnterPress={() => navigate('/home')} autoFocus playSound>
           Volver al inicio
         </FocusableButton>
       </div>

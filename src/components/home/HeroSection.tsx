@@ -34,10 +34,10 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
   const hasTrailer = !!(currentItem?.trailer_sources?.length);
   const trailerUrl = hasTrailer ? currentItem.trailer_sources![0].url : null;
 
-  // Resolve banner URL (always full size for hero)
+  // Resolve banner URL
   const currentBannerUrl = useMemo(() => {
     if (!currentItem) return null;
-    return resolveBackdrop(currentItem.images, currentItem.banner ?? currentItem.cover, clientEndpoint);
+    return resolveBackdrop(currentItem.images, currentItem.banner_resized ?? currentItem.banner ?? currentItem.cover_resized ?? currentItem.cover, clientEndpoint);
   }, [currentItem, clientEndpoint]);
 
   // Resolve logo URL
@@ -57,7 +57,7 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
     if (items.length > 1) {
       const nextItem = items[(currentIndex + 1) % items.length];
       if (nextItem) {
-        const url = resolveBackdrop(nextItem.images, nextItem.banner ?? nextItem.cover, clientEndpoint);
+        const url = resolveBackdrop(nextItem.images, nextItem.banner_resized ?? nextItem.banner ?? nextItem.cover_resized ?? nextItem.cover, clientEndpoint);
         if (url) {
           const img = new Image();
           img.src = url;
@@ -308,6 +308,7 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
               focusKey="hero-view-more"
               focusedClassName="scale-105 shadow-lg shadow-black/40"
               className="px-[clamp(1.5rem,3vw,2rem)] py-[clamp(0.625rem,1.4vh,0.75rem)] bg-white text-black text-[clamp(0.875rem,1.25vw,1rem)] font-bold rounded-full transition-transform duration-200"
+              playSound
             >
               Ver más
             </Focusable>
