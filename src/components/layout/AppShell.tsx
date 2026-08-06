@@ -16,7 +16,7 @@ export function AppShell() {
           ? 'var(--sidebar-w, 200px) 1fr'
           : 'var(--sidebar-w-collapsed, 72px) 1fr',
         gridTemplateAreas: '"sidebar main"',
-        transition: 'grid-template-columns 0.3s ease-out',
+        //transition: 'grid-template-columns 0.3s ease-out',
       }}
     >
       <TVSidebar onFocusChange={setSidebarFocused} />

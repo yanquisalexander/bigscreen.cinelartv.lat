@@ -65,7 +65,7 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
 
   const avatarUrl = useMemo(() => {
     if (!profile) return '';
-    return profile.avatar_url ?? `${clientEndpoint}/assets/default/avatars/${profile.avatar_id ?? 'coolCat'}.png`;
+    return `${clientEndpoint}/assets/default/avatars/${profile.avatar_id ?? 'coolCat'}.png`;
   }, [profile, clientEndpoint]);
 
   const collapsed = !hasFocusedChild;
