@@ -11,6 +11,7 @@ function pickWebpUrl(variants: ImageVariants | undefined, baseUrl?: string): str
   if (!variants) return null;
   const preferred = [variants.medium, variants.large, variants.small, variants.thumbnail, variants.original];
   for (const v of preferred) {
+    if (v?.avif) return resolveImageUrl(v.avif, baseUrl);
     if (v?.webp) return resolveImageUrl(v.webp, baseUrl);
   }
   return null;

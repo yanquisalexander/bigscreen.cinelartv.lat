@@ -288,11 +288,10 @@ export const DetailHero = memo(function DetailHero({
         </FocusContext.Provider>
 
         {/* Floating artwork panel — decorative depth layer */}
-        <div className="hidden lg:flex justify-end relative">
+        <div className="hidden md:flex justify-end relative">
           <div className="absolute -inset-6 -z-10 rounded-[2.5rem] bg-accent/10 blur-3xl" />
           <div
-            className="relative rounded-[2rem] overflow-hidden ring-1 ring-white/10 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.75)]"
-            style={{ width: 'clamp(14rem,22vw,22rem)', aspectRatio: '3/4' }}
+            className="relative rounded-[2rem] overflow-hidden ring-1 ring-white/10 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.75)] w-[clamp(14rem,22vw,22rem)] aspect-[3/4]"
           >
             {(posterUrl ?? backdropUrl) ? (
               <img src={posterUrl ?? backdropUrl} alt="" aria-hidden className="w-full h-full object-cover hero-fade-in" />
