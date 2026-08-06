@@ -72,7 +72,7 @@ export function FocusableRow({ title, children, className = '', focusKey, prefer
             (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
             (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
           }}
-          className="flex gap-4 px-[clamp(3rem,7.5vw,6rem)] overflow-x-auto hide-scrollbar pt-2 pb-6 snap-x snap-start min-h-[300px]"
+          className="flex gap-4 px-[clamp(3rem,7.5vw,6rem)] overflow-x-auto hide-scrollbar pt-1 pb-2 snap-x snap-start"
         >
           {children}
         </div>
