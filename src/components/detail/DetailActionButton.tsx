@@ -16,8 +16,8 @@ interface DetailActionButtonProps {
 
 const variantClasses = {
   primary: 'bg-white text-black font-bold',
-  secondary: 'bg-white/15 text-white font-semibold',
-  ghost: 'bg-transparent text-white border border-white/20 font-semibold',
+  secondary: 'bg-white/[0.08] text-white font-semibold ring-1 ring-white/10',
+  ghost: 'bg-transparent text-white/80 font-semibold ring-1 ring-white/15',
 };
 
 export const DetailActionButton = memo(function DetailActionButton({
@@ -51,12 +51,12 @@ export const DetailActionButton = memo(function DetailActionButton({
         'rounded-full cursor-pointer',
         'transition-all duration-200 ease-out',
         variant === 'primary'
-          ? 'px-[clamp(2.25rem,4.5vw,3.5rem)] py-[clamp(0.75rem,1.8vh,1.125rem)] text-[clamp(0.9375rem,1.4vw,1.1875rem)]'
-          : 'px-[clamp(1.5rem,3vw,2.25rem)] py-[clamp(0.625rem,1.5vh,0.9375rem)] text-[clamp(0.8125rem,1.2vw,1rem)]',
+          ? 'px-[clamp(2rem,4vw,3.25rem)] py-[clamp(0.75rem,1.7vh,1.0625rem)] text-[clamp(0.9375rem,1.35vw,1.125rem)]'
+          : 'px-[clamp(1.375rem,2.6vw,2rem)] py-[clamp(0.625rem,1.4vh,0.875rem)] text-[clamp(0.8125rem,1.15vw,0.9375rem)]',
         variantClasses[variant],
-        focused && variant === 'primary' && 'scale-110 shadow-[0_0_24px_rgba(255,255,255,0.3)]',
-        focused && variant === 'secondary' && 'scale-110 bg-white/25 shadow-[0_0_20px_rgba(255,255,255,0.15)]',
-        focused && variant === 'ghost' && 'scale-110 border-white/50 bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.1)]',
+        focused && variant === 'primary' && 'scale-[1.06] shadow-[0_10px_28px_-6px_rgba(255,255,255,0.35)]',
+        focused && variant === 'secondary' && 'scale-[1.06] bg-white/[0.16] ring-white/20 shadow-[0_8px_22px_-6px_rgba(0,0,0,0.5)]',
+        focused && variant === 'ghost' && 'scale-[1.06] bg-white/10 ring-white/30 text-white',
         className,
       )}
     >

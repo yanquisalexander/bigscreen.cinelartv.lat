@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react';
 import { FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { LucidePlay, LucideClapperboard, LucidePlus, LucideRotateCcw } from 'lucide-react';
-import { formatTime, classNames, resolveBackdrop, resolveLogo } from '@/utils/helpers';
+import { formatTime, classNames, resolveBackdrop, resolvePoster, resolveLogo } from '@/utils/helpers';
 import { DetailActionButton } from './DetailActionButton';
 import type { ContentDetail } from '@/types/content';
 import { isTVShow } from '@/types/content';
@@ -46,6 +46,7 @@ export const DetailHero = memo(function DetailHero({
   onHeroFocus,
 }: DetailHeroProps) {
   const backdropUrl = resolveBackdrop(content.images, content.banner_resized ?? content.banner ?? content.cover_resized ?? content.cover, clientEndpoint);
+  const posterUrl = resolvePoster(content.images, content.cover_resized ?? content.cover, clientEndpoint);
   const logoUrl = resolveLogo(content.images, clientEndpoint);
 
   const { ref: heroRef, focusKey: heroFocusKey } = useFocusable({
@@ -287,11 +288,14 @@ export const DetailHero = memo(function DetailHero({
         </FocusContext.Provider>
 
         {/* Floating artwork panel — decorative depth layer */}
-        <div className="hidden lg:block relative">
+        <div className="hidden lg:flex justify-end relative">
           <div className="absolute -inset-6 -z-10 rounded-[2.5rem] bg-accent/10 blur-3xl" />
-          <div className="relative rounded-[2rem] overflow-hidden ring-1 ring-white/10 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.75)] aspect-[3/4]">
-            {backdropUrl ? (
-              <img src={backdropUrl} alt="" aria-hidden className="w-full h-full object-cover hero-fade-in" />
+          <div
+            className="relative rounded-[2rem] overflow-hidden ring-1 ring-white/10 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.75)]"
+            style={{ width: 'clamp(14rem,22vw,22rem)', aspectRatio: '3/4' }}
+          >
+            {(posterUrl ?? backdropUrl) ? (
+              <img src={posterUrl ?? backdropUrl} alt="" aria-hidden className="w-full h-full object-cover hero-fade-in" />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-accent/30 to-surface" />
             )}
