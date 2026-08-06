@@ -70,16 +70,20 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
 
   const collapsed = !hasFocusedChild;
 
+  // Fixed icon column so icon position never shifts between collapsed/expanded
+  // states — avoids reflow on focus change, keeps the collapse instant and cheap.
+  const itemBaseClasses = 'flex h-11 items-center gap-3 rounded-md text-sm font-medium';
+
   const itemClasses = (isActive: boolean) => classNames(
-    'flex h-10 items-center gap-3 rounded-lg text-sm font-medium',
-    collapsed ? 'justify-center px-0' : 'justify-start px-2',
-    isActive ? 'text-white' : 'text-white/70',
+    itemBaseClasses,
+    collapsed ? 'justify-center px-0' : 'justify-start px-3',
+    isActive ? 'text-white border-l-2 border-accent' : 'text-white/55 border-l-2 border-transparent',
   );
 
   const bottomItemClasses = classNames(
-    'flex h-10 items-center gap-3 rounded-lg text-sm font-medium mb-1',
-    collapsed ? 'justify-center px-0' : 'justify-start px-2',
-    'text-white/70',
+    itemBaseClasses,
+    collapsed ? 'justify-center px-0' : 'justify-start px-3',
+    'text-white/55 border-l-2 border-transparent',
   );
 
   const labelStyle = (show: boolean): React.CSSProperties => ({
@@ -92,7 +96,7 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
         ref={ref as React.RefObject<HTMLElement>}
         style={{ gridArea: 'sidebar' }}
         className={classNames(
-          'relative h-full w-full flex flex-col py-4 bg-surface/10',
+          'relative h-full w-full flex flex-col py-4 bg-[#090909]',
           collapsed ? 'px-0' : 'px-2',
         )}
       >
@@ -105,11 +109,13 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
                 onEnterPress={() => navigate(item.path)}
                 onArrowPress={focusContent}
                 focusKey={`nav-${item.key}`}
-                focusedClassName="bg-white !text-black"
+                focusedClassName="bg-white !text-black border-transparent"
                 className={itemClasses(isActive)}
                 playSound
               >
-                <item.icon className="text-xl flex-shrink-0" />
+                <span className="w-6 flex items-center justify-center flex-shrink-0">
+                  <item.icon className="text-xl" />
+                </span>
                 <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
                   {item.label}
                 </span>
@@ -118,68 +124,77 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
           })}
         </nav>
 
-        <Focusable
-          onEnterPress={() => navigate('/settings')}
-          onArrowPress={focusContent}
-          focusKey="nav-settings"
-          focusedClassName="bg-white !text-black"
-          className={bottomItemClasses}
-          playSound
-        >
-          <SettingsRegular className="text-xl flex-shrink-0" />
-          <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
-            Ajustes
-          </span>
-        </Focusable>
-
-        {isGuest ? (
+        <div className="flex flex-col gap-1 pt-2 mt-2 border-t border-white/10">
           <Focusable
-            onEnterPress={handleLogin}
+            onEnterPress={() => navigate('/settings')}
             onArrowPress={focusContent}
-            focusKey="nav-login"
-            focusedClassName="bg-white !text-black"
+            focusKey="nav-settings"
+            focusedClassName="bg-white !text-black border-transparent"
             className={bottomItemClasses}
             playSound
           >
-            <LucideLogIn className="text-xl flex-shrink-0" />
+            <span className="w-6 flex items-center justify-center flex-shrink-0">
+              <SettingsRegular className="text-xl" />
+            </span>
             <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
-              Iniciar sesión
+              Ajustes
             </span>
           </Focusable>
-        ) : profile && (
-          <Focusable
-            onEnterPress={handleProfile}
-            onArrowPress={focusContent}
-            focusKey="nav-profile"
-            focusedClassName="bg-white !text-black [&_span]:text-black"
-            className={classNames(
-              'flex h-10 items-center gap-2 rounded-lg',
-              collapsed ? 'justify-center px-0' : 'justify-start px-2',
-            )}
-            playSound
-          >
-            <img
-              src={avatarUrl}
-              alt={profile.name}
-              className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const fallback = target.nextElementSibling as HTMLElement;
-                if (fallback) fallback.style.display = 'flex';
-              }}
-            />
-            <div
-              className="w-7 h-7 rounded-full bg-accent items-center justify-center text-white font-bold text-xs flex-shrink-0"
-              style={{ display: 'none' }}
+
+          {isGuest ? (
+            <Focusable
+              onEnterPress={handleLogin}
+              onArrowPress={focusContent}
+              focusKey="nav-login"
+              focusedClassName="bg-white !text-black border-transparent"
+              className={bottomItemClasses}
+              playSound
             >
-              {profile.name.charAt(0).toUpperCase()}
-            </div>
-            <span className="truncate whitespace-nowrap text-white" style={labelStyle(hasFocusedChild)}>
-              {profile.name}
-            </span>
-          </Focusable>
-        )}
+              <span className="w-6 flex items-center justify-center flex-shrink-0">
+                <LucideLogIn className="text-xl" />
+              </span>
+              <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
+                Iniciar sesión
+              </span>
+            </Focusable>
+          ) : profile && (
+            <Focusable
+              onEnterPress={handleProfile}
+              onArrowPress={focusContent}
+              focusKey="nav-profile"
+              focusedClassName="bg-white !text-black border-transparent [&_span]:text-black"
+              className={classNames(
+                itemBaseClasses,
+                collapsed ? 'justify-center px-0' : 'justify-start px-3',
+                'text-white border-l-2 border-transparent',
+              )}
+              playSound
+            >
+              <span className="w-6 flex items-center justify-center flex-shrink-0">
+                <img
+                  src={avatarUrl}
+                  alt={profile.name}
+                  className="w-6 h-6 rounded-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const fallback = target.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+                <div
+                  className="w-6 h-6 rounded-full bg-accent items-center justify-center text-white font-bold text-xs"
+                  style={{ display: 'none' }}
+                >
+                  {profile.name.charAt(0).toUpperCase()}
+                </div>
+              </span>
+              <span className="truncate whitespace-nowrap" style={labelStyle(hasFocusedChild)}>
+                {profile.name}
+              </span>
+            </Focusable>
+          )}
+        </div>
       </aside>
     </FocusContext.Provider>
   );
