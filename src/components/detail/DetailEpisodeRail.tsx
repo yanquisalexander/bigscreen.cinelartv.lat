@@ -114,7 +114,7 @@ const EpisodeCard = memo(function EpisodeCard({
   onArrowLeft,
 }: EpisodeCardProps) {
   const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
-  const thumbUrl = resolveEpisodeThumbnail(episode.images, episode.thumbnail ?? episode.thumbnail_resized, clientEndpoint);
+  const thumbUrl = resolveEpisodeThumbnail(episode.images, episode.thumbnail_resized ?? episode.thumbnail, clientEndpoint);
 
   const progress = episode.continue_watching
     ? Math.round(

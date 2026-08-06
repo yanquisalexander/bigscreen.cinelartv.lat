@@ -9,7 +9,7 @@ export function resolveImageUrl(path?: string | null, baseUrl?: string): string 
 
 function pickWebpUrl(variants: ImageVariants | undefined, baseUrl?: string): string | null {
   if (!variants) return null;
-  const preferred = [variants.medium, variants.large, variants.original, variants.small, variants.thumbnail];
+  const preferred = [variants.medium, variants.large, variants.small, variants.thumbnail, variants.original];
   for (const v of preferred) {
     if (v?.webp) return resolveImageUrl(v.webp, baseUrl);
   }
