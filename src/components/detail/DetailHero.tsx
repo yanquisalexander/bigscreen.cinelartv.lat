@@ -124,12 +124,12 @@ export const DetailHero = memo(function DetailHero({
 
       {/* Content grid */}
       <div
-        className="relative h-full grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_clamp(18rem,30vw,32rem)] items-center
-          gap-[clamp(2rem,5vw,4.5rem)]
-          px-[clamp(3rem,7.5vw,6rem)]
-          pt-[clamp(6.5rem,15vh,8.5rem)]
-          pb-[clamp(3rem,7vh,4.5rem)]
-          min-h-[clamp(36rem,86vh,60rem)]"
+        className="relative h-full grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_clamp(14rem,22vw,22rem)] items-center
+          gap-[clamp(1rem,3vw,3rem)]
+          px-[clamp(2rem,5vw,6rem)]
+          pt-[clamp(4rem,10vh,8.5rem)]
+          pb-[clamp(2rem,5vh,4.5rem)]
+          min-h-[clamp(30rem,75vh,60rem)]"
       >
         <FocusContext.Provider value={heroFocusKey}>
           <div
@@ -291,7 +291,7 @@ export const DetailHero = memo(function DetailHero({
         <div className="hidden md:flex justify-end relative">
           <div className="absolute -inset-6 -z-10 rounded-[2.5rem] bg-accent/10 blur-3xl" />
           <div
-            className="relative rounded-[2rem] overflow-hidden ring-1 ring-white/10 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.75)] w-[clamp(14rem,22vw,22rem)] aspect-[3/4]"
+            className="relative rounded-[2rem] overflow-hidden ring-1 ring-white/10 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.75)] w-[clamp(12rem,18vw,20rem)] aspect-[3/4]"
           >
             {(posterUrl ?? backdropUrl) ? (
               <img src={posterUrl ?? backdropUrl} alt="" aria-hidden className="w-full h-full object-cover hero-fade-in" />
