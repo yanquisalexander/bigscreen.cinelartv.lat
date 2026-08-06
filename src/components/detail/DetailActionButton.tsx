@@ -16,8 +16,8 @@ interface DetailActionButtonProps {
 
 const variantClasses = {
   primary: 'bg-white text-black font-bold',
-  secondary: 'bg-white/[0.08] text-white font-semibold ring-1 ring-white/10',
-  ghost: 'bg-transparent text-white/80 font-semibold ring-1 ring-white/15',
+  secondary: 'bg-white/10 text-white font-semibold border border-white/20',
+  ghost: 'bg-transparent text-white/80 font-semibold border border-white/20',
 };
 
 export const DetailActionButton = memo(function DetailActionButton({
@@ -49,14 +49,15 @@ export const DetailActionButton = memo(function DetailActionButton({
       className={classNames(
         'tv-no-select inline-flex items-center justify-center gap-[clamp(0.5rem,1vw,0.75rem)]',
         'rounded-full cursor-pointer',
-        'transition-all duration-200 ease-out',
+        // Sin transiciones ni escalas costosas; cambio de estado inmediato por rendimiento
         variant === 'primary'
           ? 'px-[clamp(2rem,4vw,3.25rem)] py-[clamp(0.75rem,1.7vh,1.0625rem)] text-[clamp(0.9375rem,1.35vw,1.125rem)]'
           : 'px-[clamp(1.375rem,2.6vw,2rem)] py-[clamp(0.625rem,1.4vh,0.875rem)] text-[clamp(0.8125rem,1.15vw,0.9375rem)]',
         variantClasses[variant],
-        focused && variant === 'primary' && 'scale-[1.06] shadow-[0_10px_28px_-6px_rgba(255,255,255,0.35)]',
-        focused && variant === 'secondary' && 'scale-[1.06] bg-white/[0.16] ring-white/20 shadow-[0_8px_22px_-6px_rgba(0,0,0,0.5)]',
-        focused && variant === 'ghost' && 'scale-[1.06] bg-white/10 ring-white/30 text-white',
+        // Estados de foco eficientes basados en cambios de color sólidos y bordes limpios
+        focused && variant === 'primary' && 'bg-accent text-black outline outline-3 outline-white',
+        focused && variant === 'secondary' && 'bg-white text-black outline outline-3 outline-white',
+        focused && variant === 'ghost' && 'bg-white/20 text-white outline outline-3 outline-white',
         className,
       )}
     >

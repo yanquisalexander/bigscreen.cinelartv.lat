@@ -98,8 +98,8 @@ class AdOverlayElement extends HTMLElement {
 
     // Listener de click explícito para mayor robustez en TV
     this._skipBtnEl?.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.handleSkip();
+      e.preventDefault();
+      this.handleSkip();
     });
 
     video.play().then(() => {
@@ -126,20 +126,20 @@ class AdOverlayElement extends HTMLElement {
 
     // Sincronización del countdown basada en reproducción real
     if (!this._canSkip && ct >= this._skipOffset) {
-        this._canSkip = true;
-        this.updateSkipUI();
-        requestAnimationFrame(() => SpatialNavigation.setFocus(`${FOCUS_KEY_ROOT}-skip`));
+      this._canSkip = true;
+      this.updateSkipUI();
+      requestAnimationFrame(() => SpatialNavigation.setFocus(`${FOCUS_KEY_ROOT}-skip`));
     } else if (!this._canSkip) {
-        this.updateSkipUI();
+      this.updateSkipUI();
     }
 
     if (this._progressEl && dur > 0) this._progressEl.style.width = `${(ct / dur) * 100}%`;
     if (this._timeEl && dur > 0) this._timeEl.textContent = `${this.formatTime(ct)} / ${this.formatTime(dur)}`;
-    
+
     if (dur > 0 && this._ad) {
-        if (!this._quartiles.q1 && ct >= dur * 0.25) { this._quartiles.q1 = true; trackEvent(this._ad, 'firstQuartile'); }
-        if (!this._quartiles.q2 && ct >= dur * 0.5) { this._quartiles.q2 = true; trackEvent(this._ad, 'midpoint'); }
-        if (!this._quartiles.q3 && ct >= dur * 0.75) { this._quartiles.q3 = true; trackEvent(this._ad, 'thirdQuartile'); }
+      if (!this._quartiles.q1 && ct >= dur * 0.25) { this._quartiles.q1 = true; trackEvent(this._ad, 'firstQuartile'); }
+      if (!this._quartiles.q2 && ct >= dur * 0.5) { this._quartiles.q2 = true; trackEvent(this._ad, 'midpoint'); }
+      if (!this._quartiles.q3 && ct >= dur * 0.75) { this._quartiles.q3 = true; trackEvent(this._ad, 'thirdQuartile'); }
     }
   }
 
@@ -207,8 +207,14 @@ class AdOverlayElement extends HTMLElement {
         onEnterPress: () => item.activate(),
         onArrowPress: () => true,
         onUpdateFocus: (focused: boolean) => {
-          el.style.transform = focused ? 'scale(1.05)' : 'scale(1)';
-          el.style.boxShadow = focused ? '0 0 0 2px rgba(255,255,255,0.8)' : 'none';
+          // Cambio eficiente en lugar de box-shadow y transform
+          if (focused) {
+            el.style.outline = '3px solid white';
+            el.style.backgroundColor = item.key.includes('skip') ? '#ffffff' : 'rgba(255,255,255,0.2)';
+          } else {
+            el.style.outline = 'none';
+            el.style.backgroundColor = item.key.includes('skip') ? '#e6e6e6' : 'rgba(0,0,0,0.6)';
+          }
         },
       };
     }).filter((x): x is NonNullable<typeof x> => x !== null);
@@ -236,26 +242,26 @@ class AdOverlayElement extends HTMLElement {
       <style>
         tv-ad-overlay { position: fixed; inset: 0; z-index: 50; background: #000; display: block; }
         tv-ad-overlay video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center; display: block; }
-        [data-focus-key] { cursor: pointer; outline: none; transition: transform 150ms ease, box-shadow 150ms ease; }
+        [data-focus-key] { cursor: pointer; outline: none; }
         @keyframes ad-spin { to { transform: rotate(360deg); } }
       </style>
       <video playsinline autoplay></video>
       <div data-ad-spinner style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
         <div style="width:40px;height:40px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:ad-spin 0.8s linear infinite;"></div>
       </div>
-      <div style="position:absolute;top:0;left:0;right:0;background:linear-gradient(to bottom,rgba(0,0,0,0.7),transparent,transparent);padding:24px;pointer-events:none;">
+      <div style="position:absolute;top:0;left:0;right:0;background:linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);padding:24px;pointer-events:none;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <span style="color:rgba(255,255,255,0.9);font-size:14px;font-weight:600;background:rgba(255,255,255,0.15);backdrop-filter:blur(8px);padding:6px 12px;border-radius:8px;">Anuncio</span>
-          <span data-ad-time style="color:rgba(255,255,255,0.5);font-size:12px;font-variant-numeric:tabular-nums;"></span>
+          <span style="color:rgba(255,255,255,0.9);font-size:14px;font-weight:600;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.2);padding:6px 12px;border-radius:8px;">Anuncio</span>
+          <span data-ad-time style="color:rgba(255,255,255,0.7);font-size:12px;font-variant-numeric:tabular-nums;"></span>
         </div>
       </div>
       <div style="position:absolute;bottom:0;left:0;right:0;height:4px;background:rgba(255,255,255,0.1);">
-        <div data-ad-progress style="height:100%;background:rgba(255,255,255,0.7);width:0%;"></div>
+        <div data-ad-progress style="height:100%;background:#ffffff;width:0%;"></div>
       </div>
       <div style="position:absolute;bottom:24px;right:24px;display:flex;align-items:center;gap:12px;">
-        <div data-focus-key="${FOCUS_KEY_ROOT}-mute" data-ad-mute style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.1);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.7);">${this.iconVolumeOn()}</div>
-        <div data-ad-countdown style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(255,255,255,0.1);backdrop-filter:blur(8px);border-radius:12px;color:rgba(255,255,255,0.6);font-size:14px;"><span data-ad-skip-label>Saltar en ${this._skipOffset}s</span></div>
-        <div data-focus-key="${FOCUS_KEY_ROOT}-skip" data-ad-skip style="display:none;align-items:center;gap:8px;padding:10px 16px;background:rgba(255,255,255,0.92);backdrop-filter:blur(12px);border-radius:12px;color:#000;font-size:14px;font-weight:600;"><span>Saltar anuncio</span>${this.iconChevronRight()}</div>
+        <div data-focus-key="${FOCUS_KEY_ROOT}-mute" data-ad-mute style="width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;color:#ffffff;border:2px solid transparent;">${this.iconVolumeOn()}</div>
+        <div data-ad-countdown style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(0,0,0,0.6);border-radius:12px;color:rgba(255,255,255,0.9);font-size:14px;"><span data-ad-skip-label>Saltar en ${this._skipOffset}s</span></div>
+        <div data-focus-key="${FOCUS_KEY_ROOT}-skip" data-ad-skip style="display:none;align-items:center;gap:8px;padding:10px 16px;background:#e6e6e6;border-radius:12px;color:#000;font-size:14px;font-weight:600;border:2px solid transparent;"><span>Saltar anuncio</span>${this.iconChevronRight()}</div>
       </div>
     `;
   }

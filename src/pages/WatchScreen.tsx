@@ -33,6 +33,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
   const { contentId, episodeId } = useParams<{ contentId: string; episodeId: string }>();
   const navigate = useNavigate();
   const tokens = useAuthStore((s) => s.tokens);
+  const isAdmin = useAuthStore((s) => s.session?.current_user?.admin) ?? false;
   const clientEndpoint = useConfigStore((s) => s.config.CLIENT_ENDPOINT);
 
   const { attachVideo, videoRef, load, play, setOnEnded, getEngine, engineReady, applyPreferredAudioLanguage, isPlaying, isBuffering } = usePlayerEngine();
@@ -198,7 +199,10 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
 
   // --- Preroll ---
   useEffect(() => {
-    if (test || !streamUrl || prerollChecked || adPhase !== 'none') return;
+    if (test || !streamUrl || prerollChecked || adPhase !== 'none' || isAdmin) {
+      if (isAdmin) setPrerollChecked(true);
+      return;
+    }
     pdbg('watch.preroll', 'fetching VAST');
     fetchVast(AD_PREROLL_TAG).then((ad) => {
       pdbg('watch.preroll', 'vast settled', ad ? 'ad found' : 'no ad');
@@ -276,8 +280,12 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
   // --- Ended handler ---
   useEffect(() => {
     setOnEnded(() => {
-      if (test) {
-        navigate('/home');
+      if (test || isAdmin) {
+        if (nextEpisode) {
+          navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
+        } else {
+          navigate(-1);
+        }
         return;
       }
       fetchVast(AD_POSTROLL_TAG).then((ad) => {
@@ -302,7 +310,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
         }
       });
     });
-  }, [setOnEnded, nextEpisode, contentId, navigate, test]);
+  }, [setOnEnded, nextEpisode, contentId, navigate, test, isAdmin]);
 
   // --- Sync controls ref with engine + data ---
   useEffect(() => {
