@@ -14,11 +14,21 @@ const ICON_MAP = {
   warning: LucideAlertTriangle,
 } as const;
 
-const COLOR_MAP = {
-  error: 'text-live',
-  success: 'text-success',
-  info: 'text-accent-light',
-  warning: 'text-gold',
+// Filled badge background per type — the icon sits on a solid color
+// circle rather than floating on dark, which is how most TV platforms
+// (YouTube TV, Apple TV) signal severity at a glance.
+const BADGE_COLOR_MAP = {
+  error: 'bg-live',
+  success: 'bg-success',
+  info: 'bg-accent-light',
+  warning: 'bg-gold',
+} as const;
+
+const LABEL_MAP = {
+  error: 'Error',
+  success: 'Listo',
+  info: 'Información',
+  warning: 'Advertencia',
 } as const;
 
 export function TVToast() {
@@ -38,7 +48,8 @@ export function TVToast() {
   if (animState === 'hidden') return null;
 
   const Icon = ICON_MAP[type];
-  const color = COLOR_MAP[type];
+  const badgeColor = BADGE_COLOR_MAP[type];
+  const label = LABEL_MAP[type];
 
   return (
     <div
@@ -46,16 +57,44 @@ export function TVToast() {
         'fixed top-0 right-0 z-[9999]',
         animState === 'in' ? 'animate-toast-in' : 'animate-toast-out',
       )}
+      style={{
+        marginTop: 'clamp(2rem, 5vh, 3rem)',
+        marginRight: 'clamp(2rem, 4vw, 3rem)',
+      }}
     >
-      <div className={classNames(
-        'rounded-xl bg-[#181818] px-5 py-4 max-w-[23rem] mr-12 mt-12',
-        'flex items-start gap-4',
-      )}>
-        <Icon size={24} className={classNames(color, 'mt-0.5 flex-shrink-0')} strokeWidth={2} />
-        <p className="text-white text-base font-medium leading-relaxed flex-1 min-w-0">
-          {message}
-        </p>
+      <div
+        className="flex items-center bg-[#141414] border border-white/[0.08] rounded-full"
+        style={{
+          maxWidth: 'clamp(19rem, 27vw, 25rem)',
+          gap: 'clamp(0.75rem, 1.4vw, 1rem)',
+          paddingBlock: 'clamp(0.5rem, 1.1vh, 0.625rem)',
+          paddingInline: 'clamp(0.625rem, 1.2vw, 0.75rem) clamp(1.25rem, 2.2vw, 1.5rem)',
+        }}
+      >
+        <span
+          className={classNames('flex items-center justify-center rounded-full flex-shrink-0', badgeColor)}
+          style={{
+            width: 'clamp(2rem, 3.6vh, 2.5rem)',
+            height: 'clamp(2rem, 3.6vh, 2.5rem)',
+          }}
+        >
+          <Icon size={18} className="text-black" strokeWidth={2.25} />
+        </span>
 
+        <div className="flex-1 min-w-0">
+          <p
+            className="font-semibold text-white/50 uppercase tracking-wide leading-none"
+            style={{ fontSize: 'clamp(0.625rem, 0.8vw, 0.6875rem)', marginBottom: 'clamp(0.1875rem, 0.4vh, 0.25rem)' }}
+          >
+            {label}
+          </p>
+          <p
+            className="text-white font-medium leading-snug"
+            style={{ fontSize: 'clamp(0.875rem, 1.15vw, 1rem)' }}
+          >
+            {message}
+          </p>
+        </div>
       </div>
     </div>
   );
