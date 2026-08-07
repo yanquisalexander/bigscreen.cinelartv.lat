@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { getCurrentSession, refreshAccessToken } from '@/features/auth/session';
+import { getCurrentSession } from '@/features/auth/session';
 import { useNavigate } from 'react-router-dom';
 
 const GUEST_ALLOWED_PATHS = ['/home', '/search', '/live'];
@@ -17,7 +17,6 @@ function isGuestAllowed(pathname: string): boolean {
 function SyncSession({ token }: { token: string }) {
   const setSession = useAuthStore((s) => s.setSession);
   const logout = useAuthStore((s) => s.logout);
-  const updateTokens = useAuthStore((s) => s.updateTokens);
   const navigate = useNavigate();
   const syncedRef = useRef(false);
 
@@ -29,28 +28,11 @@ function SyncSession({ token }: { token: string }) {
       .then((session) => {
         setSession(session);
       })
-      .catch(async (err) => {
-        if (err?.status === 401) {
-          const refreshToken = useAuthStore.getState().tokens?.refreshToken;
-          if (refreshToken) {
-            try {
-              const result = await refreshAccessToken(refreshToken);
-              updateTokens({
-                accessToken: result.access_token,
-                refreshToken: result.refresh_token,
-              });
-              const session = await getCurrentSession(result.access_token);
-              setSession(session);
-              return;
-            } catch {
-              // refresh failed — logout
-            }
-          }
-          logout();
-          navigate('/auth', { replace: true });
-        }
+      .catch(() => {
+        logout();
+        navigate('/auth', { replace: true });
       });
-  }, [token, setSession, logout, updateTokens, navigate]);
+  }, [token, setSession, logout, navigate]);
 
   return null;
 }

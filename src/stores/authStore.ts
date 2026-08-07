@@ -72,6 +72,7 @@ interface AuthState {
   setProfile: (profile: Profile) => void;
   updateTokens: (tokens: TokenPair) => void;
   initialize: () => void;
+  getRefreshToken: () => string | null;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -155,4 +156,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     saveTokens(tokens);
     set({ tokens });
   },
+
+  getRefreshToken: () => get().tokens?.refreshToken ?? null,
 }));
