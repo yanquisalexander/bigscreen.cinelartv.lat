@@ -3,6 +3,26 @@ import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spat
 import { Focusable } from '@/components/tv/Focusable';
 import { Monitor, Volume2, Check } from 'lucide-react';
 
+function scrollToFocused(container: HTMLDivElement | null) {
+  if (!container) return;
+  const tryScroll = () => {
+    const focused = container.querySelector('[data-focused="true"]') as HTMLElement | null;
+    if (focused) {
+      focused.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return true;
+    }
+    return false;
+  };
+  // Try immediately in case focus is already applied
+  if (tryScroll()) return;
+  // Otherwise observe until data-focused flips to true
+  const observer = new MutationObserver(() => {
+    if (tryScroll()) observer.disconnect();
+  });
+  observer.observe(container, { attributes: true, subtree: true, attributeFilter: ['data-focused'] });
+  setTimeout(() => observer.disconnect(), 1000);
+}
+
 interface QualityInfo {
   auto: boolean;
   activeHeight: number | null;
@@ -21,6 +41,7 @@ interface EngineLike {
   getAudioTracksInfo(): AudioInfo[] | null;
   selectQuality(option: number | 'auto'): void;
   selectAudioTrack(language: string, role?: string): void;
+  onTracksChanged?: (fn: () => void) => void;
 }
 
 interface Props {
@@ -50,6 +71,12 @@ export function PlayerSettingsPanel({ engine, open }: Props) {
     if (open) refresh();
   }, [open, refresh]);
 
+  // Update quality list when Shaka signals tracks changed
+  useEffect(() => {
+    if (!open || !engine?.onTracksChanged) return;
+    return engine.onTracksChanged(refresh);
+  }, [open, engine, refresh]);
+
   useEffect(() => {
     if (!open) return;
     didFocusRef.current = false;
@@ -57,25 +84,36 @@ export function PlayerSettingsPanel({ engine, open }: Props) {
 
   useEffect(() => {
     if (!open || didFocusRef.current) return;
-    const first = quality
-      ? 'player-settings-quality-auto'
+    const activeKey = quality
+      ? (quality.auto
+          ? 'player-settings-quality-auto'
+          : quality.activeHeight
+            ? `player-settings-quality-${quality.activeHeight}`
+            : 'player-settings-quality-auto')
       : audio && audio.length
         ? `player-settings-audio-${sanitize(audio[0].language)}-${sanitize(audio[0].role)}`
         : null;
-    if (!first) return;
+    if (!activeKey) return;
     didFocusRef.current = true;
-    setFocus(first);
-  }, [open, quality, audio]);
+    setFocus(activeKey);
+    scrollToFocused(ref.current);
+  }, [open, quality, audio, ref]);
 
   if (!open) return null;
+
+  const scrollOnFocus = () => scrollToFocused(ref.current);
 
   return (
     <FocusContext.Provider value={focusKey}>
       <div
-        ref={ref as React.RefObject<HTMLDivElement>}
-        className="absolute top-[clamp(4.5rem,9vh,6rem)] right-[clamp(2rem,4vw,3rem)] w-[clamp(280px,25vw,400px)] max-h-[70vh] bg-[#1c1c1e] rounded-[clamp(1rem,2vw,1.5rem)] p-4 shadow-2xl z-50 overflow-y-auto"
+        className="absolute top-[clamp(4.5rem,9vh,6rem)] right-[clamp(2rem,4vw,3rem)] w-[clamp(280px,25vw,400px)] max-h-[70vh] bg-[#1c1c1e] rounded-[clamp(1rem,2vw,1.5rem)] shadow-2xl z-50 flex flex-col overflow-hidden"
       >
-        <h2 className="text-white text-[clamp(1rem,1.5vw,1.25rem)] font-semibold mb-4 px-2">Configuración</h2>
+        <h2 className="shrink-0 px-4 pt-4 pb-2 text-white text-[clamp(1rem,1.5vw,1.25rem)] font-semibold border-b border-white/10">Configuración</h2>
+
+        <div
+          ref={ref as React.RefObject<HTMLDivElement>}
+          className="flex-1 overflow-y-auto p-4"
+        >
 
         <div className="text-[#8e8e93] text-[clamp(0.7rem,1vw,0.85rem)] font-bold uppercase tracking-wider mb-2 px-2">Calidad</div>
         {quality ? (
@@ -89,6 +127,7 @@ export function PlayerSettingsPanel({ engine, open }: Props) {
                 refresh();
               }}
               focusKey="player-settings-quality-auto"
+              onFocusScroll={scrollOnFocus}
             />
             {quality.tracks.map((t) => (
               <SettingsItem
@@ -101,6 +140,7 @@ export function PlayerSettingsPanel({ engine, open }: Props) {
                   refresh();
                 }}
                 focusKey={`player-settings-quality-${t.height}`}
+                onFocusScroll={scrollOnFocus}
               />
             ))}
           </>
@@ -121,11 +161,13 @@ export function PlayerSettingsPanel({ engine, open }: Props) {
                 refresh();
               }}
               focusKey={`player-settings-audio-${sanitize(a.language)}-${sanitize(a.role)}`}
+              onFocusScroll={scrollOnFocus}
             />
           ))
         ) : (
           <div className="px-4 py-2 text-[#8e8e93] text-sm">Sin pistas de audio</div>
         )}
+        </div>
       </div>
     </FocusContext.Provider>
   );
@@ -141,17 +183,20 @@ function SettingsItem({
   icon,
   onSelect,
   focusKey,
+  onFocusScroll,
 }: {
   label: string;
   active: boolean;
   icon: React.ReactNode;
   onSelect: () => void;
   focusKey: string;
+  onFocusScroll?: () => void;
 }) {
   return (
     <Focusable
       focusKey={focusKey}
       onEnterPress={onSelect}
+      onFocus={onFocusScroll}
       className="flex items-center justify-between p-3 my-1 rounded-xl cursor-pointer transition-all duration-200"
       focusedClassName="bg-white/10 scale-105"
       playSound

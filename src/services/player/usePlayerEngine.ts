@@ -61,6 +61,10 @@ export function usePlayerEngine() {
   const selectAudioTrack = useCallback((language: string, role?: string) => engineRef.current?.selectAudioTrack(language, role), []);
   const applyPreferredAudioLanguage = useCallback((lang?: string) => engineRef.current?.applyPreferredAudioLanguage(lang), []);
 
+  const onTracksChanged = useCallback((fn: () => void): (() => void) => {
+    return engineRef.current?.on('trackschanged', fn) ?? (() => {});
+  }, []);
+
   return {
     attachVideo,
     videoRef,
@@ -75,6 +79,7 @@ export function usePlayerEngine() {
     selectQuality,
     selectAudioTrack,
     applyPreferredAudioLanguage,
+    onTracksChanged,
     engineReady,
     isPlaying,
     isBuffering,

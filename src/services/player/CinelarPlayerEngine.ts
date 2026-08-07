@@ -17,7 +17,7 @@ const shaka: any =
   (typeof globalThis !== 'undefined' && (globalThis as any).shaka?.Player) ? (globalThis as any).shaka :
   _mod;
 
-type PlayerEvent = 'playing' | 'paused' | 'buffering' | 'error' | 'timeupdate' | 'durationchange' | 'ended';
+type PlayerEvent = 'playing' | 'paused' | 'buffering' | 'error' | 'timeupdate' | 'durationchange' | 'ended' | 'trackschanged';
 type EventCallback = (data?: any) => void;
 
 export class CinelarPlayerEngine {
@@ -84,6 +84,10 @@ export class CinelarPlayerEngine {
         toast(`[Player] Error: ${code} ${message}`);
         pdbg('engine.shaka-error', `code=${code}`, message, event?.detail);
         this.emit('error', event.detail);
+      });
+
+      this.player.addEventListener('trackschanged', () => {
+        this.emit('trackschanged');
       });
     } catch (e: any) {
       toast(`[Player] Init fallo: ${e?.message ?? String(e)}`);
@@ -342,11 +346,18 @@ export class CinelarPlayerEngine {
     this.eventListeners.clear();
   }
 
-  public on(event: PlayerEvent, callback: EventCallback) {
+  public on(event: PlayerEvent, callback: EventCallback): () => void {
     if (!this.eventListeners.has(event)) {
       this.eventListeners.set(event, []);
     }
     this.eventListeners.get(event)?.push(callback);
+    return () => {
+      const list = this.eventListeners.get(event);
+      if (list) {
+        const idx = list.indexOf(callback);
+        if (idx >= 0) list.splice(idx, 1);
+      }
+    };
   }
 
   private emit(event: PlayerEvent, data?: any) {
