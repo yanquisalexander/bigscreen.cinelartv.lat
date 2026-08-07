@@ -35,21 +35,13 @@ export const playerDebugEnabled = enabled;
 const MEDIA_EVENTS = [
   'loadedmetadata',
   'loadeddata',
-  'canplay',
-  'canplaythrough',
-  'playing',
   'waiting',
   'stalled',
-  'suspend',
   'play',
   'pause',
   'ended',
-  'emptied',
-  'abort',
   'durationchange',
-  'readystatechange',
   'error',
-  'visibilitychange',
 ] as const;
 
 /** Attach logging listeners to a <video> element. Safe to call multiple times. */
@@ -60,13 +52,9 @@ export function instrumentVideo(video: HTMLVideoElement): void {
 
   for (const ev of MEDIA_EVENTS) {
     video.addEventListener(ev, () => {
-      if (ev === 'readystatechange') {
-        pdbg(`video:${ev}`, `readyState=${video.readyState} networkState=${video.networkState}`);
-      } else if (ev === 'error') {
+      if (ev === 'error') {
         const detail = video.error ? `code=${video.error.code} (${video.error.message})` : 'no error detail';
         pdbg(`video:${ev}`, detail);
-      } else if (ev === 'visibilitychange') {
-        pdbg(`video:${ev}`, `document.visibilityState=${document.visibilityState}`);
       } else {
         pdbg(`video:${ev}`, `time=${video.currentTime.toFixed(2)} readyState=${video.readyState} paused=${video.paused}`);
       }

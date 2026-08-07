@@ -515,13 +515,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     }
   }, [isBuffering]);
 
-  // --- Sync duration to WC ---
-  useEffect(() => {
-    if (controlsRef.current) {
-      const el = controlsRef.current.shadowRoot?.querySelector('[data-duration-time]');
-      if (el) el.textContent = '';
-    }
-  }, [isBuffering]);
+  // Duration is now managed entirely by PlayerControlsElement._startSeekbarLoop()
 
   // When prefersNative, show only a loading spinner while native player is active
   if (useNative) {
