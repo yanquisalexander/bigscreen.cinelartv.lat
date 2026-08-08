@@ -4,15 +4,17 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { FocusContext, setFocus, useFocusable, getCurrentFocusKey, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
-import { consumeWatchData, updateProgress } from '@/features/content/api';
+import { consumeWatchData, updateProgress, pingStream, sendStreamEnd, getStoredSessionToken, saveSessionToken, clearSessionToken } from '@/features/content/api';
 import { usePlayerEngine } from '@/services/player/usePlayerEngine';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useSiteSettingsStore } from '@/stores/siteSettingsStore';
 import { useToastStore } from '@/stores/toastStore';
 import { resolveImageUrl, resolveBackdrop, resolvePoster } from '@/utils/helpers';
 import { addContinueWatching, prefersNative as prefersNativePlayer, launchNativePlayer, setOnNativePlayerFinished } from '@/services/NativeBridge';
 import { fetchVast } from '@/services/player/vast-client';
 import { pdbg } from '@/services/player/playerDebug';
 import { M3eLoadingIndicator } from '@m3e/react/loading-indicator';
+import { MonitorPlay } from 'lucide-react';
 import { inputManager } from '@/services/InputManager';
 import type { WatchData } from '@/types/content';
 import { isTVShow } from '@/types/content';
@@ -21,9 +23,11 @@ import type { VastAd } from '@/types/vast';
 
 import '@/components/tv/PlayerControlsElement';
 import '@/components/tv/FocusableElement';
+
 import '@/components/tv/FocusableCardElement';
 import '@/components/tv/AdOverlayElement';
 import { PlayerSettingsPanel } from '@/components/player/PlayerSettingsPanel';
+import { TVFocusable } from '@/components/tv/TVFocusable';
 
 const AD_PREROLL_TAG = 'https://pubads.g.doubleclick.net/gampad/live/ads?iu=/22530741549/CTV_VAST_ADS&description_url=[DESCRIPTION_URL]&tfcd=0&npa=0&sz=400x300%7C640x480&gdfp_req=1&unviewed_position_start=1&output=vast&env=vp&impl=s&correlator=[CACHEBUSTER]';
 const AD_POSTROLL_TAG = 'https://youradexchange.com/video/select.php?r=11621170';
@@ -49,8 +53,53 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
   const adPhaseRef = useRef<'none' | 'preroll' | 'midroll' | 'postroll'>('none');
   const pendingNavigationRef = useRef<{ contentId: string; episodeId?: string } | null>(null);
 
+  const [streamLimitError, setStreamLimitError] = useState<string | null>(null);
+  const [streamLimitSessions, setStreamLimitSessions] = useState<any[]>([]);
+  const streamPingTokenRef = useRef<string | null>(null);
+  const clientRequestIdRef = useRef(
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `cr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+  );
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const siteSettings = useSiteSettingsStore((s) => s.settings);
+
   const streamUrl = watchData?.sources?.[0]?.url;
   const ready = !!(watchData && streamUrl);
+
+  // --- Stream session helpers ---
+  const stopStreamPing = useCallback(() => {
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
+    }
+  }, []);
+
+  const startStreamPing = useCallback((sessionId: string) => {
+    if (!sessionId) return;
+    stopStreamPing();
+    const intervalMs = (siteSettings.stream_ping_interval_seconds || 10) * 1000;
+    pingIntervalRef.current = setInterval(() => {
+      if (tokens?.accessToken) {
+        pingStream(tokens.accessToken, sessionId).catch(() => { });
+      }
+    }, intervalMs);
+    streamPingTokenRef.current = sessionId;
+  }, [tokens?.accessToken, siteSettings.stream_ping_interval_seconds, stopStreamPing]);
+
+  const releaseStreamSlot = useCallback(() => {
+    const sessionId = streamPingTokenRef.current || getStoredSessionToken();
+    if (!sessionId || !tokens?.accessToken) return;
+    sendStreamEnd(tokens.accessToken, sessionId).catch(() => { });
+  }, [tokens?.accessToken]);
+
+  // Regenerate clientRequestId on content/episode navigation
+  useEffect(() => {
+    clientRequestIdRef.current =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `cr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }, [contentId, episodeId]);
 
   const prefersModernPlayback = useSettingsStore((s) => s.prefersModernPlayback);
   const useNative = useMemo(
@@ -107,6 +156,13 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     saveLastFocusedChild: true,
     preferredChildFocusKey: 'watch-playpause',
   });
+
+  const { ref: limitRef, focusKey: limitFocusKey } = useFocusable({
+    focusKey: 'stream-limit-root',
+    trackChildren: true,
+    saveLastFocusedChild: true,
+    preferredChildFocusKey: 'stream-limit-home',
+  });
   const focusPlaybackControl = useCallback(() => {
     requestAnimationFrame(() => {
       if (doesFocusableExist('watch-playpause')) {
@@ -144,6 +200,23 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     };
   }, []);
 
+  // --- Release stream slot on unmount or tab close ---
+  useEffect(() => {
+    const handlePageHide = () => {
+      const sessionId = streamPingTokenRef.current || getStoredSessionToken();
+      if (!sessionId || !tokens?.accessToken) return;
+      const url = `${window.location.origin}/stream/end`;
+      const payload = new Blob([JSON.stringify({ session_id: sessionId })], { type: 'application/json' });
+      navigator.sendBeacon?.(url, payload);
+    };
+    window.addEventListener('pagehide', handlePageHide);
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      stopStreamPing();
+      releaseStreamSlot();
+    };
+  }, [tokens?.accessToken, stopStreamPing, releaseStreamSlot]);
+
   // --- Reset ad state on content change ---
   useEffect(() => {
     if (test) return;
@@ -153,7 +226,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
   }, [contentId, episodeId, test]);
 
   // --- Load watch data ---
-  useEffect(() => {
+  const fetchData = useCallback(() => {
     if (test) {
       setWatchData({
         sources: [{ url: TEST_STREAM_URL }],
@@ -167,8 +240,18 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     }
     if (!tokens || !contentId) return;
     setWatchData(null);
-    pdbg('watch.watchdata', 'fetching', { contentId, episodeId });
-    consumeWatchData(tokens.accessToken, contentId, episodeId)
+    setStreamLimitError(null);
+    setStreamLimitSessions([]);
+    stopStreamPing();
+
+    const storedToken = getStoredSessionToken();
+    const opts = {
+      deviceSessionToken: storedToken ?? undefined,
+      clientRequestId: clientRequestIdRef.current,
+    };
+
+    pdbg('watch.watchdata', 'fetching', { contentId, episodeId, hasToken: !!storedToken });
+    consumeWatchData(tokens.accessToken, contentId, episodeId, opts)
       .then((data) => {
         pdbg('watch.watchdata', 'resolved', { hasSources: !!data.sources?.length, title: data.content?.title });
         const isTVShow = data.content.content_type === 'TVSHOW' || data.content.contentType === 'TVSHOW';
@@ -188,14 +271,44 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
           navigate('/home', { replace: true });
           return;
         }
+
+        // Persist / resume device session token
+        if (data.deviceSessionToken) {
+          saveSessionToken(data.deviceSessionToken);
+          startStreamPing(data.deviceSessionToken);
+        } else {
+          clearSessionToken();
+        }
+
         setWatchData(data);
       })
-      .catch((err) => {
+      .catch((err: any) => {
         pdbg('watch.watchdata', 'REJECTED', err);
-        useToastStore.getState().show('No se pudo cargar el contenido. Intenta de nuevo más tarde.', 'error', 4000);
+        const errStr = String(err?.message ?? err ?? '');
+
+        // Stream limit reached
+        if (err?.body?.error === 'STREAM_LIMIT_REACHED' || errStr.includes('STREAM_LIMIT_REACHED')) {
+          setStreamLimitError('Has alcanzado el número máximo de transmisiones simultáneas.');
+          setStreamLimitSessions(err?.body?.sessions ?? []);
+          clearSessionToken();
+          return;
+        }
+
+        const is502 = err?.status === 502 || errStr.includes('502') || errStr.toLowerCase().includes('bad gateway');
+        useToastStore.getState().show(
+          is502
+            ? 'El servicio no está disponible temporalmente. Intenta de nuevo.'
+            : 'No se pudo cargar el contenido. Intenta de nuevo más tarde.',
+          'error',
+          is502 ? 6000 : 4000,
+        );
         navigate('/home', { replace: true });
       });
-  }, [test, tokens, contentId, episodeId, navigate]);
+  }, [test, tokens, contentId, episodeId, navigate, stopStreamPing, startStreamPing]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // --- Preroll ---
   useEffect(() => {
@@ -270,7 +383,8 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     const timer = setInterval(() => {
       const video = videoRef.current;
       if (video && video.duration) {
-        updateProgress(tokens.accessToken, contentId, episodeId, video.currentTime, video.duration).catch(() => { });
+        const sessionToken = streamPingTokenRef.current || getStoredSessionToken() || undefined;
+        updateProgress(tokens.accessToken, contentId, episodeId, video.currentTime, video.duration, sessionToken).catch(() => { });
         addContinueWatching({ ...cwItemBase, progress: Math.round(video.currentTime * 1000), duration: Math.round(video.duration * 1000) });
       }
     }, 10000);
@@ -527,13 +641,98 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     );
   }
 
+  // Stream limit reached — full-screen YouTube-style page
+  if (streamLimitError) {
+    return (
+      <FocusContext.Provider value={limitFocusKey}>
+        <div
+          ref={limitRef as React.RefObject<HTMLDivElement>}
+          className="fixed inset-0 w-screen h-screen bg-[#0f0f0f] flex flex-col items-center justify-center select-none"
+        >
+          <div className="flex flex-col items-center text-center max-w-lg px-8">
+            <MonitorPlay className="text-[#3ea6ff] mb-6" size={64} />
+
+            <h1 className="text-white text-3xl font-semibold mb-4">
+              Límite de transmisiones alcanzado
+            </h1>
+
+            <p className="text-white/70 text-base leading-relaxed mb-10">
+              Ya hay demasiados dispositivos reproduciendo contenido en esta cuenta.
+              Detén la transmisión en otro dispositivo para continuar viendo.
+            </p>
+
+            <div className="flex gap-4">
+              <TVFocusable
+                focusKey="stream-limit-home"
+                parentFocusKey={limitFocusKey}
+                onEnterPress={() => navigate('/home', { replace: true })}
+                autoFocus
+                className="px-8 py-3 bg-white/10 text-white font-medium rounded-full text-base cursor-pointer"
+                focusedClassName="!bg-white !text-black"
+              >
+                Volver al inicio
+              </TVFocusable>
+
+              <TVFocusable
+                focusKey="stream-limit-retry"
+                parentFocusKey={limitFocusKey}
+                onEnterPress={() => {
+                  setStreamLimitError(null);
+                  setStreamLimitSessions([]);
+                  fetchData();
+                }}
+                className="px-8 py-3 bg-white/10 text-white font-medium rounded-full text-base cursor-pointer"
+                focusedClassName="!bg-white !text-black"
+              >
+                Reintentar
+              </TVFocusable>
+            </div>
+          </div>
+        </div>
+      </FocusContext.Provider>
+    );
+  }
+
   return (
     <FocusContext.Provider value={focusKey}>
       <div
         ref={ref as React.RefObject<HTMLDivElement>}
         className="fixed inset-0 w-screen h-screen bg-black overflow-hidden select-none"
       >
-        {!ready && (
+        {/* Stream limit reached overlay */}
+        {streamLimitError && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-8">
+            <div className="text-center max-w-md">
+              <h2 className="text-white text-xl font-semibold mb-3">Límite de transmisiones alcanzado</h2>
+              <p className="text-white/60 text-sm mb-6">{streamLimitError}</p>
+              {streamLimitSessions.length > 0 && (
+                <div className="mb-6">
+                  <p className="text-white/40 text-xs uppercase tracking-wider mb-2">Sesiones activas</p>
+                  <ul className="space-y-2">
+                    {streamLimitSessions.map((s: any) => (
+                      <li key={s.session_id} className="bg-white/5 rounded-lg px-4 py-2 text-left">
+                        <div className="text-white text-sm">{s.device_name || 'Dispositivo desconocido'}</div>
+                        <div className="text-white/50 text-xs">
+                          {s.content_title || 'Contenido desconocido'}
+                          {s.episode_title ? ` · ${s.episode_title}` : ''}
+                        </div>
+                        <div className="text-white/30 text-xs">{s.device_type || ''} · TTL: {s.ttl}s</div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <button
+                onClick={() => navigate('/home', { replace: true })}
+                className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm transition-colors"
+              >
+                Volver al inicio
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!ready && !streamLimitError && (
           <div className="absolute inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30">
             <p className="text-white/50 text-xl tracking-wide uppercase">Cargando...</p>
           </div>

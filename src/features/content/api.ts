@@ -32,11 +32,17 @@ export async function getWatchData(
   accessToken: string,
   contentId: string | number,
   episodeId?: string | number,
+  opts?: { deviceSessionToken?: string; clientRequestId?: string },
 ): Promise<WatchData> {
   const path = episodeId
     ? `/watch/${contentId}/${episodeId}.json`
     : `/watch/${contentId}.json`;
-  const response = await apiRequest<{ data: WatchData }>(path, {}, accessToken);
+  const params = new URLSearchParams();
+  if (opts?.deviceSessionToken) params.set('deviceSessionToken', opts.deviceSessionToken);
+  if (opts?.clientRequestId) params.set('clientRequestId', opts.clientRequestId);
+  const qs = params.toString();
+  const url = qs ? `${path}?${qs}` : path;
+  const response = await apiRequest<{ data: WatchData }>(url, {}, accessToken);
   return response.data;
 }
 
@@ -49,12 +55,13 @@ export function prefetchWatchData(
   accessToken: string,
   contentId: string | number,
   episodeId?: string | number,
+  opts?: { deviceSessionToken?: string; clientRequestId?: string },
 ): void {
   evictStaleCache();
   const key = watchDataCacheKey(contentId, episodeId);
   if (watchDataCache.has(key)) return;
 
-  const promise = getWatchData(accessToken, contentId, episodeId)
+  const promise = getWatchData(accessToken, contentId, episodeId, opts)
     .then((data) => {
       // Once we have the stream URL, start pre-buffering the video
       const streamUrl = data.sources?.[0]?.url;
@@ -80,6 +87,7 @@ export function consumeWatchData(
   accessToken: string,
   contentId: string | number,
   episodeId?: string | number,
+  opts?: { deviceSessionToken?: string; clientRequestId?: string },
 ): Promise<WatchData> {
   evictStaleCache();
   const key = watchDataCacheKey(contentId, episodeId);
@@ -90,7 +98,7 @@ export function consumeWatchData(
     return cached.promise;
   }
 
-  return getWatchData(accessToken, contentId, episodeId);
+  return getWatchData(accessToken, contentId, episodeId, opts);
 }
 
 /** Drop any cached data (e.g. on logout). */
@@ -133,6 +141,39 @@ export async function pingStream(
 ): Promise<void> {
   await apiRequest('/stream/ping', {
     method: 'POST',
-    body: JSON.stringify({ device_session_token: deviceSessionToken }),
+    body: JSON.stringify({ session_id: deviceSessionToken }),
   }, accessToken);
+}
+
+export async function sendStreamEnd(
+  accessToken: string,
+  deviceSessionToken: string,
+): Promise<void> {
+  await apiRequest('/stream/end', {
+    method: 'POST',
+    body: JSON.stringify({ session_id: deviceSessionToken }),
+  }, accessToken);
+}
+
+// --- Device session token (persisted across navigations) ---
+const DEVICE_TOKEN_KEY = 'cinelar_device_session_token';
+
+export function getStoredSessionToken(): string | null {
+  try {
+    return localStorage.getItem(DEVICE_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function saveSessionToken(token: string): void {
+  try {
+    localStorage.setItem(DEVICE_TOKEN_KEY, token);
+  } catch { /* ignore */ }
+}
+
+export function clearSessionToken(): void {
+  try {
+    localStorage.removeItem(DEVICE_TOKEN_KEY);
+  } catch { /* ignore */ }
 }

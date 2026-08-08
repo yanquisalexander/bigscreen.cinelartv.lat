@@ -173,6 +173,7 @@ export interface WatchData {
   seasons?: WatchSeason[];
   continue_watching?: ContinueWatching;
   sources: ContentSource[];
+  deviceSessionToken?: string;
 }
 
 export function getContentType(item: { content_type?: string; contentType?: string }): string | undefined {

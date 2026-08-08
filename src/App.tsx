@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router-dom';
 import { router } from '@/router';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
+import { useSiteSettingsStore } from '@/stores/siteSettingsStore';
 import { TVToast } from '@/components/ui/TVToast';
 import { useToastStore } from '@/stores/toastStore';
 import { checkCompat } from '@/services/compat';
@@ -37,6 +38,12 @@ export default function App() {
       }
     })();
     return () => { mounted = false; };
+  }, [configLoaded]);
+
+  // Load site settings once config is ready (non-blocking, non-critical)
+  useEffect(() => {
+    if (!configLoaded) return;
+    useSiteSettingsStore.getState().loadSettings();
   }, [configLoaded]);
 
   useEffect(() => {
