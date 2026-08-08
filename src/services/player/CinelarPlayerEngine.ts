@@ -81,7 +81,6 @@ export class CinelarPlayerEngine {
       this.player.addEventListener('error', (event: any) => {
         const code = event?.detail?.code ?? 'unknown';
         const message = event?.detail?.message ?? '';
-        toast(`[Player] Error: ${code} ${message}`);
         pdbg('engine.shaka-error', `code=${code}`, message, event?.detail);
         this.emit('error', event.detail);
       });
@@ -104,8 +103,6 @@ export class CinelarPlayerEngine {
         pdbg('engine.attach', 'attach() OK');
       } catch (e: any) {
         this.attachError = e;
-        const msg = e?.message ?? e?.code ?? String(e);
-        toast(`[Player] No se pudo preparar el reproductor (${msg}).`);
         pdbg('engine.attach', 'attach() FAILED', e);
         // Without a working attach, Shaka cannot drive the element: drop it
         // so non-adaptive URLs fall back to native <video> playback.
@@ -160,7 +157,6 @@ export class CinelarPlayerEngine {
       if (this.attachError) {
         // attach() failed: Shaka cannot play adaptive manifests here.
         if (this.isAdaptiveManifest(url)) {
-          toast('[Player] No se pudo iniciar el reproductor (MSE no disponible?).');
           pdbg('engine.load', 'ABORTED — attach failed and URL is adaptive');
           this.emit('error', this.attachError);
           return;
@@ -175,8 +171,6 @@ export class CinelarPlayerEngine {
         pdbg('engine.load', 'shaka load OK');
         return;
       } catch (e: any) {
-        const msg = e?.message ?? String(e);
-        toast(`[Player] Load fallo: ${msg}`);
         pdbg('engine.load', 'shaka load FAILED', e);
         this.emit('error', e);
         return;

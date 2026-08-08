@@ -14,7 +14,7 @@ import { addContinueWatching, prefersNative as prefersNativePlayer, launchNative
 import { fetchVast } from '@/services/player/vast-client';
 import { pdbg } from '@/services/player/playerDebug';
 import { M3eLoadingIndicator } from '@m3e/react/loading-indicator';
-import { MonitorPlay } from 'lucide-react';
+import { MonitorPlay, AlertTriangle } from 'lucide-react';
 import { inputManager } from '@/services/InputManager';
 import type { WatchData } from '@/types/content';
 import { isTVShow } from '@/types/content';
@@ -52,9 +52,11 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
   const adOverlayRef = useRef<any>(null);
   const adPhaseRef = useRef<'none' | 'preroll' | 'midroll' | 'postroll'>('none');
   const pendingNavigationRef = useRef<{ contentId: string; episodeId?: string } | null>(null);
+  const loadedUrlRef = useRef<string | null>(null);
 
   const [streamLimitError, setStreamLimitError] = useState<string | null>(null);
   const [streamLimitSessions, setStreamLimitSessions] = useState<any[]>([]);
+  const [playerError, setPlayerError] = useState<{ code?: number | string; message?: string } | null>(null);
   const streamPingTokenRef = useRef<string | null>(null);
   const clientRequestIdRef = useRef(
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -162,6 +164,13 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     trackChildren: true,
     saveLastFocusedChild: true,
     preferredChildFocusKey: 'stream-limit-home',
+  });
+
+  const { ref: playerErrorRef, focusKey: playerErrorFocusKey } = useFocusable({
+    focusKey: 'player-error-root',
+    trackChildren: true,
+    saveLastFocusedChild: true,
+    preferredChildFocusKey: 'player-error-retry',
   });
   const focusPlaybackControl = useCallback(() => {
     requestAnimationFrame(() => {
@@ -343,16 +352,17 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     if (!streamUrl || adPhase !== 'none' || !prerollChecked) return;
     let cancelled = false;
     const resume = watchData?.continue_watching?.progress ?? 0;
+    loadedUrlRef.current = streamUrl;
     pdbg('watch.load', 'calling engine.load', { engineReady, url: streamUrl, resume });
     load(streamUrl, resume).then(() => {
       if (cancelled) return;
       pdbg('watch.load', 'engine.load resolved → play()');
       play();
       applyPreferredAudioLanguage(userLang);
-    }).catch(() => {
+    }).catch((e: any) => {
       if (cancelled) return;
       pdbg('watch.load', 'engine.load rejected');
-      useToastStore.getState().show('No se pudo reproducir el contenido.', 'error', 4000);
+      setPlayerError({ code: e?.code, message: e?.message ?? 'Error al cargar el contenido.' });
     });
     return () => { cancelled = true; };
   }, [streamUrl, load, play, watchData, applyPreferredAudioLanguage, userLang, adPhase, prerollChecked, engineReady]);
@@ -445,6 +455,19 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     el.clientEndpoint = clientEndpoint;
     el.nextEpisode = nextEpisode;
   }, [engineReady, getEngine, watchData, allEpisodes, allSegments, currentSeasonNumber, episodeId, contentId, clientEndpoint, nextEpisode, videoRef]);
+
+  // --- Listen to player errors (show full-screen overlay) ---
+  useEffect(() => {
+    const engine = getEngine();
+    if (!engine) return;
+    const unsub = engine.on('error', (err: any) => {
+      const name = err?.name ?? '';
+      if (name === 'AbortError' || name === 'NotAllowedError') return;
+      pdbg('watch.player-error', 'showing overlay', err?.code, err?.message);
+      setPlayerError({ code: err?.code, message: err?.message });
+    });
+    return unsub;
+  }, [getEngine, engineReady]);
 
   // --- Handle controls events ---
   useEffect(() => {
@@ -683,6 +706,71 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
                 }}
                 className="px-8 py-3 bg-white/10 text-white font-medium rounded-full text-base cursor-pointer"
                 focusedClassName="!bg-white !text-black"
+              >
+                Reintentar
+              </TVFocusable>
+            </div>
+          </div>
+        </div>
+      </FocusContext.Provider>
+    );
+  }
+
+  // Player error — full-screen error page
+  if (playerError) {
+    return (
+      <FocusContext.Provider value={playerErrorFocusKey}>
+        <div
+          ref={playerErrorRef as React.RefObject<HTMLDivElement>}
+          className="fixed inset-0 w-screen h-screen bg-[#0f0f0f] flex flex-col items-center justify-center select-none"
+        >
+          <div className="flex flex-col items-center text-center max-w-lg px-8">
+            <AlertTriangle className="text-[#3ea6ff] mb-6" size={64} />
+
+            <h1 className="text-white text-3xl font-semibold mb-4">
+              Error de reproducción
+            </h1>
+
+            <p className="text-white/70 text-base leading-relaxed mb-4">
+              Ocurrió un error al intentar reproducir el contenido. Por favor, intenta de nuevo.
+            </p>
+
+            {(playerError.code != null || playerError.message) && (
+              <p className="text-white/40 text-sm font-mono mb-8">
+                {playerError.code != null ? playerError.code : ''}
+                {playerError.message ? `: ${playerError.message}` : ''}
+              </p>
+            )}
+
+            <div className="flex gap-4">
+              <TVFocusable
+                focusKey="player-error-back"
+                parentFocusKey={playerErrorFocusKey}
+                onEnterPress={() => navigate('/home', { replace: true })}
+                autoFocus
+                className="px-8 py-3 bg-white/10 text-white font-medium rounded-full text-base cursor-pointer"
+                focusedClassName="!bg-white !text-black"
+              >
+                Volver
+              </TVFocusable>
+
+              <TVFocusable
+                focusKey="player-error-retry"
+                parentFocusKey={playerErrorFocusKey}
+                onEnterPress={() => {
+                  setPlayerError(null);
+                  if (loadedUrlRef.current) {
+                    const resume = watchData?.continue_watching?.progress ?? 0;
+                    load(loadedUrlRef.current, resume).then(() => {
+                      play();
+                      applyPreferredAudioLanguage(userLang);
+                    }).catch((e: any) => {
+                      setPlayerError({ code: e?.code, message: e?.message ?? 'Error al cargar el contenido.' });
+                    });
+                  }
+                }}
+                className="px-8 py-3 bg-[#3ea6ff] text-white font-medium rounded-full text-base cursor-pointer"
+                focusedClassName="!bg-[#65b8ff] !text-black"
               >
                 Reintentar
               </TVFocusable>
