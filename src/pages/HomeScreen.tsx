@@ -49,12 +49,16 @@ export function HomeScreen() {
         img_variants: ['xlarge', 'large', 'medium'],
       });
       setData(explore);
-    } catch (e) {
+    } catch (e: any) {
       setError(true);
+      const errStr = String(e?.message ?? e ?? '');
+      const is502 = e?.status === 502 || errStr.includes('502') || errStr.toLowerCase().includes('bad gateway');
       useToastStore.getState().show(
-        'Error al cargar la página. Intenta de nuevo.',
+        is502
+          ? 'El servicio no está disponible temporalmente. Intenta de nuevo.'
+          : 'Error al cargar la página. Intenta de nuevo.',
         'error',
-        5000,
+        is502 ? 6000 : 5000,
       );
     } finally {
       setLoading(false);
