@@ -725,7 +725,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
           className="fixed inset-0 w-screen h-screen bg-[#0f0f0f] flex flex-col items-center justify-center select-none"
         >
           <div className="flex flex-col items-center text-center max-w-lg px-8">
-            <AlertTriangle className="text-[#3ea6ff] mb-6" size={64} />
+            <AlertTriangle className="text-red-400 mb-6" size={64} />
 
             <h1 className="text-white text-3xl font-semibold mb-4">
               Error de reproducción
