@@ -118,7 +118,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
     if (!watchData?.seasons) return [];
     const result: FlatEpisode[] = [];
     for (const season of watchData.seasons) {
-      const seasonNum = season.position ?? 1;
+      const seasonNum = (season.position ?? 0) + 1;
       for (const ep of season.episodes ?? []) {
         result.push({ ...ep, seasonNumber: seasonNum });
       }
@@ -134,7 +134,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
   const currentSeasonNumber = useMemo(() => {
     if (!watchData?.episode?.season_id || !watchData?.seasons) return null;
     const idx = watchData.seasons.findIndex((s) => s.id === watchData.episode!.season_id);
-    return idx >= 0 ? (watchData.seasons[idx].position ?? idx + 1) : null;
+    return idx >= 0 ? ((watchData.seasons[idx].position ?? idx) + 1) : null;
   }, [watchData]);
 
   const nextEpisode = useMemo(() => {

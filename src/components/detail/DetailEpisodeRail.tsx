@@ -147,7 +147,7 @@ const EpisodeCard = memo(function EpisodeCard({
     onArrowPress: handleArrow,
   });
 
-  const episodeNum = episode.position ?? index + 1;
+  const episodeNum = (episode.position ?? index) + 1;
 
   return (
     <div
