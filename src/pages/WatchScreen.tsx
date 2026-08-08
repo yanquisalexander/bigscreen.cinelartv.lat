@@ -769,8 +769,8 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
                     });
                   }
                 }}
-                className="px-8 py-3 bg-[#3ea6ff] text-white font-medium rounded-full text-base cursor-pointer"
-                focusedClassName="!bg-[#65b8ff] !text-black"
+                className="px-8 py-3 bg-white/10 text-white font-medium rounded-full text-base cursor-pointer"
+                focusedClassName="!bg-white !text-black"
               >
                 Reintentar
               </TVFocusable>
