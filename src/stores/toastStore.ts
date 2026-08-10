@@ -5,8 +5,9 @@ export type ToastType = 'error' | 'success' | 'info' | 'warning';
 interface ToastState {
   visible: boolean;
   message: string;
+  title?: string;
   type: ToastType;
-  show: (message: string, type?: ToastType, duration?: number) => void;
+  show: (message: string, type?: ToastType, duration?: number, title?: string) => void;
   hide: () => void;
 }
 
@@ -16,11 +17,12 @@ export const useToastStore = create<ToastState>((set) => {
   return {
     visible: false,
     message: '',
+    title: undefined,
     type: 'info',
 
-    show: (message, type = 'info', duration = 4000) => {
+    show: (message, type = 'info', duration = 4000, title) => {
       if (hideTimer) clearTimeout(hideTimer);
-      set({ visible: true, message, type });
+      set({ visible: true, message, type, title });
 
       if (duration > 0) {
         hideTimer = setTimeout(() => {

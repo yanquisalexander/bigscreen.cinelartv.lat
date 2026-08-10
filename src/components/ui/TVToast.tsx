@@ -1,38 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useToastStore } from '@/stores/toastStore';
-import {
-  LucideAlertCircle,
-  LucideCheckCircle,
-  LucideInfo,
-  LucideAlertTriangle,
-} from 'lucide-react';
-
-const ICON_MAP = {
-  error: LucideAlertCircle,
-  success: LucideCheckCircle,
-  info: LucideInfo,
-  warning: LucideAlertTriangle,
-} as const;
-
-// Filled badge background per type — the icon sits on a solid color
-// circle rather than floating on dark, which is how most TV platforms
-// (YouTube TV, Apple TV) signal severity at a glance.
-const BADGE_COLOR_MAP = {
-  error: 'bg-live',
-  success: 'bg-success',
-  info: 'bg-accent-light',
-  warning: 'bg-gold',
-} as const;
-
-const LABEL_MAP = {
-  error: 'Error',
-  success: 'Listo',
-  info: 'Información',
-  warning: 'Advertencia',
-} as const;
 
 export function TVToast() {
-  const { visible, message, type, hide } = useToastStore();
+  const { visible, message, title, hide } = useToastStore();
   const [animState, setAnimState] = useState<'in' | 'out' | 'hidden'>('hidden');
 
   useEffect(() => {
@@ -47,9 +17,7 @@ export function TVToast() {
 
   if (animState === 'hidden') return null;
 
-  const Icon = ICON_MAP[type];
-  const badgeColor = BADGE_COLOR_MAP[type];
-  const label = LABEL_MAP[type];
+  const hasTitle = Boolean(title);
 
   return (
     <div
@@ -58,43 +26,43 @@ export function TVToast() {
         animState === 'in' ? 'animate-toast-in' : 'animate-toast-out',
       )}
       style={{
-        marginTop: 'clamp(2rem, 5vh, 3rem)',
-        marginRight: 'clamp(2rem, 4vw, 3rem)',
+        marginTop: 'clamp(1.5rem, 3.5vh, 3rem)',
+        marginRight: 'clamp(1.5rem, 3.5vw, 3rem)',
       }}
     >
       <div
-        className="flex items-center bg-[#141414] border border-white/[0.08] rounded-full"
+        className="shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
         style={{
-          maxWidth: 'clamp(19rem, 27vw, 25rem)',
-          gap: 'clamp(0.75rem, 1.4vw, 1rem)',
-          paddingBlock: 'clamp(0.5rem, 1.1vh, 0.625rem)',
-          paddingInline: 'clamp(0.625rem, 1.2vw, 0.75rem) clamp(1.25rem, 2.2vw, 1.5rem)',
+          backgroundColor: '#181818',
+          borderRadius: '0.75rem',
+          maxWidth: '23rem',
+          width: 'auto',
+          padding: 'clamp(0.875rem, 1.8vh, 1.125rem) clamp(1rem, 1.8vw, 1.25rem)',
         }}
       >
-        <span
-          className={classNames('flex items-center justify-center rounded-full flex-shrink-0', badgeColor)}
-          style={{
-            width: 'clamp(2rem, 3.6vh, 2.5rem)',
-            height: 'clamp(2rem, 3.6vh, 2.5rem)',
-          }}
-        >
-          <Icon size={18} className="text-black" strokeWidth={2.25} />
-        </span>
-
-        <div className="flex-1 min-w-0">
+        {hasTitle ? (
+          <>
+            <p
+              className="text-white font-semibold leading-snug"
+              style={{ fontSize: 'clamp(0.9375rem, 1.2vw, 1rem)', whiteSpace: 'normal', overflowWrap: 'anywhere' }}
+            >
+              {title}
+            </p>
+            <p
+              className="text-white/70 leading-snug"
+              style={{ fontSize: 'clamp(0.8125rem, 1vw, 0.875rem)', marginTop: 'clamp(0.25rem, 0.6vh, 0.375rem)', whiteSpace: 'normal', overflowWrap: 'anywhere' }}
+            >
+              {message}
+            </p>
+          </>
+        ) : (
           <p
-            className="font-semibold text-white/50 uppercase tracking-wide leading-none"
-            style={{ fontSize: 'clamp(0.625rem, 0.8vw, 0.6875rem)', marginBottom: 'clamp(0.1875rem, 0.4vh, 0.25rem)' }}
-          >
-            {label}
-          </p>
-          <p
-            className="text-white font-medium leading-snug"
-            style={{ fontSize: 'clamp(0.875rem, 1.15vw, 1rem)' }}
+            className="text-white/80 leading-snug"
+            style={{ fontSize: 'clamp(0.875rem, 1.1vw, 0.9375rem)', whiteSpace: 'normal', overflowWrap: 'anywhere' }}
           >
             {message}
           </p>
-        </div>
+        )}
       </div>
     </div>
   );
