@@ -1,8 +1,9 @@
+import { type ReactNode } from 'react';
 import { Focusable } from './Focusable';
 import { classNames } from '@/utils/helpers';
 
 interface FocusableButtonProps {
-  children: string;
+  children: ReactNode;
   onEnterPress: () => void;
   variant?: 'primary' | 'secondary' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
