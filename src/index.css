@@ -31,6 +31,9 @@
   }
 }
 
+* {
+  user-select: none; /* No tiene sentido en TV */
+}
 
 
 /* Ocultamos scrollbar nativo */
