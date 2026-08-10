@@ -140,6 +140,9 @@ export interface WatchContent {
   contentType?: string;
   banner?: string;
   cover?: string;
+  banner_resized?: string;
+  cover_resized?: string;
+  year?: number | null;
   images?: ContentImages;
   segments?: Segment[];
 }

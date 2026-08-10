@@ -128,12 +128,12 @@ export function FocusableCard({
       ref={ref}
       data-focused={focused}
       className={classNames(
-        'shrink-0 rounded-xl overflow-hidden border-2 transition-all duration-300 ease-out focus:outline-none will-change-transform snap-start',
+        'shrink-0 rounded-xl overflow-hidden border-2 transition-[transform,width] duration-300 ease-out focus:outline-none will-change-transform snap-start',
         isRowVariant
-          ? (focused 
-              ? 'w-[clamp(340px,26vw,500px)] h-[clamp(195px,15vw,288px)] border-white opacity-100 shadow-lg shadow-black/50' 
-              : 'w-[clamp(130px,10vw,192px)] h-[clamp(195px,15vw,288px)] border-transparent opacity-80'
-            )
+          ? (focused
+            ? 'w-[clamp(340px,26vw,500px)] h-[clamp(195px,15vw,288px)] border-white opacity-100 shadow-lg shadow-black/50'
+            : 'w-[clamp(130px,10vw,192px)] h-[clamp(195px,15vw,288px)] border-transparent opacity-80'
+          )
           : 'w-[230px] h-[130px] border-transparent',
         className,
       )}
