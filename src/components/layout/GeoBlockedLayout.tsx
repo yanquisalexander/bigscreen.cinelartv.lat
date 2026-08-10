@@ -1,13 +1,16 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusContext, setFocus, useFocusable, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
 import { useSpatialNavInit } from '@/hooks/useSpatialNavInit';
 import { Focusable } from '@/components/tv/Focusable';
 import { TvRegular } from '@fluentui/react-icons';
 import { LucideRefreshCw, LucideMapPinOff } from 'lucide-react';
-import { classNames } from '@/utils/helpers';
+import { classNames, isBackKey } from '@/utils/helpers';
 import { checkGeoBlock, clearGeoCache } from '@/services/geoblocking';
-import { useToastStore } from "@/stores/toastStore";
+import { useToastStore } from '@/stores/toastStore';
+import { ExitDialog } from '@/components/ui/ExitDialog';
+import { exitApp } from '@/services/NativeBridge';
+import { GeoblockedModeContext, SIDEBAR_FOCUS_KEY } from './geoblockedModeContext';
 
 export function GeoBlockedLayout() {
   useSpatialNavInit();
@@ -15,9 +18,10 @@ export function GeoBlockedLayout() {
   const location = useLocation();
   const [sidebarFocused, setSidebarFocused] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [showExitDialog, setShowExitDialog] = useState(false);
 
   const { ref, focusKey, hasFocusedChild } = useFocusable({
-    focusKey: 'geoblocked-sidebar',
+    focusKey: SIDEBAR_FOCUS_KEY,
     trackChildren: true,
     saveLastFocusedChild: true,
     preferredChildFocusKey: 'nav-live',
@@ -27,6 +31,30 @@ export function GeoBlockedLayout() {
     setSidebarFocused(hasFocusedChild);
   }, [hasFocusedChild]);
 
+  const isSidebarFocused = useCallback(() => {
+    const key = getCurrentFocusKey();
+    return !!key && (key === SIDEBAR_FOCUS_KEY || key.startsWith('nav-'));
+  }, []);
+
+  // Back key: close exit dialog, or open it when the sidebar has focus.
+  // When focus is in the content area, LiveTVScreen delegates to us via
+  // GeoblockedModeContext to move focus to the sidebar.
+  useEffect(() => {
+    const handleBack = (e: KeyboardEvent) => {
+      if (!isBackKey(e)) return;
+      const sidebarHasFocus = isSidebarFocused();
+      if (!showExitDialog && !sidebarHasFocus) return;
+      e.preventDefault();
+      if (showExitDialog) {
+        setShowExitDialog(false);
+      } else {
+        setShowExitDialog(true);
+      }
+    };
+    window.addEventListener('keydown', handleBack);
+    return () => window.removeEventListener('keydown', handleBack);
+  }, [isSidebarFocused, showExitDialog]);
+
   const focusContent = useCallback((direction: string) => {
     if (direction !== 'right') return true;
     setFocus('livetv-root');
@@ -35,7 +63,7 @@ export function GeoBlockedLayout() {
 
   const handleRetry = useCallback(async () => {
     if (retrying) return;
-    useToastStore.getState().show("Verificando ubicación...", "info");
+    useToastStore.getState().show('Intentando verificar tu ubicación nuevamente', 'info', 3000, 'Verificando ubicación');
     setRetrying(true);
     try {
       await clearGeoCache();
@@ -66,15 +94,16 @@ export function GeoBlockedLayout() {
   };
 
   return (
-    <div
-      className="grid h-dvh overflow-hidden bg-bg"
-      style={{
-        gridTemplateColumns: sidebarFocused
-          ? 'var(--sidebar-w, 200px) 1fr'
-          : 'var(--sidebar-w-collapsed, 72px) 1fr',
-        gridTemplateAreas: '"sidebar main"',
-      }}
-    >
+    <GeoblockedModeContext.Provider value={SIDEBAR_FOCUS_KEY}>
+      <div
+        className="grid h-dvh overflow-hidden bg-bg"
+        style={{
+          gridTemplateColumns: sidebarFocused
+            ? 'var(--sidebar-w, 200px) 1fr'
+            : 'var(--sidebar-w-collapsed, 72px) 1fr',
+          gridTemplateAreas: '"sidebar main"',
+        }}
+      >
       <FocusContext.Provider value={focusKey}>
         <aside
           ref={ref as React.RefObject<HTMLElement>}
@@ -133,6 +162,14 @@ export function GeoBlockedLayout() {
       <main className="h-full w-full overflow-hidden" style={{ gridArea: 'main' }}>
         <Outlet />
       </main>
-    </div>
+      </div>
+
+      {showExitDialog && (
+        <ExitDialog
+          onConfirm={() => exitApp()}
+          onCancel={() => setShowExitDialog(false)}
+        />
+      )}
+    </GeoblockedModeContext.Provider>
   );
 }

@@ -26,6 +26,7 @@ import {
 } from '@/services/NativeBridge';
 import { getLiveTvChannels, type LiveTvChannel } from '@/api/live';
 import { classNames, isBackKey } from '@/utils/helpers';
+import { useGeoblockedMode } from '@/components/layout/geoblockedModeContext';
 
 /* ─── helpers ──────────────────────────────────────────────────── */
 
@@ -289,6 +290,7 @@ export function LiveTVScreen() {
   const tokens = useAuthStore((s) => s.tokens);
   const nativeSupported = supportsLiveTV();
   const { favorites, toggleFavorite, isFavorite } = useLiveTvFavoritesStore();
+  const geoblockedSidebarKey = useGeoblockedMode();
 
   const [channels, setChannels] = useState<LiveTvChannel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -326,6 +328,10 @@ export function LiveTVScreen() {
         if (searchOpen) {
           setSearchOpen(false);
           setSearchQuery('');
+        } else if (geoblockedSidebarKey) {
+          // In geoblocked mode there is no /home route; delegate to the shell,
+          // which moves focus to the sidebar (and from there opens the exit dialog).
+          setFocus(geoblockedSidebarKey);
         } else {
           navigate('/home');
         }
@@ -333,7 +339,7 @@ export function LiveTVScreen() {
     };
     window.addEventListener('keydown', handleBack);
     return () => window.removeEventListener('keydown', handleBack);
-  }, [navigate, searchOpen]);
+  }, [navigate, searchOpen, geoblockedSidebarKey]);
 
   /* ── derived data ── */
 
@@ -405,7 +411,9 @@ export function LiveTVScreen() {
     preferredChildFocusKey: 'live-hero-play',
   });
 
-  const focusSidebar = useCallback(() => setFocus('sidebar'), []);
+  const focusSidebar = useCallback(() => {
+    setFocus(geoblockedSidebarKey ?? 'sidebar');
+  }, [geoblockedSidebarKey]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -438,7 +446,13 @@ export function LiveTVScreen() {
             </p>
             <Focusable
               focusKey="livetv-back"
-              onEnterPress={() => navigate('/home')}
+              onEnterPress={() => {
+                if (geoblockedSidebarKey) {
+                  setFocus(geoblockedSidebarKey);
+                } else {
+                  navigate('/home');
+                }
+              }}
               onArrowPress={(direction) => {
                 if (direction !== 'left') return true;
                 focusSidebar();
