@@ -4,7 +4,11 @@ import { useAuthStore } from '@/stores/authStore';
 
 let configRef: RemoteConfig = { ...DEFAULT_CONFIG };
 
-let pendingRefresh: Promise<string | null> | null = null;
+type RefreshResult =
+  | { ok: true; token: string }
+  | { ok: false; tokenInvalid: boolean };
+
+let pendingRefresh: Promise<RefreshResult> | null = null;
 
 export function setApiConfig(config: RemoteConfig) {
   configRef = config;
@@ -35,9 +39,9 @@ async function parseResponse(response: Response): Promise<unknown> {
   }
 }
 
-async function tryRefreshToken(): Promise<string | null> {
+async function tryRefreshToken(): Promise<RefreshResult> {
   const refreshToken = useAuthStore.getState().getRefreshToken();
-  if (!refreshToken) return null;
+  if (!refreshToken) return { ok: false, tokenInvalid: false };
 
   try {
     const { CLIENT_ENDPOINT } = getApiConfig();
@@ -48,25 +52,31 @@ async function tryRefreshToken(): Promise<string | null> {
       signal: AbortSignal.timeout(15000),
     });
 
-    if (!response.ok) return null;
-
     const data = (await parseResponse(response)) as {
-      access_token: string;
+      access_token?: string;
       refresh_token?: string;
     };
 
+    if (!response.ok || !data.access_token) {
+      return {
+        ok: false,
+        tokenInvalid: response.status === 401 || response.status === 403,
+      };
+    }
+
+    const current = useAuthStore.getState().tokens;
     useAuthStore.getState().updateTokens({
       accessToken: data.access_token,
-      refreshToken: data.refresh_token,
+      refreshToken: data.refresh_token ?? current?.refreshToken,
     });
 
-    return data.access_token;
+    return { ok: true, token: data.access_token };
   } catch {
-    return null;
+    return { ok: false, tokenInvalid: false };
   }
 }
 
-function getRefreshedToken(): Promise<string | null> {
+function getRefreshedToken(): Promise<RefreshResult> {
   if (pendingRefresh) return pendingRefresh;
 
   pendingRefresh = tryRefreshToken().finally(() => {
@@ -99,11 +109,13 @@ export async function apiRequest<T>(
     signal: init.signal ?? AbortSignal.timeout(15000),
   });
 
-  if (response.status === 401 && !(init as RequestInit & { _retry?: boolean })._retry) {
-    const newToken = await getRefreshedToken();
+  const body = await parseResponse(response);
 
-    if (newToken) {
-      headers['Authorization'] = `Bearer ${newToken}`;
+  if (response.status === 401 && !(init as RequestInit & { _retry?: boolean })._retry) {
+    const result = await getRefreshedToken();
+
+    if (result.ok) {
+      headers['Authorization'] = `Bearer ${result.token}`;
       const retryResponse = await fetch(url, {
         ...init,
         headers,
@@ -126,11 +138,19 @@ export async function apiRequest<T>(
       return retryBody as T;
     }
 
-    useAuthStore.getState().logout();
-    throw new APIError('Sesión expirada', 401, { error: 'session_expired' });
-  }
+    if (result.tokenInvalid) {
+      useAuthStore.getState().logout();
+      throw new APIError('Sesión expirada', 401, { error: 'session_expired' });
+    }
 
-  const body = await parseResponse(response);
+    const errorBody = body as Record<string, unknown>;
+    const message =
+      (errorBody?.error_description as string) ??
+      (errorBody?.error as string) ??
+      (errorBody?.message as string) ??
+      `HTTP ${response.status}`;
+    throw new APIError(message, response.status, body);
+  }
 
   if (!response.ok) {
     const errorBody = body as Record<string, unknown>;

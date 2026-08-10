@@ -107,8 +107,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: (tokens: TokenPair) => {
     localStorage.removeItem(GUEST_KEY);
-    saveTokens(tokens);
-    set({ tokens, isAuthenticated: true, isGuest: false });
+    const merged = {
+      accessToken: tokens.accessToken,
+      refreshToken:
+        tokens.refreshToken ?? localStorage.getItem(REFRESH_KEY) ?? undefined,
+    };
+    saveTokens(merged);
+    set({ tokens: merged, isAuthenticated: true, isGuest: false });
   },
 
   logout: () => {
@@ -153,8 +158,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   updateTokens: (tokens: TokenPair) => {
-    saveTokens(tokens);
-    set({ tokens });
+    const merged = {
+      accessToken: tokens.accessToken,
+      refreshToken:
+        tokens.refreshToken ??
+        get().tokens?.refreshToken ??
+        localStorage.getItem(REFRESH_KEY) ??
+        undefined,
+    };
+    saveTokens(merged);
+    set({ tokens: merged });
   },
 
   getRefreshToken: () => get().tokens?.refreshToken ?? null,
