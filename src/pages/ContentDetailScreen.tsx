@@ -332,7 +332,7 @@ export function ContentDetailScreen() {
         />
 
         {/* Content sections — generous rhythm instead of hairline dividers */}
-        <div className="px-[clamp(3rem,7.5vw,6rem)] pb-[clamp(5rem,12vh,7.5rem)] flex flex-col gap-[clamp(2.5rem,6vh,4.5rem)]">
+        <div className="px-[clamp(2rem,5vw,6rem)] pb-[clamp(5rem,12vh,7.5rem)] flex flex-col gap-[clamp(2.5rem,6vh,4.5rem)]">
           {/* Overview */}
           <DetailOverview
             description={content.description}
