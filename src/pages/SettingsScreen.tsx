@@ -14,16 +14,22 @@ import { Focusable } from '@/components/tv/Focusable';
 import { classNames } from '@/utils/helpers';
 import { inputManager } from '@/services/InputManager';
 import { Play, Volume2, Palette, Shield, Info, LucideRotateCcw } from 'lucide-react';
+import { buttonItem, showPanel } from "@/services/overlayPanel";
 
 /* ─── Section definitions ──────────────────────────────────────── */
 
-const SECTIONS = [
+const SECTIONS: readonly {
+  key: string;
+  label: string;
+  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+}[] = [
   { key: 'reproduccion', label: 'Reproducción', icon: Play },
   { key: 'audio', label: 'Audio', icon: Volume2 },
   { key: 'apariencia', label: 'Apariencia', icon: Palette },
   { key: 'privacidad', label: 'Privacidad', icon: Shield },
   { key: 'informacion', label: 'Información', icon: Info },
   { key: 'reiniciar', label: 'Reiniciar', icon: LucideRotateCcw },
+  { key: 'factory-reset', label: 'Restablecer app' },
 ] as const;
 
 type SectionKey = (typeof SECTIONS)[number]['key'];
@@ -98,6 +104,7 @@ export function SettingsScreen() {
           {activeSection === 'apariencia' && <AparienciaContent />}
           {activeSection === 'privacidad' && <PrivacidadContent />}
           {activeSection === 'reiniciar' && <ReiniciarContent />}
+          {activeSection === 'factory-reset' && <FactoryResetContent />}
           {activeSection === 'informacion' && (
             <InformacionContent
               platform={platform}
@@ -171,7 +178,9 @@ function SettingsSidebar({
               isActive ? 'text-white bg-white/10' : 'text-text-secondary',
             )}
           >
-            <section.icon className="text-[clamp(1.15rem,1.5vw,1.3rem)]" />
+            {
+              section.icon && <section.icon className="text-[clamp(1.15rem,1.5vw,1.3rem)]" />
+            }
             <span className="whitespace-nowrap">{section.label}</span>
           </Focusable>
         );
@@ -351,6 +360,52 @@ function ReiniciarContent() {
         className="inline-flex items-center justify-center px-[clamp(2rem,4vw,3rem)] py-[clamp(0.625rem,1.4vh,0.875rem)] rounded-full bg-surface text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-semibold border border-white/10 cursor-pointer"
       >
         Reiniciar app
+      </Focusable>
+    </div>
+  );
+}
+
+function FactoryResetContent() {
+  const navigate = useNavigate();
+
+  return (
+    <div data-settings-section="factory-reset" className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+      <div className="w-[clamp(4rem,7vw,5.5rem)] h-[clamp(4rem,7vw,5.5rem)] rounded-2xl bg-red-500/20 flex items-center justify-center mb-[clamp(1.5rem,3vh,2.5rem)]">
+        <LucideRotateCcw className="w-[clamp(2rem,3.5vw,3rem)] h-[clamp(2rem,3.5vw,3rem)] text-red-500" />
+      </div>
+
+      <h2 className="text-white text-[clamp(1.5rem,3vw,2.25rem)] font-bold mb-[clamp(0.75rem,1.5vh,1rem)]">
+        Restablecer app
+      </h2>
+
+      <p className="text-text-secondary text-[clamp(0.85rem,1.2vw,1.05rem)] leading-relaxed max-w-[clamp(300px,40vw,500px)] mb-[clamp(2rem,4vh,3rem)]">
+        Esto borrará todos los datos de la aplicación y la devolverá a su estado original. Úsalo solo si es necesario.
+      </p>
+
+      <Focusable
+        focusKey="settings-factory-reset-btn"
+        onEnterPress={() => {
+          showPanel({
+            title: "Restablecer app",
+            subtitle: "¿Estás seguro de que quieres borrar todos los datos y restablecer la aplicación? Esta acción no se puede deshacer.",
+
+            items: [
+              buttonItem({ title: 'Restablecer app', subtitle: 'Borrar todos los datos y volver a la pantalla de inicio', icon: 'trash' }),
+              buttonItem({ title: 'Volver', subtitle: 'Cancelar y regresar a la configuración', icon: 'x' })
+            ],
+          })
+        }}
+        onArrowPress={(direction) => {
+          if (direction === 'left') {
+            setFocus('settings-nav-factory-reset');
+            return false;
+          }
+          return true;
+        }}
+        focusedClassName="!bg-white !text-black"
+        className="inline-flex items-center justify-center px-[clamp(2rem,4vw,3rem)] py-[clamp(0.625rem,1.4vh,0.875rem)] rounded-full bg-red-500 text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-semibold border border-red-500/50 cursor-pointer"
+      >
+        Restablecer app
       </Focusable>
     </div>
   );

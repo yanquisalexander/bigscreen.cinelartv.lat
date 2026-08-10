@@ -12,6 +12,7 @@ import { useNativeBridgeSync } from '@/hooks/useNativeBridgeSync';
 import { checkGeoBlock } from '@/services/geoblocking';
 import { GeoBlockedLayout } from '@/components/layout/GeoBlockedLayout';
 import { LiveTVScreen } from '@/pages/LiveTVScreen';
+import { OverlayPanelHost } from '@/components/overlay/OverlayPanelHost';
 import { IS_DEV } from '@/stores/configStore';
 
 // Initialize stores immediately at module load time
@@ -83,6 +84,7 @@ export default function App() {
     return (
       <>
         <RouterProvider router={geoBlockedRouter} />
+        <OverlayPanelHost />
         <TVToast />
       </>
     );
@@ -110,6 +112,7 @@ export default function App() {
   return (
     <>
       <RouterProvider router={router} />
+      <OverlayPanelHost />
       <TVToast />
     </>
   );

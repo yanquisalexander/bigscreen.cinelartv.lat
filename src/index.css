@@ -260,6 +260,37 @@ html, body, #root {
   animation: toast-slide-out 0.25s ease-in forwards;
 }
 
+/* Overlay panel slide (YouTube TV style: right-side panel) */
+@keyframes panel-slide-in {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes panel-slide-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+.animate-panel-in {
+  animation: panel-slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-panel-out {
+  animation: panel-slide-out 0.22s ease-in forwards;
+}
+
 /* No text selection for TV */
 .tv-no-select {
   user-select: none;

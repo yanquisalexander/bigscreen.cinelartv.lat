@@ -4,6 +4,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
 import { useToastStore, type ToastType } from '@/stores/toastStore';
 import { checkGeoBlock, clearGeoCache, getGeoblockConfig } from '@/services/geoblocking';
+import { showPanel, updatePanel, closePanel, type PanelConfig, type PanelItem } from '@/services/overlayPanel';
+import { useOverlayPanelStore } from '@/stores/overlayPanelStore';
 import * as native from '@/services/NativeBridge';
 
 export interface CtvTools {
@@ -42,6 +44,11 @@ export interface CtvTools {
   reload: () => void;
   exitApp: () => void;
   getNative: () => Record<string, unknown>;
+  showPanel: (config: Omit<PanelConfig, 'id'> & { id?: string }) => void;
+  updatePanel: (config: Omit<PanelConfig, 'id'> & { id: string }) => void;
+  closePanel: () => void;
+  getPanelState: () => PanelConfig | null;
+  makePanelItem: (item: { title: string; subtitle?: string; imageUrl?: string; icon?: string }, onSelect?: () => void) => PanelItem;
 }
 
 export function initCtvTools(): void {
@@ -118,6 +125,18 @@ export function initCtvTools(): void {
     reload: () => window.location.reload(),
 
     exitApp: () => native.exitApp(),
+
+    showPanel: (config) => showPanel(config),
+
+    updatePanel: (config) => updatePanel(config),
+
+    closePanel: () => closePanel(),
+
+    getPanelState: () => useOverlayPanelStore.getState().panel,
+
+    makePanelItem: (item, onSelect) => {
+      return { id: item.title, ...item, onSelect };
+    },
 
     getNative: () =>
       (window as Record<string, unknown>).CinelarNative as Record<string, unknown> | undefined ?? {},
