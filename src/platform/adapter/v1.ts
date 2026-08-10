@@ -57,15 +57,11 @@ function createV1Navigation(bridge: V1Bridge): PlatformNavigation {
   };
 }
 
-function createV1Media(bridge: V1Bridge): PlatformMedia {
+function createV1Media(bridge: V1Bridge, capabilities: PlatformCapabilities): PlatformMedia {
   return {
-    getCapabilities: (): MediaCapabilities => ({
-      nativePlayer: true,
-      liveTV: true,
-      prefersNative: true,
-    }),
-    prefersNative: (): boolean => false,
-    supportsLiveTV: (): boolean => true,
+    getCapabilities: (): MediaCapabilities => capabilities.media,
+    prefersNative: (): boolean => capabilities.media.prefersNative,
+    supportsLiveTV: (): boolean => capabilities.media.liveTV,
     playContent: (data: NativePlayerData): void => {
       bridge.send({
         version: 1,
@@ -196,7 +192,7 @@ export function createV1Adapter(bridge: V1Bridge): Platform {
     capabilities,
     device: createV1Device(bridge),
     navigation: createV1Navigation(bridge),
-    media: createV1Media(bridge),
+    media: createV1Media(bridge, capabilities),
     tv: createV1TV(bridge),
     account: createV1Account(bridge),
     updates: createV1Updates(bridge),
