@@ -199,7 +199,7 @@ export function AuthScreen() {
           variant="ghost"
           size="lg"
           focusKey="guest-mode"
-          focusedClassName="!bg-white/10 !border-white/40 scale-105"
+          focusedClassName="!bg-white !text-black !scale-105 !transition-none"
           className="mt-[clamp(1.5rem,4vh,2.5rem)]"
           playSound
         >
