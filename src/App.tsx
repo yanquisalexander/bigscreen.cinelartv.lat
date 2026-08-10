@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RouterProvider } from 'react-router-dom';
+import { RouterProvider, createHashRouter, createBrowserRouter, Navigate } from 'react-router-dom';
 import { router } from '@/router';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
@@ -10,13 +10,33 @@ import { checkCompat } from '@/services/compat';
 import { IncompatibleBrowserScreen } from '@/components/ui/IncompatibleBrowserScreen';
 import { useNativeBridgeSync } from '@/hooks/useNativeBridgeSync';
 import { checkGeoBlock } from '@/services/geoblocking';
-import { BlockedScreen } from '@/pages/BlockedScreen';
+import { GeoBlockedLayout } from '@/components/layout/GeoBlockedLayout';
+import { LiveTVScreen } from '@/pages/LiveTVScreen';
+import { IS_DEV } from '@/stores/configStore';
 
 // Initialize stores immediately at module load time
 useAuthStore.getState().initialize();
 useConfigStore.getState().loadConfig();
 
 const compatResult = checkCompat();
+
+const createRouterFunction = IS_DEV ? createBrowserRouter : createHashRouter;
+
+const geoBlockedRouter = createRouterFunction([
+  {
+    element: <GeoBlockedLayout />,
+    children: [
+      {
+        path: '/live',
+        element: <LiveTVScreen />,
+      },
+      {
+        path: '*',
+        element: <Navigate to="/live" replace />,
+      },
+    ],
+  },
+]);
 
 let betaToastShown = false;
 
@@ -57,7 +77,7 @@ export default function App() {
   }
 
   if (geoBlocked) {
-    return <BlockedScreen />;
+    return <RouterProvider router={geoBlockedRouter} />;
   }
 
 
