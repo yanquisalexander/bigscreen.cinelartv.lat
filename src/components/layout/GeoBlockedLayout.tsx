@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useSpatialNavInit } from '@/hooks/useSpatialNavInit';
@@ -7,6 +7,7 @@ import { TvRegular } from '@fluentui/react-icons';
 import { LucideRefreshCw, LucideMapPinOff } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { checkGeoBlock, clearGeoCache } from '@/services/geoblocking';
+import { useToastStore } from "@/stores/toastStore";
 
 export function GeoBlockedLayout() {
   useSpatialNavInit();
@@ -22,6 +23,10 @@ export function GeoBlockedLayout() {
     preferredChildFocusKey: 'nav-live',
   });
 
+  useEffect(() => {
+    setSidebarFocused(hasFocusedChild);
+  }, [hasFocusedChild]);
+
   const focusContent = useCallback((direction: string) => {
     if (direction !== 'right') return true;
     setFocus('livetv-root');
@@ -30,6 +35,7 @@ export function GeoBlockedLayout() {
 
   const handleRetry = useCallback(async () => {
     if (retrying) return;
+    useToastStore.getState().show("Verificando ubicación...", "info");
     setRetrying(true);
     try {
       await clearGeoCache();

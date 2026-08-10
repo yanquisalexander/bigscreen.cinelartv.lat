@@ -44,6 +44,7 @@ export default function App() {
   const isReady = useAuthStore((s) => s.isReady);
   const configLoaded = useConfigStore((s) => s.isLoaded);
   const [geoBlocked, setGeoBlocked] = useState(false);
+  const [geoCheckDone, setGeoCheckDone] = useState(false);
   useNativeBridgeSync();
 
   useEffect(() => {
@@ -52,9 +53,11 @@ export default function App() {
     (async () => {
       try {
         const geo = await checkGeoBlock();
-        if (mounted && geo.blocked) setGeoBlocked(true);
+        if (mounted) setGeoBlocked(geo.blocked);
       } catch (err) {
         console.warn('checkGeoBlock failed', err);
+      } finally {
+        if (mounted) setGeoCheckDone(true);
       }
     })();
     return () => { mounted = false; };
@@ -77,11 +80,16 @@ export default function App() {
   }
 
   if (geoBlocked) {
-    return <RouterProvider router={geoBlockedRouter} />;
+    return (
+      <>
+        <RouterProvider router={geoBlockedRouter} />
+        <TVToast />
+      </>
+    );
   }
 
 
-  if (!isReady) {
+  if (!isReady || !geoCheckDone) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-bg">
         <svg
