@@ -28,7 +28,7 @@ interface LiveTvResponse {
   live_tv_channels: LiveTvChannel[];
 }
 
-export const getLiveTvChannels = async (accessToken: string): Promise<LiveTvChannel[]> => {
+export const getLiveTvChannels = async (accessToken?: string): Promise<LiveTvChannel[]> => {
   const data = await apiRequest<LiveTvResponse>('/live_tv.json', {}, accessToken);
   return data.live_tv_channels.filter((c) => c.is_active);
 };

@@ -291,7 +291,7 @@ export function LiveTVScreen() {
   const { favorites, toggleFavorite, isFavorite } = useLiveTvFavoritesStore();
 
   const [channels, setChannels] = useState<LiveTvChannel[]>([]);
-  const [loading, setLoading] = useState(!!tokens);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -300,11 +300,10 @@ export function LiveTVScreen() {
   /* ── data ── */
 
   const fetchChannels = useCallback(async () => {
-    if (!tokens?.accessToken) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await getLiveTvChannels(tokens.accessToken);
+      const data = await getLiveTvChannels(tokens?.accessToken);
       setChannels(data);
       loaded.current = true;
     } catch {
