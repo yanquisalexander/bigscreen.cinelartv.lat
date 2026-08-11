@@ -45,12 +45,14 @@ export function updatePanel(config: Omit<PanelConfig, 'id'> & { id: string }): v
   useOverlayPanelStore.getState().update({ ...config, id: config.id });
 }
 
-export function closePanel(): void {
+export function closePanel(options?: { restoreFocus?: boolean }): void {
   useOverlayPanelStore.getState().close();
   // Restore focus to whatever had it before the panel opened (POPUP_BACK
   // behavior). Double rAF lets React commit the close (panel -> null, animate
   // out) before norigin re-applies focus to the target focusable.
-  if (previousFocusKey) {
+  // Skip restoration when navigating away (restoreFocus: false) to avoid
+  // calling setFocus with a key that no longer exists on the new screen.
+  if (options?.restoreFocus !== false && previousFocusKey) {
     const key = previousFocusKey;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => setFocus(key));

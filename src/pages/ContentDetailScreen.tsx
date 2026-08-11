@@ -16,7 +16,7 @@ import type { ContentDetail } from '@/types/content';
 import { isTVShow } from '@/types/content';
 import { M3eLoadingIndicator } from '@m3e/react/loading-indicator';
 import { isBackKey } from '@/utils/helpers';
-import { showPanel, buttonItem } from '@/services/overlayPanel';
+import { showPanel, buttonItem, closePanel } from '@/services/overlayPanel';
 
 // ── Local presentational helper ─────────────────────────────────
 // Editorial-style heading: title + trailing gradient rule, replaces
@@ -38,8 +38,11 @@ function showAuthPanel(navigate: ReturnType<typeof useNavigate>) {
     subtitle: 'Para mirar este contenido debes vincular una cuenta',
     items: [
       buttonItem(
-        { title: 'Vincular cuenta', subtitle: 'Iniciar sesión o crear una nueva', icon: 'login' },
-        () => navigate('/auth'),
+        { title: 'Vincular cuenta', subtitle: 'Iniciar sesión o crear una nueva', icon: 'login', closeOnSelect: false },
+        () => {
+          closePanel({ restoreFocus: false });
+          navigate('/auth');
+        },
       ),
       buttonItem({ title: 'Volver', subtitle: 'Cancelar', icon: 'x' }),
     ],
