@@ -34,15 +34,11 @@ function SectionHeading({ title }: { title: string }) {
 
 function showAuthPanel(navigate: ReturnType<typeof useNavigate>) {
   showPanel({
-    title: 'Iniciar sesión',
-    subtitle: 'Para mirar este contenido debes iniciar sesión o crear una cuenta',
+    title: 'Vincular cuenta',
+    subtitle: 'Para mirar este contenido debes vincular una cuenta',
     items: [
       buttonItem(
-        { title: 'Iniciar sesión', subtitle: 'Usar una cuenta existente', icon: 'login' },
-        () => navigate('/auth'),
-      ),
-      buttonItem(
-        { title: 'Crear cuenta', subtitle: 'Regístrate gratis', icon: 'user' },
+        { title: 'Vincular cuenta', subtitle: 'Iniciar sesión o crear una nueva', icon: 'login' },
         () => navigate('/auth'),
       ),
       buttonItem({ title: 'Volver', subtitle: 'Cancelar', icon: 'x' }),
