@@ -16,6 +16,7 @@ import type { ContentDetail } from '@/types/content';
 import { isTVShow } from '@/types/content';
 import { M3eLoadingIndicator } from '@m3e/react/loading-indicator';
 import { isBackKey } from '@/utils/helpers';
+import { showPanel, buttonItem } from '@/services/overlayPanel';
 
 // ── Local presentational helper ─────────────────────────────────
 // Editorial-style heading: title + trailing gradient rule, replaces
@@ -29,6 +30,24 @@ function SectionHeading({ title }: { title: string }) {
       <div className="flex-1 h-px bg-gradient-to-r from-white/15 via-white/5 to-transparent" />
     </div>
   );
+}
+
+function showAuthPanel(navigate: ReturnType<typeof useNavigate>) {
+  showPanel({
+    title: 'Iniciar sesión',
+    subtitle: 'Para mirar este contenido debes iniciar sesión o crear una cuenta',
+    items: [
+      buttonItem(
+        { title: 'Iniciar sesión', subtitle: 'Usar una cuenta existente', icon: 'login' },
+        () => navigate('/auth'),
+      ),
+      buttonItem(
+        { title: 'Crear cuenta', subtitle: 'Regístrate gratis', icon: 'user' },
+        () => navigate('/auth'),
+      ),
+      buttonItem({ title: 'Volver', subtitle: 'Cancelar', icon: 'x' }),
+    ],
+  });
 }
 
 export function ContentDetailScreen() {
@@ -152,7 +171,7 @@ export function ContentDetailScreen() {
   // ── Handlers ───────────────────────────────────────────────────
   const handlePlay = useCallback(() => {
     if (!content || !canPlay) return;
-    if (!tokens && isGuest) { navigate('/auth'); return; }
+    if (!tokens && isGuest) { showAuthPanel(navigate); return; }
 
     const episodeId = content.continue_watching?.episode_id;
     if (episodeId) { navigate(`/watch/${content.id}/${episodeId}`); return; }
@@ -165,7 +184,7 @@ export function ContentDetailScreen() {
 
   const handlePlayEpisode = useCallback(
     (episodeId: string | number) => {
-      if (!tokens && isGuest) { navigate('/auth'); return; }
+      if (!tokens && isGuest) { showAuthPanel(navigate); return; }
       navigate(`/watch/${contentId}/${episodeId}`);
     },
     [contentId, navigate, tokens, isGuest],
