@@ -11,6 +11,7 @@ import { classNames } from '@/utils/helpers';
 import { inputManager } from '@/services/InputManager';
 import { Play, Volume2, Palette, Shield, Info, LucideRotateCcw } from 'lucide-react';
 import { buttonItem, showPanel } from "@/services/overlayPanel";
+import { useToastStore } from "@/stores/toastStore";
 
 /* ─── Section definitions ──────────────────────────────────────── */
 
@@ -368,7 +369,18 @@ function ReiniciarContent() {
 }
 
 function FactoryResetContent() {
-  const navigate = useNavigate();
+  const { show } = useToastStore();
+
+  const handleFactoryReset = useCallback(() => {
+    show('Restableciendo la app...', 'info', 3000);
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 500);
+  }, []);
+
+
 
   return (
     <div data-settings-section="factory-reset" className="flex flex-col items-center justify-center min-h-[60vh] text-center">
@@ -392,7 +404,9 @@ function FactoryResetContent() {
             subtitle: "¿Estás seguro de que quieres borrar todos los datos y restablecer la aplicación? Esta acción no se puede deshacer.",
 
             items: [
-              buttonItem({ title: 'Restablecer app', subtitle: 'Borrar todos los datos y volver a la pantalla de inicio', icon: 'trash' }),
+              buttonItem({ title: 'Restablecer app', subtitle: 'Borrar todos los datos y volver a la pantalla de inicio', icon: 'trash' }, () => {
+                handleFactoryReset();
+              }),
               buttonItem({ title: 'Volver', subtitle: 'Cancelar y regresar a la configuración', icon: 'x' })
             ],
           })
