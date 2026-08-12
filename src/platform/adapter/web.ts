@@ -30,7 +30,7 @@ function createWebDevice(): PlatformDevice {
     getInfo: (): Promise<DeviceInfo> => Promise.resolve({
       platform: 'web',
       appVersion: '0.0.0',
-      deviceModel: 'unknown',
+      deviceModel: navigator.platform,
       deviceName: navigator.userAgent,
       model: navigator.platform,
       nativeVersion: '0',

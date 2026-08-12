@@ -74,17 +74,19 @@ function createRequestRegistry() {
 type RequestRegistry = ReturnType<typeof createRequestRegistry>;
 
 function normalizeDeviceInfo(raw: Partial<DeviceInfo> & Record<string, unknown> | undefined): DeviceInfo {
+  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
+  const platform = typeof navigator !== 'undefined' ? navigator.platform : 'unknown';
   return {
     platform: (raw?.platform as string) ?? 'android-tv',
     appVersion: (raw?.appVersion as string) ?? '0.0.0',
-    deviceModel: (raw?.deviceModel as string) ?? (raw?.device as string) ?? (raw?.model as string) ?? 'unknown',
+    deviceModel: (raw?.deviceModel as string) ?? (raw?.device as string) ?? (raw?.model as string) ?? platform,
     deviceName:
       typeof raw?.deviceName === 'string'
         ? raw.deviceName
         : raw?.device
           ? String(raw.device)
-          : undefined,
-    model: (raw?.model as string) ?? (raw?.device as string) ?? 'unknown',
+          : userAgent,
+    model: (raw?.model as string) ?? (raw?.device as string) ?? platform,
     nativeVersion: (raw?.nativeVersion as string) ?? '0',
     nativeVersionName: (raw?.nativeVersionName as string) ?? '0.0.0',
   };
