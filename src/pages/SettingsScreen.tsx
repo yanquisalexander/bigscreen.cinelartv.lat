@@ -10,6 +10,7 @@ import {
   getNativeVersion,
   getNativeVersionName,
 } from '@/services/NativeBridge';
+import type { DeviceInfo } from '@/platform';
 import { Focusable } from '@/components/tv/Focusable';
 import { classNames } from '@/utils/helpers';
 import { inputManager } from '@/services/InputManager';
@@ -39,6 +40,31 @@ type SectionKey = (typeof SECTIONS)[number]['key'];
 export function SettingsScreen() {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<SectionKey>('reproduccion');
+  const [deviceInfo, setDeviceInfo] = useState<Partial<DeviceInfo>>({});
+
+  useEffect(() => {
+    async function loadDeviceInfo() {
+      const [appVersion, deviceModel, deviceName, model, nativeVersion, nativeVersionName] = await Promise.all([
+        getAppVersion(),
+        getDeviceModel(),
+        getDeviceName(),
+        getModel(),
+        getNativeVersion(),
+        getNativeVersionName(),
+      ]);
+
+      setDeviceInfo({
+        platform: getPlatform(),
+        appVersion,
+        deviceModel,
+        deviceName,
+        model,
+        nativeVersion,
+        nativeVersionName,
+      });
+    }
+    loadDeviceInfo();
+  }, []);
 
   const { ref, focusKey } = useFocusable({
     focusKey: 'settings-root',
@@ -52,13 +78,6 @@ export function SettingsScreen() {
   const setPrefersModernPlayback = useSettingsStore((s) => s.setPrefersModernPlayback);
   const navigationSoundEnabled = useSettingsStore((s) => s.navigationSoundEnabled);
   const setNavigationSoundEnabled = useSettingsStore((s) => s.setNavigationSoundEnabled);
-
-  const platform = getPlatform();
-  const appVersion = getAppVersion();
-  const deviceName = getDeviceName();
-  const model = getModel();
-  const nativeVersion = getNativeVersion();
-  const nativeVersionName = getNativeVersionName();
 
   const handleBack = useCallback(() => {
     navigate('/home');
@@ -107,12 +126,12 @@ export function SettingsScreen() {
           {activeSection === 'factory-reset' && <FactoryResetContent />}
           {activeSection === 'informacion' && (
             <InformacionContent
-              platform={platform}
-              appVersion={appVersion}
-              deviceName={deviceName!}
-              model={model}
-              nativeVersion={nativeVersion}
-              nativeVersionName={nativeVersionName}
+              platform={deviceInfo.platform ?? 'Cargando...'}
+              appVersion={deviceInfo.appVersion ?? 'Cargando...'}
+              deviceName={deviceInfo.deviceName ?? null}
+              model={deviceInfo.model ?? 'Cargando...'}
+              nativeVersion={deviceInfo.nativeVersion ?? '0'}
+              nativeVersionName={deviceInfo.nativeVersionName ?? null}
             />
           )}
         </div>
@@ -434,10 +453,10 @@ function InformacionContent({
 }: {
   platform: string;
   appVersion: string;
-  deviceName: string | null;
+  deviceName: string | null | undefined;
   model: string;
   nativeVersion: string;
-  nativeVersionName: string | null;
+  nativeVersionName: string | null | undefined;
 }) {
   const rows = useMemo(
     () => [
