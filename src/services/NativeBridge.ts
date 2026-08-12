@@ -1,16 +1,22 @@
 import { getPlatformInstance } from '@/platform';
-import type { AndroidTvHomeItem, LiveChannelInfo, NativePlayerData } from '@/platform';
+import type {
+  AndroidTvHomeItem,
+  DeviceInfo,
+  LiveChannelInfo,
+  NativePlayerData,
+} from '@/platform';
 
 export type { AndroidTvHomeItem, LiveChannelInfo, NativePlayerData } from '@/platform';
 export { PLAY_STORE_WEBVIEW_URL } from '@/platform';
 
 export const getPlatform = (): string => getPlatformInstance().device.getPlatform();
-export const getAppVersion = async (): Promise<string> => (await getPlatformInstance().device.getInfo()).appVersion;
-export const getDeviceModel = async (): Promise<string> => (await getPlatformInstance().device.getInfo()).deviceModel;
-export const getDeviceName = async (): Promise<string | undefined> => (await getPlatformInstance().device.getInfo()).deviceName;
-export const getModel = async (): Promise<string> => (await getPlatformInstance().device.getInfo()).model;
-export const getNativeVersion = async (): Promise<string> => (await getPlatformInstance().device.getInfo()).nativeVersion;
-export const getNativeVersionName = async (): Promise<string> => (await getPlatformInstance().device.getInfo()).nativeVersionName;
+export const getDeviceInfo = async (): Promise<DeviceInfo> => getPlatformInstance().device.getInfo();
+export const getAppVersion = async (): Promise<string> => (await getDeviceInfo()).appVersion;
+export const getDeviceModel = async (): Promise<string> => (await getDeviceInfo()).deviceModel;
+export const getDeviceName = async (): Promise<string | undefined> => (await getDeviceInfo()).deviceName;
+export const getModel = async (): Promise<string> => (await getDeviceInfo()).model;
+export const getNativeVersion = async (): Promise<string> => (await getDeviceInfo()).nativeVersion;
+export const getNativeVersionName = async (): Promise<string> => (await getDeviceInfo()).nativeVersionName;
 
 export const exitApp = (): void => getPlatformInstance().navigation.exitApp();
 export const isAndroidTV = (): boolean => getPlatformInstance().device.isAndroidTV();

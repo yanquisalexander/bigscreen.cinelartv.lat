@@ -13,39 +13,93 @@ import type {
   LiveChannelInfo,
   NativePlayerData,
 } from '../types';
-import type { V1Bridge, BridgeMessage } from '../protocol/v1';
+import type { V1Bridge, BridgeMessage, BridgeResponse } from '../protocol/v1';
 import { V1_MESSAGE_TYPES } from '../protocol/v1';
 import { platformEvents } from '../events';
+
+const REQUEST_TIMEOUT_MS = 5000;
 
 let requestIdCounter = 0;
 function nextRequestId(): string {
   return `r-${Date.now().toString(36)}-${(++requestIdCounter).toString(36)}`;
 }
 
-function createV1Device(bridge: V1Bridge): PlatformDevice {
-  return {
-    getPlatform: () => 'web',
-    getInfo: (): Promise<DeviceInfo> => {
-      return new Promise((resolve, reject) => {
-        const requestId = nextRequestId();
-        
-        const handler = (message: BridgeMessage) => {
-          if (message.type === 'device.info' && message.requestId === requestId) {
-            // Eliminar listener (esto requeriría un mecanismo en el puente)
-            resolve(message.payload as DeviceInfo);
-          }
-        };
+type IncomingMessage = BridgeMessage | BridgeResponse;
 
-        bridge.onRequest(handler);
+interface PendingRequest {
+  resolve: (value: unknown) => void;
+  reject: (reason?: unknown) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
 
-        bridge.send({
-          version: 1,
-          type: V1_MESSAGE_TYPES.DEVICE_GET_INFO,
-          requestId: requestId,
-        });
+function createRequestRegistry() {
+  const pending = new Map<string, PendingRequest>();
+
+  function send<T>(bridge: V1Bridge, message: Omit<BridgeMessage, 'version' | 'requestId'>): Promise<T> {
+    const requestId = nextRequestId();
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        pending.delete(requestId);
+        reject(new Error(`Bridge request timed out: ${message.type}`));
+      }, REQUEST_TIMEOUT_MS);
+      pending.set(requestId, {
+        resolve: resolve as (value: unknown) => void,
+        reject,
+        timer,
       });
-    },
-    isAndroidTV: () => false,
+      bridge.send({ ...message, version: 1, requestId });
+    });
+  }
+
+  function route(message: IncomingMessage): boolean {
+    if (typeof message !== 'object' || message === null) return false;
+    if (!('ok' in message) || message.requestId == null) return false;
+
+    const entry = pending.get(message.requestId);
+    if (!entry) return true;
+
+    clearTimeout(entry.timer);
+    pending.delete(message.requestId);
+    if (message.ok) {
+      entry.resolve(message.value);
+    } else {
+      entry.reject(new Error(message.code + (message.message ? `: ${message.message}` : '')));
+    }
+    return true;
+  }
+
+  return { send, route };
+}
+
+type RequestRegistry = ReturnType<typeof createRequestRegistry>;
+
+function normalizeDeviceInfo(raw: Partial<DeviceInfo> & Record<string, unknown> | undefined): DeviceInfo {
+  return {
+    platform: (raw?.platform as string) ?? 'android-tv',
+    appVersion: (raw?.appVersion as string) ?? '0.0.0',
+    deviceModel: (raw?.deviceModel as string) ?? (raw?.device as string) ?? (raw?.model as string) ?? 'unknown',
+    deviceName:
+      typeof raw?.deviceName === 'string'
+        ? raw.deviceName
+        : raw?.device
+          ? String(raw.device)
+          : undefined,
+    model: (raw?.model as string) ?? (raw?.device as string) ?? 'unknown',
+    nativeVersion: (raw?.nativeVersion as string) ?? '0',
+    nativeVersionName: (raw?.nativeVersionName as string) ?? '0.0.0',
+  };
+}
+
+function createV1Device(bridge: V1Bridge, registry: RequestRegistry): PlatformDevice {
+  return {
+    getPlatform: () => 'android-tv',
+    getInfo: (): Promise<DeviceInfo> =>
+      registry
+        .send<Partial<DeviceInfo> & Record<string, unknown>>(bridge, {
+          type: V1_MESSAGE_TYPES.DEVICE_GET_INFO,
+        })
+        .then(normalizeDeviceInfo),
+    isAndroidTV: () => true,
     isSmartTV: () => /SmartTV|Tizen|WebOS/i.test(navigator.userAgent),
   };
 }
@@ -191,9 +245,11 @@ function detectV1Capabilities(_bridge: V1Bridge): PlatformCapabilities {
 
 export function createV1Adapter(bridge: V1Bridge): Platform {
   const capabilities = detectV1Capabilities(bridge);
+  const registry = createRequestRegistry();
 
-  bridge.onRequest((message: BridgeMessage) => {
-    if (message.type === 'media.finished') {
+  bridge.onRequest((message: IncomingMessage) => {
+    if (registry.route(message)) return;
+    if (isEvent(message) && message.type === 'media.finished') {
       platformEvents.emit('media.finished', undefined);
     }
   });
@@ -201,11 +257,15 @@ export function createV1Adapter(bridge: V1Bridge): Platform {
   return {
     version: 1,
     capabilities,
-    device: createV1Device(bridge),
+    device: createV1Device(bridge, registry),
     navigation: createV1Navigation(bridge),
     media: createV1Media(bridge, capabilities),
     tv: createV1TV(bridge),
     account: createV1Account(bridge),
     updates: createV1Updates(bridge),
   };
+}
+
+function isEvent(message: IncomingMessage): message is BridgeMessage {
+  return 'type' in message && typeof (message as BridgeMessage).type === 'string';
 }

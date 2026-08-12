@@ -3,13 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import {
-  getPlatform,
-  getAppVersion,
-  getDeviceModel,
-  getDeviceName,
-  getModel,
-  getNativeVersion,
-  getNativeVersionName,
+  getDeviceInfo,
 } from '@/services/NativeBridge';
 import type { DeviceInfo } from '@/platform';
 import { Focusable } from '@/components/tv/Focusable';
@@ -45,24 +39,12 @@ export function SettingsScreen() {
 
   useEffect(() => {
     async function loadDeviceInfo() {
-      const [appVersion, deviceModel, deviceName, model, nativeVersion, nativeVersionName] = await Promise.all([
-        getAppVersion(),
-        getDeviceModel(),
-        getDeviceName(),
-        getModel(),
-        getNativeVersion(),
-        getNativeVersionName(),
-      ]);
-
-      setDeviceInfo({
-        platform: getPlatform(),
-        appVersion,
-        deviceModel,
-        deviceName,
-        model,
-        nativeVersion,
-        nativeVersionName,
-      });
+      try {
+        const info = await getDeviceInfo();
+        setDeviceInfo(info);
+      } catch {
+        // Si el puente no responde, mantener campos vacíos (se muestran como "Cargando...")
+      }
     }
     loadDeviceInfo();
   }, []);
