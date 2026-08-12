@@ -5,12 +5,12 @@ export type { AndroidTvHomeItem, LiveChannelInfo, NativePlayerData } from '@/pla
 export { PLAY_STORE_WEBVIEW_URL } from '@/platform';
 
 export const getPlatform = (): string => getPlatformInstance().device.getPlatform();
-export const getAppVersion = (): string => getPlatformInstance().device.getInfo().appVersion;
-export const getDeviceModel = (): string => getPlatformInstance().device.getInfo().deviceModel;
-export const getDeviceName = (): string | undefined => getPlatformInstance().device.getInfo().deviceName;
-export const getModel = (): string => getPlatformInstance().device.getInfo().model;
-export const getNativeVersion = (): string => getPlatformInstance().device.getInfo().nativeVersion;
-export const getNativeVersionName = (): string => getPlatformInstance().device.getInfo().nativeVersionName;
+export const getAppVersion = async (): Promise<string> => (await getPlatformInstance().device.getInfo()).appVersion;
+export const getDeviceModel = async (): Promise<string> => (await getPlatformInstance().device.getInfo()).deviceModel;
+export const getDeviceName = async (): Promise<string | undefined> => (await getPlatformInstance().device.getInfo()).deviceName;
+export const getModel = async (): Promise<string> => (await getPlatformInstance().device.getInfo()).model;
+export const getNativeVersion = async (): Promise<string> => (await getPlatformInstance().device.getInfo()).nativeVersion;
+export const getNativeVersionName = async (): Promise<string> => (await getPlatformInstance().device.getInfo()).nativeVersionName;
 
 export const exitApp = (): void => getPlatformInstance().navigation.exitApp();
 export const isAndroidTV = (): boolean => getPlatformInstance().device.isAndroidTV();

@@ -27,7 +27,7 @@ const WEB_CAPABILITIES: PlatformCapabilities = {
 function createWebDevice(): PlatformDevice {
   return {
     getPlatform: () => 'web',
-    getInfo: (): DeviceInfo => ({
+    getInfo: (): Promise<DeviceInfo> => Promise.resolve({
       platform: 'web',
       appVersion: '0.0.0',
       deviceModel: 'unknown',

@@ -144,7 +144,7 @@ export interface PlatformNavigation {
 
 export interface PlatformDevice {
   getPlatform(): string;
-  getInfo(): DeviceInfo;
+  getInfo(): Promise<DeviceInfo>;
   isAndroidTV(): boolean;
   isSmartTV(): boolean;
 }

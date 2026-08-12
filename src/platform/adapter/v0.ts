@@ -23,7 +23,7 @@ const native =
 function createV0Device(): PlatformDevice {
   return {
     getPlatform: () => native.getPlatform?.() ?? 'web',
-    getInfo: (): DeviceInfo => ({
+    getInfo: (): Promise<DeviceInfo> => Promise.resolve({
       platform: native.getPlatform?.() ?? 'web',
       appVersion: native.getAppVersion?.() ?? '0.0.0',
       deviceModel: native.getDeviceModel?.() ?? 'unknown',

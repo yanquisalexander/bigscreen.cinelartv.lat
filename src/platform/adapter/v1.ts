@@ -22,18 +22,29 @@ function nextRequestId(): string {
   return `r-${Date.now().toString(36)}-${(++requestIdCounter).toString(36)}`;
 }
 
-function createV1Device(_bridge: V1Bridge): PlatformDevice {
+function createV1Device(bridge: V1Bridge): PlatformDevice {
   return {
     getPlatform: () => 'web',
-    getInfo: (): DeviceInfo => ({
-      platform: 'web',
-      appVersion: '0.0.0',
-      deviceModel: 'unknown',
-      deviceName: undefined,
-      model: 'unknown',
-      nativeVersion: '0',
-      nativeVersionName: '0.0.0',
-    }),
+    getInfo: (): Promise<DeviceInfo> => {
+      return new Promise((resolve, reject) => {
+        const requestId = nextRequestId();
+        
+        const handler = (message: BridgeMessage) => {
+          if (message.type === 'device.info' && message.requestId === requestId) {
+            // Eliminar listener (esto requeriría un mecanismo en el puente)
+            resolve(message.payload as DeviceInfo);
+          }
+        };
+
+        bridge.onRequest(handler);
+
+        bridge.send({
+          version: 1,
+          type: V1_MESSAGE_TYPES.DEVICE_GET_INFO,
+          requestId: requestId,
+        });
+      });
+    },
     isAndroidTV: () => false,
     isSmartTV: () => /SmartTV|Tizen|WebOS/i.test(navigator.userAgent),
   };
