@@ -96,7 +96,7 @@ export const TVSidebar = memo(function TVSidebar({ onFocusChange }: TVSidebarPro
         ref={ref as React.RefObject<HTMLElement>}
         style={{ gridArea: 'sidebar' }}
         className={classNames(
-          'relative h-full w-full flex flex-col py-4 bg-[#090909]',
+          'relative h-full w-full flex flex-col py-4 bg-bg',
           collapsed ? 'px-0' : 'px-2',
         )}
       >
