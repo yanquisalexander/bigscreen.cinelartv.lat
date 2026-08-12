@@ -19,8 +19,8 @@ const WatchScreen = lazy(() =>
 );
 
 const WatchFallback = (
-  <div className="fixed inset-0 bg-[#0a0a0a] flex items-center justify-center">
-    <p className="text-white/40 text-base tracking-wide">Cargando...</p>
+  <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30">
+    <p className="text-white/50 text-xl tracking-wide uppercase">Cargando...</p>
   </div>
 );
 
