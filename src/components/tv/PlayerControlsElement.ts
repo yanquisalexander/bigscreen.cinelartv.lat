@@ -210,6 +210,9 @@ export class PlayerControlsElement extends LitElement {
   private rafId = 0;
   private controlsTimer: ReturnType<typeof setTimeout> | null = null;
   private logicTimer: ReturnType<typeof setInterval> | null = null;
+  private _restoreFocusOnShow = false;
+  private _restoreFocusRetry = 0;
+  private _restoreFocusToken = 0;
 
   @state() private _isPlaying!: boolean;
   @state() private _duration!: number;
@@ -336,19 +339,30 @@ export class PlayerControlsElement extends LitElement {
       this._teardownVideo();
       if (this.videoEl) this._initVideoListeners();
     }
+
     if (changedProperties.has('episodes')) {
       this._allEpisodes = this.episodes.episodes;
       this._currentEpisodeId = this.episodes.currentId;
       this.contentId = this.episodes.contentId;
     }
+
     if (changedProperties.has('settingsOpen')) {
       this.dispatchEvent(new CustomEvent('settings-toggle', {
-        bubbles: true, composed: true,
+        bubbles: true,
+        composed: true,
         detail: { open: this.settingsOpen },
       }));
     }
 
-    const needsSync = ['showControls', 'railExpanded', 'episodes', 'skipSegment', 'nextEpisode', 'isBuffering'].some(p => changedProperties.has(p));
+    const needsSync = [
+      'showControls',
+      'railExpanded',
+      'episodes',
+      'skipSegment',
+      'nextEpisode',
+      'isBuffering',
+    ].some((p) => changedProperties.has(p));
+
     if (needsSync) {
       this._syncOverlayFocusability();
       this._syncFocusables();
@@ -356,8 +370,19 @@ export class PlayerControlsElement extends LitElement {
 
     if (changedProperties.has('showControls')) {
       this.classList.toggle('controls-hidden', !this.showControls);
-      if (this.showControls) this._restartControlsHideTimer();
+
+      if (this.showControls) {
+        this._restartControlsHideTimer();
+
+        if (this._restoreFocusOnShow) {
+          this._restoreFocusOnShow = false;
+          this._restoreFocusRetry = 0;
+          this._restoreFocusToken += 1;
+          void this._restoreControlFocusWhenReady(this._restoreFocusToken);
+        }
+      }
     }
+
     if (changedProperties.has('railExpanded')) {
       this._restartControlsHideTimer();
     }
@@ -742,7 +767,7 @@ export class PlayerControlsElement extends LitElement {
 
   private _collapseRailIfFocusLeaves() {
     const currentFocus = getCurrentFocusKey() ?? '';
-    if (currentFocus === 'watch-episodes' || currentFocus.startsWith('rail-ep-item-')) return;
+    if (currentFocus.startsWith('rail-ep-item-')) return;
     this.railExpanded = false;
   }
 
@@ -785,26 +810,162 @@ export class PlayerControlsElement extends LitElement {
     this._wasPlayingBeforeSeek = false;
   }
 
+  private _nextFrame(): Promise<void> {
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  }
+
+  private _getControlElement(focusKey: string): HTMLElement | null {
+    if (focusKey === 'watch-seekbar') {
+      return this.renderRoot.querySelector('[data-seekbar-focusable]') as HTMLElement | null;
+    }
+
+    if (focusKey === 'watch-skip') {
+      return this.renderRoot.querySelector('[data-skip-btn]') as HTMLElement | null;
+    }
+
+    return this.renderRoot.querySelector(`[focus-key="${focusKey}"]`) as HTMLElement | null;
+  }
+
+  private _canFocusControl(focusKey: string): boolean {
+    if (!focusKey) return false;
+
+    if (focusKey.startsWith('rail-ep-item-') && !this.railExpanded) {
+      return false;
+    }
+
+    if (focusKey === 'watch-seekbar' && (!this.showControls || this.railExpanded)) {
+      return false;
+    }
+
+    if (focusKey === 'watch-skip' && !this.skipSegment) {
+      return false;
+    }
+
+    if (
+      (focusKey === 'watch-next-play' || focusKey === 'watch-next-cancel') &&
+      (!this.nextEpisode || !this._nextShowing)
+    ) {
+      return false;
+    }
+
+    const el = this._getControlElement(focusKey);
+    if (!el) return false;
+
+    if (el.getAttribute('focusable') === 'false') return false;
+    if (el.getAttribute('aria-disabled') === 'true') return false;
+
+    return true;
+  }
+
   private _focusControl(focusKey: string): boolean {
-    const el = this.renderRoot.querySelector(`[focus-key="${focusKey}"]`) as HTMLElement | null;
-    if (!el || el.getAttribute('focusable') === 'false') return false;
-    requestAnimationFrame(() => SpatialNavigation.setFocus(focusKey));
+    if (!this._canFocusControl(focusKey)) return false;
+
+    requestAnimationFrame(() => {
+      if (!this._canFocusControl(focusKey)) return;
+
+      try {
+        SpatialNavigation.setFocus(focusKey);
+      } catch (_err) {
+        // noop
+      }
+    });
+
     return true;
   }
 
   private _restoreControlFocus(): void {
-    if (this._focusControl(this._lastFocusedControlKey)) return;
-    if (this._focusControl('watch-playpause')) return;
-    SpatialNavigation.setFocus('watch-root');
+    this._restoreFocusRetry = 0;
+    this._restoreFocusToken += 1;
+    void this._restoreControlFocusWhenReady(this._restoreFocusToken);
+  }
+
+  private async _restoreControlFocusWhenReady(token: number): Promise<void> {
+    if (token !== this._restoreFocusToken) return;
+
+    await this.updateComplete;
+    await this._nextFrame();
+
+    if (token !== this._restoreFocusToken) return;
+
+    const candidates = [
+      this._lastFocusedControlKey,
+      'watch-playpause',
+      'watch-seekbar',
+      'watch-episodes',
+      'watch-settings',
+      'watch-skip',
+      'watch-next-play',
+      'watch-next-cancel',
+    ].filter((key): key is string => Boolean(key));
+
+    for (const key of candidates) {
+      if (!this._canFocusControl(key)) continue;
+
+      try {
+        SpatialNavigation.setFocus(key);
+      } catch (_err) {
+        // noop
+      }
+
+      await this._nextFrame();
+
+      if (token !== this._restoreFocusToken) return;
+
+      if (getCurrentFocusKey() === key) {
+        return;
+      }
+    }
+
+    if (this._restoreFocusRetry < 5) {
+      this._restoreFocusRetry += 1;
+      requestAnimationFrame(() => void this._restoreControlFocusWhenReady(token));
+      return;
+    }
+
+    try {
+      SpatialNavigation.setFocus('watch-root');
+    } catch (_err) {
+      // noop
+    }
   }
 
   private _syncOverlayFocusability() {
-    if (!this.showControls) {
-      const currentFocus = getCurrentFocusKey();
-      if (!currentFocus || ['watch-playpause', 'watch-settings', 'watch-episodes', 'watch-seekbar'].includes(currentFocus)) {
-        requestAnimationFrame(() => { if (getCurrentFocusKey() !== 'watch-root') SpatialNavigation.setFocus('watch-root'); });
+    if (this.showControls) return;
+
+    const currentFocus = getCurrentFocusKey() ?? '';
+
+    if (currentFocus.startsWith('player-settings')) return;
+
+    const hiddenOverlayFocusKeys = new Set([
+      'watch-playpause',
+      'watch-settings',
+      'watch-episodes',
+      'watch-seekbar',
+    ]);
+
+    const isHiddenOverlayFocus =
+      !currentFocus ||
+      hiddenOverlayFocusKeys.has(currentFocus) ||
+      currentFocus.startsWith('rail-ep-item-');
+
+    if (!isHiddenOverlayFocus) return;
+
+    requestAnimationFrame(() => {
+      const nowFocus = getCurrentFocusKey() ?? '';
+
+      const stillHidden =
+        !nowFocus ||
+        hiddenOverlayFocusKeys.has(nowFocus) ||
+        nowFocus.startsWith('rail-ep-item-');
+
+      if (stillHidden && nowFocus !== 'watch-root') {
+        try {
+          SpatialNavigation.setFocus('watch-root');
+        } catch (_err) {
+          // noop
+        }
       }
-    }
+    });
   }
 
   private _restartControlsHideTimer() {
@@ -824,16 +985,34 @@ export class PlayerControlsElement extends LitElement {
 
   private _setupGlobalKeyHandler() {
     const handleKey = (e: KeyboardEvent) => {
-      const isDirectional = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key);
+      const isDirectional = [
+        'ArrowLeft',
+        'ArrowRight',
+        'ArrowUp',
+        'ArrowDown',
+      ].includes(e.key);
+
       const isAction = e.key === 'Enter' || e.key === ' ';
+
       if (!isDirectional && !isAction) return;
+
       const currentFocus = getCurrentFocusKey() ?? '';
-      if (this.settingsOpen || currentFocus.startsWith('player-settings') || this.showControls) return;
+
+      if (
+        this.settingsOpen ||
+        currentFocus.startsWith('player-settings') ||
+        this.showControls
+      ) {
+        return;
+      }
+
       e.preventDefault();
       e.stopImmediatePropagation();
+
       this.showControls = true;
-      if (isDirectional) this._restoreControlFocus();
+      this._restoreFocusOnShow = true;
     };
+
     window.addEventListener('keydown', handleKey, true);
     (this as any)._keyHandler = handleKey;
   }
