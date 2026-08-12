@@ -15,6 +15,7 @@ import { isTVShow } from '@/types/content';
 import { syncContinueWatching, syncRecommendations, exitApp } from '@/services/NativeBridge';
 import { ExitDialog } from '@/components/ui/ExitDialog';
 import type { AndroidTvHomeItem } from '@/services/NativeBridge';
+import { CinelarLogo } from "@/components/ui/CinelarLogo";
 
 const progressPercent = (item: ContentItem) => {
   if (!item.progress || !item.duration) return 0;
@@ -185,7 +186,9 @@ export function HomeScreen() {
           ref={ref as React.RefObject<HTMLDivElement>}
           className={`w-full h-dvh hide-scrollbar bg-bg transition-all duration-700 ${heroImmersive ? 'overflow-hidden' : 'overflow-y-auto'}`}
         >
-          <h1 className="fixed top-[clamp(1rem,3vh,1.5rem)] right-[clamp(1.5rem,4vw,2rem)] text-white text-[clamp(1.5rem,2vw,2rem)] font-medium z-999">CinelarTV</h1>
+          <CinelarLogo className="fixed top-[clamp(1rem,3vh,1.5rem)] right-[clamp(1.5rem,4vw,2rem)] text-white  h-[clamp(1.5rem,2vw,2rem)] z-999">
+
+          </CinelarLogo>
           {loading ? (
             <div className="w-full h-full flex flex-col">
               <div className="w-full h-[clamp(360px,70vh,680px)] bg-surface animate-pulse-slow" />
