@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { createHashRouter, createBrowserRouter, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 import { AppShell } from '@/components/layout/AppShell';
@@ -9,10 +10,27 @@ import { SearchScreen } from '@/pages/SearchScreen';
 import { LiveTVScreen } from '@/pages/LiveTVScreen';
 import { SettingsScreen } from '@/pages/SettingsScreen';
 import { ContentDetailScreen } from '@/pages/ContentDetailScreen';
-import { WatchScreen } from '@/pages/WatchScreen';
 import { BlockedScreen } from '@/pages/BlockedScreen';
 import { IS_DEV } from "@/stores/configStore";
 import { FallbackScreen } from '@/pages/FallbackScreen';
+
+const WatchScreen = lazy(() =>
+  import('@/pages/WatchScreen').then(m => ({ default: m.WatchScreen }))
+);
+
+const WatchFallback = (
+  <div className="fixed inset-0 bg-[#0a0a0a] flex items-center justify-center">
+    <p className="text-white/40 text-base tracking-wide">Cargando...</p>
+  </div>
+);
+
+function WatchRoute() {
+  return (
+    <Suspense fallback={WatchFallback}>
+      <WatchScreen />
+    </Suspense>
+  );
+}
 
 const createRouterFunction = IS_DEV ? createBrowserRouter : createHashRouter;
 
@@ -28,10 +46,6 @@ export const router = createRouterFunction([
   {
     path: '/blocked',
     element: <BlockedScreen />,
-  },
-  {
-    path: '/watch/test',
-    element: <WatchScreen test />,
   },
   {
     element: <ProtectedRoute />,
@@ -68,11 +82,11 @@ export const router = createRouterFunction([
       },
       {
         path: '/watch/:contentId',
-        element: <WatchScreen />,
+        element: <WatchRoute />,
       },
       {
         path: '/watch/:contentId/:episodeId',
-        element: <WatchScreen />,
+        element: <WatchRoute />,
       },
     ],
   },
