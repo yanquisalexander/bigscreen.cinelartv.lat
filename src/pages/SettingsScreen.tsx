@@ -5,6 +5,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import {
   getPlatform,
   getAppVersion,
+  getDeviceModel,
   getDeviceName,
   getModel,
   getNativeVersion,
