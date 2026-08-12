@@ -5,9 +5,10 @@ const NAV_SOUND_KEY = 'cinelar_navigation_sound';
 
 function loadPrefersModern(): boolean {
   try {
-    return localStorage.getItem(MODERN_PLAYBACK_KEY) === '1';
+    const stored = localStorage.getItem(MODERN_PLAYBACK_KEY);
+    return stored === null ? true : stored === '1';
   } catch {
-    return false;
+    return true;
   }
 }
 
