@@ -31,9 +31,8 @@ import { TVFocusable } from '@/components/tv/TVFocusable';
 
 const AD_PREROLL_TAG = 'https://pubads.g.doubleclick.net/gampad/live/ads?iu=/22530741549/CTV_VAST_ADS&description_url=[DESCRIPTION_URL]&tfcd=0&npa=0&sz=400x300%7C640x480&gdfp_req=1&unviewed_position_start=1&output=vast&env=vp&impl=s&correlator=[CACHEBUSTER]';
 const AD_POSTROLL_TAG = 'https://youradexchange.com/video/select.php?r=11621170';
-const TEST_STREAM_URL = 'https://storage.googleapis.com/shaka-demo-assets/bbb-dark-truths-hls/hls.m3u8';
 
-export function WatchScreen({ test = false }: { test?: boolean }) {
+export function WatchScreen() {
   const { contentId, episodeId } = useParams<{ contentId: string; episodeId: string }>();
   const navigate = useNavigate();
   const tokens = useAuthStore((s) => s.tokens);
@@ -44,7 +43,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
   const [watchData, setWatchData] = useState<WatchData | null>(null);
   const [currentAd, setCurrentAd] = useState<VastAd | null>(null);
   const [adPhase, setAdPhase] = useState<'none' | 'preroll' | 'midroll' | 'postroll'>('none');
-  const [prerollChecked, setPrerollChecked] = useState(test);
+  const [prerollChecked, setPrerollChecked] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [debugVisible, setDebugVisible] = useState(() => typeof window !== 'undefined' && window.location.search.includes('debug=1'));
 
@@ -228,25 +227,13 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
 
   // --- Reset ad state on content change ---
   useEffect(() => {
-    if (test) return;
     setPrerollChecked(false);
     setAdPhase('none');
     setCurrentAd(null);
-  }, [contentId, episodeId, test]);
+  }, [contentId, episodeId]);
 
   // --- Load watch data ---
   const fetchData = useCallback(() => {
-    if (test) {
-      setWatchData({
-        sources: [{ url: TEST_STREAM_URL }],
-        content: {
-          title: 'Big Buck Bunny',
-          content_type: 'MOVIE',
-          description: 'Video de prueba',
-        },
-      } as unknown as WatchData);
-      return;
-    }
     if (!tokens || !contentId) return;
     setWatchData(null);
     setStreamLimitError(null);
@@ -313,7 +300,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
         );
         navigate('/home', { replace: true });
       });
-  }, [test, tokens, contentId, episodeId, navigate, stopStreamPing, startStreamPing]);
+  }, [tokens, contentId, episodeId, navigate, stopStreamPing, startStreamPing]);
 
   useEffect(() => {
     fetchData();
@@ -321,7 +308,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
 
   // --- Preroll ---
   useEffect(() => {
-    if (test || !streamUrl || prerollChecked || adPhase !== 'none' || isAdmin) {
+    if (!streamUrl || prerollChecked || adPhase !== 'none' || isAdmin) {
       if (isAdmin) setPrerollChecked(true);
       return;
     }
@@ -345,7 +332,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
       setPrerollChecked(true);
     }, 9000);
     return () => clearTimeout(safety);
-  }, [test, streamUrl, prerollChecked, adPhase]);
+  }, [streamUrl, prerollChecked, adPhase]);
 
   // --- Load stream ---
   useEffect(() => {
@@ -369,7 +356,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
 
   // --- Progress reporting ---
   useEffect(() => {
-    if (test || !tokens || !contentId || !watchData) return;
+    if (!tokens || !contentId || !watchData) return;
 
     const cover = resolvePoster(watchData.content.images, watchData.content.cover_resized ?? watchData.content.cover, clientEndpoint) ?? undefined;
     const banner = resolveBackdrop(watchData.content.images, watchData.content.banner_resized ?? watchData.content.banner, clientEndpoint, 'medium') ?? undefined;
@@ -399,12 +386,12 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
       }
     }, 10000);
     return () => clearInterval(timer);
-  }, [test, tokens, contentId, watchData, clientEndpoint, episodeId, videoRef]);
+  }, [tokens, contentId, watchData, clientEndpoint, episodeId, videoRef]);
 
   // --- Ended handler ---
   useEffect(() => {
     setOnEnded(() => {
-      if (test || isAdmin) {
+      if (isAdmin) {
         if (nextEpisode) {
           navigate(`/watch/${contentId}/${nextEpisode.id}`, { replace: true });
         } else {
@@ -434,7 +421,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
         }
       });
     });
-  }, [setOnEnded, nextEpisode, contentId, navigate, test, isAdmin]);
+  }, [setOnEnded, nextEpisode, contentId, navigate, isAdmin]);
 
   // --- Sync controls ref with engine + data ---
   useEffect(() => {
@@ -597,11 +584,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
         controlsRef.current.showControls = false;
         return;
       }
-      if (test) {
-        navigate('/home');
-      } else {
-        navigate(-1);
-      }
+      navigate(-1);
     };
 
     const handlePlayPause = () => {
@@ -616,7 +599,7 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
       inputManager.off('back', handleBack);
       inputManager.off('playpause', handlePlayPause);
     };
-  }, [navigate, settingsOpen, test, focusPlaybackControl, engineReady]);
+  }, [navigate, settingsOpen, focusPlaybackControl, engineReady]);
 
   // --- Auto-hide on play ---
   useEffect(() => {
@@ -823,12 +806,6 @@ export function WatchScreen({ test = false }: { test?: boolean }) {
         {!ready && !streamLimitError && (
           <div className="absolute inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30">
             <p className="text-white/50 text-xl tracking-wide uppercase">Cargando...</p>
-          </div>
-        )}
-
-        {test && (
-          <div className="absolute top-0 left-0 z-30 px-4 py-2 bg-live/80 text-white text-xs font-bold uppercase tracking-wider rounded-br-xl">
-            Modo prueba
           </div>
         )}
 
