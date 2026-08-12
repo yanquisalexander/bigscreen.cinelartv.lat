@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useOverlayPanelStore, type PanelConfig, type PanelItem } from '@/stores/overlayPanelStore';
-import { closePanel } from '@/services/overlayPanel';
+import { closePanel, backPanel } from '@/services/overlayPanel';
 import { Focusable } from '@/components/tv/Focusable';
 import { isBackKey } from '@/utils/helpers';
 import {
@@ -61,7 +61,7 @@ function ensureBackListener() {
     if (!useOverlayPanelStore.getState().panel) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    closePanel();
+    backPanel();
   };
 
   window.addEventListener('keydown', handleBack, true);

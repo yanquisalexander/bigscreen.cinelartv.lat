@@ -2,7 +2,7 @@ import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navi
 import { useOverlayPanelStore, type PanelConfig, type PanelItem } from '@/stores/overlayPanelStore';
 
 let sequence = 0;
-let previousFocusKey: string | null = null;
+let focusStack: string[] = [];
 
 function nextId(prefix: string): string {
   sequence += 1;
@@ -17,7 +17,7 @@ function makeId(): string {
 }
 
 export function buttonItem(
-  item: { title: string; subtitle?: string; imageUrl?: string; icon?: string },
+  item: { title: string; subtitle?: string; imageUrl?: string; icon?: string; closeOnSelect?: boolean },
   onSelect?: () => void,
 ): PanelItem {
   return {
@@ -26,6 +26,7 @@ export function buttonItem(
     subtitle: item.subtitle,
     imageUrl: item.imageUrl,
     icon: item.icon,
+    closeOnSelect: item.closeOnSelect,
     onSelect,
   };
 }
@@ -37,8 +38,27 @@ export function overlayMessage(title: string, subtitle?: string): PanelItem {
 export function showPanel(
   config: Omit<PanelConfig, 'id'> & { id?: string },
 ): void {
-  previousFocusKey = getCurrentFocusKey();
+  focusStack = [getCurrentFocusKey()];
   useOverlayPanelStore.getState().open({ ...config, id: config.id ?? makeId() });
+}
+
+export function navigatePanel(
+  config: Omit<PanelConfig, 'id'> & { id?: string },
+): void {
+  focusStack.push(getCurrentFocusKey());
+  useOverlayPanelStore.getState().navigate({ ...config, id: config.id ?? makeId() });
+}
+
+export function backPanel(): void {
+  const didBack = useOverlayPanelStore.getState().back();
+  if (!didBack) {
+    closePanel();
+    return;
+  }
+  const restoredFocusKey = focusStack.pop()!;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => setFocus(restoredFocusKey));
+  });
 }
 
 export function updatePanel(config: Omit<PanelConfig, 'id'> & { id: string }): void {
@@ -47,16 +67,13 @@ export function updatePanel(config: Omit<PanelConfig, 'id'> & { id: string }): v
 
 export function closePanel(options?: { restoreFocus?: boolean }): void {
   useOverlayPanelStore.getState().close();
-  // Restore focus to whatever had it before the panel opened (POPUP_BACK
-  // behavior). Double rAF lets React commit the close (panel -> null, animate
-  // out) before norigin re-applies focus to the target focusable.
-  // Skip restoration when navigating away (restoreFocus: false) to avoid
-  // calling setFocus with a key that no longer exists on the new screen.
-  if (options?.restoreFocus !== false && previousFocusKey) {
-    const key = previousFocusKey;
+  if (options?.restoreFocus !== false && focusStack.length > 0) {
+    const key = focusStack[0];
+    focusStack = [];
     requestAnimationFrame(() => {
       requestAnimationFrame(() => setFocus(key));
     });
+  } else {
+    focusStack = [];
   }
-  previousFocusKey = null;
 }
