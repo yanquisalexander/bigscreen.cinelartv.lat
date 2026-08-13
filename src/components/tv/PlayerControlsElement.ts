@@ -674,6 +674,7 @@ export class PlayerControlsElement extends LitElement {
     const FRAME_MS = 100;
     let lastPct = -1;
     let lastDur = 0;
+    let lastSec = -1;
 
     const update = () => {
       const dur = video.duration || 0;
@@ -685,6 +686,13 @@ export class PlayerControlsElement extends LitElement {
         this._duration = dur;
       }
 
+      const sec = Math.floor(ct);
+      if (sec !== lastSec) {
+        lastSec = sec;
+        const timeLabel = this.renderRoot.querySelector('[data-current-time]') as HTMLElement;
+        if (timeLabel) timeLabel.textContent = formatTime(ct);
+      }
+
       if (Math.abs(pct - lastPct) > 0.5) {
         lastPct = pct;
         let bufferedEnd = 0;
@@ -694,13 +702,11 @@ export class PlayerControlsElement extends LitElement {
         const fill = this.renderRoot.querySelector('[data-fill]') as HTMLElement;
         const buffered = this.renderRoot.querySelector('[data-buffered]') as HTMLElement;
         const thumb = this.renderRoot.querySelector('[data-thumb]') as HTMLElement;
-        const timeLabel = this.renderRoot.querySelector('[data-current-time]') as HTMLElement;
         const seekbar = this.renderRoot.querySelector('[data-seekbar-focusable]') as HTMLElement | null;
 
         if (fill) fill.style.width = `${pct}%`;
         if (buffered) buffered.style.width = `${bufferedPct}%`;
         if (thumb) thumb.style.left = `${pct}%`;
-        if (timeLabel) timeLabel.textContent = formatTime(ct);
 
         if (seekbar) {
           seekbar.setAttribute('aria-valuenow', String(Math.round(pct)));
