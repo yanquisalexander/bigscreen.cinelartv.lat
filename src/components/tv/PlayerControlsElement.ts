@@ -552,7 +552,16 @@ export class PlayerControlsElement extends LitElement {
           onEnterPress: () => this.togglePlayPause(),
           onArrowPress: (direction: string) => {
             if (!this.showControls || this.railExpanded) return true;
-            if (direction === 'down') { this._focusControl('watch-playpause'); return false; }
+            if (direction === 'down') {
+              if (this._allEpisodes.length > 0) {
+                this.railExpanded = true;
+                const activeEp = this._allEpisodes.find((e) => e.id === this._currentEpisodeId) ?? this._allEpisodes[0];
+                if (activeEp) requestAnimationFrame(() => SpatialNavigation.setFocus(`rail-ep-item-${activeEp.id}`));
+              } else {
+                this._focusControl('watch-playpause');
+              }
+              return false;
+            }
             if (direction === 'left') { this._seekBy(-SEEK_STEP_SECONDS); return false; }
             if (direction === 'right') { this._seekBy(SEEK_STEP_SECONDS); return false; }
             return true;
@@ -589,7 +598,7 @@ export class PlayerControlsElement extends LitElement {
     for (const focusKey of this._renderedEpisodeKeys) this.registrar.unregister(focusKey);
     this._renderedEpisodeKeys = [];
 
-    if (this.showControls && this._allEpisodes.length > 0) {
+    if (this.showControls && this.railExpanded && this._allEpisodes.length > 0) {
       episodeCards.forEach((card, index) => {
         const episode = this._allEpisodes[index];
         if (!episode) return;
@@ -1127,7 +1136,8 @@ export class PlayerControlsElement extends LitElement {
     if (key === 'watch-playpause' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-episodes'); return; }
     if (key === 'watch-playpause' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-settings'); return; }
     if (key === 'watch-episodes' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-playpause'); return; }
-    if (key !== 'watch-episodes' || custom.detail?.direction !== 'down' || this._allEpisodes.length === 0) return;
+
+    if (!['watch-episodes', 'watch-playpause', 'watch-settings'].includes(key ?? '') || custom.detail?.direction !== 'down' || this._allEpisodes.length === 0) return;
 
     custom.preventDefault();
     this.railExpanded = true;

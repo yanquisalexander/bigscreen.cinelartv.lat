@@ -153,6 +153,7 @@ export function WatchScreen() {
 
   const { ref, focusKey } = useFocusable({
     focusKey: 'watch-root',
+    focusable: false,
     trackChildren: true,
     saveLastFocusedChild: true,
     preferredChildFocusKey: 'watch-playpause',
@@ -160,6 +161,7 @@ export function WatchScreen() {
 
   const { ref: limitRef, focusKey: limitFocusKey } = useFocusable({
     focusKey: 'stream-limit-root',
+    focusable: false,
     trackChildren: true,
     saveLastFocusedChild: true,
     preferredChildFocusKey: 'stream-limit-home',
@@ -167,6 +169,7 @@ export function WatchScreen() {
 
   const { ref: playerErrorRef, focusKey: playerErrorFocusKey } = useFocusable({
     focusKey: 'player-error-root',
+    focusable: false,
     trackChildren: true,
     saveLastFocusedChild: true,
     preferredChildFocusKey: 'player-error-retry',

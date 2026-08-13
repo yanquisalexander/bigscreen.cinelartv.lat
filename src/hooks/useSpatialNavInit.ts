@@ -7,7 +7,7 @@ function ensureInit() {
   if (initialized) return;
   initialized = true;
 
-  init({
+init({
     debug: false,
     throttle: 80,
   });
