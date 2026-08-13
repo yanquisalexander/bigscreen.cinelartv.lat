@@ -122,17 +122,10 @@ jobs:
           mkdir -p "$COBALT_WORKDIR"
           echo "Cobalt workdir: $COBALT_WORKDIR"
 
-      - name: Initialize Cobalt (gclient config)
+- name: Initialize Cobalt (gclient config)
         working-directory: ${{ runner.workspace }}/cobalt-build
         run: |
-          cat > .gclient << 'EOF'
-          solutions = [{
-            "url": "https://github.com/youtube/cobalt.git@27.lts.1",
-            "managed": False,
-            "name": "src/cobalt",
-          }]
-          target_os = [ "linux", "android" ]
-          EOF
+          printf 'solutions = [{\n  "url": "https://github.com/youtube/cobalt.git@27.lts.1",\n  "managed": false,\n  "name": "src/cobalt",\n}]\n' > .gclient
           cat .gclient
 
       - name: Cache ccache
