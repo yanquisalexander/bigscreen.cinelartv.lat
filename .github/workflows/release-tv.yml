@@ -158,16 +158,10 @@ jobs:
           restore-keys: |
             ccache-release-${{ runner.os }}-${{ steps.config.outputs.platform }}-
 
-      - name: Prepare directory structure
-        working-directory: ${{ runner.workspace }}/cobalt-build
-        run: |
-          mkdir -p src/build/config
-          touch src/build/config/gclient_args.gni
-
       - name: Sync Cobalt dependencies (gclient sync)
         working-directory: ${{ runner.workspace }}/cobalt-build
         run: |
-          gclient sync --no-history --shallow --revision "src/cobalt@${{ env.COBALT_VERSION }}"
+          gclient sync --no-history --shallow
         timeout-minutes: 60
 
       - name: Configure Cobalt build (GN)
