@@ -125,7 +125,7 @@ jobs:
       - name: Initialize Cobalt (gclient config)
         working-directory: ${{ runner.workspace }}/cobalt-build
         run: |
-          printf 'solutions = [{\n  "url": "https://github.com/youtube/cobalt.git@27.lts.1",\n  "managed": false,\n  "name": "src/cobalt",\n}]\n' > .gclient
+          printf 'solutions = [{\n  "url": "https://github.com/youtube/cobalt.git@27.lts.1",\n  "managed": False,\n  "name": "src/cobalt",\n}]\n' > .gclient
           cat .gclient
 
       - name: Cache ccache
