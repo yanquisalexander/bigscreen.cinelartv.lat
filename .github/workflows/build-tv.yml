@@ -33,22 +33,22 @@ env:
 
 jobs:
   build:
-    name: Build + Package (${{ matrix.platform }})
+    name: Build + Package
     runs-on: ubuntu-22.04
     timeout-minutes: 120
-
-    strategy:
-      matrix:
-        platform: [${{ inputs.platform || 'android-arm' }}]
-        build_type: [${{ inputs.cobalt_build_type || 'gold' }}]
-
-    env:
-      COBALT_PLATFORM: ${{ matrix.platform }}
-      COBALT_BUILD_TYPE: ${{ matrix.build_type }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Resolve platform and build type
+        id: config
+        run: |
+          PLATFORM="${{ inputs.platform || 'android-arm' }}"
+          BUILD_TYPE="${{ inputs.cobalt_build_type || 'gold' }}"
+          echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
+          echo "build_type=$BUILD_TYPE" >> "$GITHUB_OUTPUT"
+          echo "Platform: $PLATFORM | Build: $BUILD_TYPE"
 
       - name: Read version config
         id: versions
@@ -57,7 +57,7 @@ jobs:
           STARBOARD_API=$(python3 -c "import json; print(json.load(open('cobalt-versions.json'))['cobalt']['starboard_api_version'])")
           echo "cobalt_ref=$COBALT_REF" >> "$GITHUB_OUTPUT"
           echo "starboard_api=$STARBOARD_API" >> "$GITHUB_OUTPUT"
-          echo "Cobalt: $COBALT_REF | Starboard: $STARBOARD_API | Platform: ${{ matrix.platform }}"
+          echo "Cobalt: $COBALT_REF | Starboard: $STARBOARD_API | Platform: ${{ steps.config.outputs.platform }}"
 
       - name: Install system dependencies
         run: |
@@ -68,14 +68,12 @@ jobs:
             libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev \
             libxi-dev libgl-dev libegl-dev libgles2-mesa-dev
 
-      # ── Android NDK/SDK (solo para android-arm) ──
       - name: Setup Android SDK + NDK
-        if: matrix.platform == 'android-arm'
+        if: steps.config.outputs.platform == 'android-arm'
         run: |
           ANDROID_HOME="${{ runner.workspace }}/android-sdk"
           mkdir -p "$ANDROID_HOME"
 
-          # cmdline-tools
           CMDLINE_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
           curl -sL "$CMDLINE_URL" -o /tmp/cmdtools.zip
           unzip -qo /tmp/cmdtools.zip -d "$ANDROID_HOME/cmdline-tools"
@@ -83,7 +81,6 @@ jobs:
 
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
 
-          # Accept licenses + install platform + NDK
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
           sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125"
 
@@ -109,7 +106,7 @@ jobs:
             git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git "$DEPOT_PATH"
           fi
           echo "$DEPOT_PATH" >> "$GITHUB_PATH"
-          echo "depot_tools ready"
+          echo "depot_tools ready at $DEPOT_PATH"
 
       - name: Create Cobalt working directory
         run: |
@@ -127,9 +124,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-${{ runner.os }}-${{ matrix.platform }}-${{ github.sha }}
+          key: ccache-${{ runner.os }}-${{ steps.config.outputs.platform }}-${{ github.sha }}
           restore-keys: |
-            ccache-${{ runner.os }}-${{ matrix.platform }}-
+            ccache-${{ runner.os }}-${{ steps.config.outputs.platform }}-
 
       - name: Prepare directory structure
         working-directory: ${{ runner.workspace }}/cobalt-build
@@ -146,13 +143,15 @@ jobs:
       - name: Configure Cobalt build (GN)
         working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
         run: |
+          PLATFORM="${{ steps.config.outputs.platform }}"
+          BUILD_TYPE="${{ steps.config.outputs.build_type }}"
           GN_ARGS=""
-          if [ "${{ matrix.platform }}" = "android-arm" ]; then
+          if [ "$PLATFORM" = "android-arm" ]; then
             GN_ARGS="target_os=\"android\" target_cpu=\"arm\" android_ndk_root=\"$ANDROID_NDK_HOME\" android_sdk_root=\"$ANDROID_HOME\""
           fi
           python3 cobalt/build/gn.py \
-            -p ${{ matrix.platform }} \
-            -c ${{ matrix.build_type }} \
+            -p "$PLATFORM" \
+            -c "$BUILD_TYPE" \
             --no-rbe \
             --args="$GN_ARGS"
           echo "GN configuration done"
@@ -160,50 +159,41 @@ jobs:
       - name: Build Cobalt (Ninja)
         working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
         run: |
-          autoninja -C "out/${{ matrix.platform }}_${{ matrix.build_type }}" cobalt
+          PLATFORM="${{ steps.config.outputs.platform }}"
+          BUILD_TYPE="${{ steps.config.outputs.build_type }}"
+          autoninja -C "out/${PLATFORM}_${BUILD_TYPE}" cobalt
           echo "Cobalt build done"
 
-      - name: Build Evergreen loader (if enabled)
+      - name: Build Evergreen loader
         working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
         run: |
-          BUILD_DIR="out/${{ matrix.platform }}_${{ matrix.build_type }}"
-          if [ -f "$BUILD_DIR/loader_app" ]; then
-            echo "Evergreen loader built: $BUILD_DIR/loader_app"
-            ls -lh "$BUILD_DIR/loader_app"
-          else
-            echo "Loader app not found, building..."
-            autoninja -C "$BUILD_DIR" loader_app || echo "loader_app target not available"
-          fi
+          PLATFORM="${{ steps.config.outputs.platform }}"
+          BUILD_TYPE="${{ steps.config.outputs.build_type }}"
+          BUILD_DIR="out/${PLATFORM}_${BUILD_TYPE}"
+          autoninja -C "$BUILD_DIR" loader_app || echo "loader_app not available"
 
       - name: Verify Cobalt build
         working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
         run: |
-          BUILD_DIR="out/${{ matrix.platform }}_${{ matrix.build_type }}"
-          echo "Build output:"
+          PLATFORM="${{ steps.config.outputs.platform }}"
+          BUILD_TYPE="${{ steps.config.outputs.build_type }}"
+          BUILD_DIR="out/${PLATFORM}_${BUILD_TYPE}"
+          echo "=== Build output ==="
           ls -lh "$BUILD_DIR/" | head -20
 
-          COBALT_BIN="$BUILD_DIR/cobalt"
-          if [ -f "$COBALT_BIN" ]; then
-            file "$COBALT_BIN"
-            echo "Cobalt binary OK"
-          fi
-
-          LOADER="$BUILD_DIR/loader_app"
-          if [ -f "$LOADER" ]; then
-            file "$LOADER"
-            echo "Evergreen loader OK"
-          fi
-
-          LIBCOBALT="$BUILD_DIR/libcobalt.so"
-          if [ -f "$LIBCOBALT" ]; then
-            file "$LIBCOBALT"
-            echo "Evergreen libcobalt.so OK"
-          fi
+          for f in cobalt loader_app libcobalt.so; do
+            if [ -f "$BUILD_DIR/$f" ]; then
+              file "$BUILD_DIR/$f"
+              echo "  -> $f OK"
+            fi
+          done
 
       - name: Run NPLB smoke tests
         working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
         run: |
-          BUILD_DIR="out/${{ matrix.platform }}_${{ matrix.build_type }}"
+          PLATFORM="${{ steps.config.outputs.platform }}"
+          BUILD_TYPE="${{ steps.config.outputs.build_type }}"
+          BUILD_DIR="out/${PLATFORM}_${BUILD_TYPE}"
           if [ -f "$BUILD_DIR/nplb" ]; then
             file "$BUILD_DIR/nplb"
             echo "NPLB tests available (skipping cross-compiled binary)"
@@ -222,25 +212,23 @@ jobs:
 
       - name: Package artifact
         run: |
-          BUILD_DIR="${{ runner.workspace }}/cobalt-build/src/cobalt/out/${{ matrix.platform }}_${{ matrix.build_type }}"
-          PACKAGE_DIR="build/tv/${{ matrix.platform }}"
+          PLATFORM="${{ steps.config.outputs.platform }}"
+          BUILD_TYPE="${{ steps.config.outputs.build_type }}"
+          BUILD_DIR="${{ runner.workspace }}/cobalt-build/src/cobalt/out/${PLATFORM}_${BUILD_TYPE}"
+          PACKAGE_DIR="build/tv/${PLATFORM}"
           mkdir -p "$PACKAGE_DIR"
 
-          # Binario principal
           for f in cobalt loader_app libcobalt.so; do
             cp "$BUILD_DIR/$f" "$PACKAGE_DIR/" 2>/dev/null || true
           done
-
-          # Shared libraries
           cp -r "$BUILD_DIR/"*.so "$PACKAGE_DIR/" 2>/dev/null || true
           cp -r "$BUILD_DIR/"*.apk "$PACKAGE_DIR/" 2>/dev/null || true
 
-          # Manifest
           python3 -c "
           import json, os
           manifest = {
-              'platform': '${{ matrix.platform }}',
-              'build_type': '${{ matrix.build_type }}',
+              'platform': '$PLATFORM',
+              'build_type': '$BUILD_TYPE',
               'cobalt_version': '${{ env.COBALT_VERSION }}',
               'starboard_api': ${{ steps.versions.outputs.starboard_api }},
               'app_url': '${{ env.APP_URL }}',
@@ -253,9 +241,8 @@ jobs:
               json.dump(manifest, f, indent=2)
           "
 
-          # Start script
-          if [ "${{ matrix.platform }}" = "android-arm" ]; then
-            printf '#!/bin/bash\nset -e\necho "Android TV artifact - push to device via adb"\necho "  adb push . /sdcard/cobalt/"\necho "  adb shell /sdcard/cobalt/loader_app --url=%s"\n' "${{ env.APP_URL }}" > "$PACKAGE_DIR/start.sh"
+          if [ "$PLATFORM" = "android-arm" ]; then
+            printf '#!/bin/bash\nset -e\necho "Android TV artifact - push via adb"\necho "  adb push . /sdcard/cobalt/"\necho "  adb shell /sdcard/cobalt/loader_app --url=%s"\n' "${{ env.APP_URL }}" > "$PACKAGE_DIR/start.sh"
           else
             printf '#!/bin/bash\nset -e\nSCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"\n"$SCRIPT_DIR/cobalt" --url="%s"\n' "${{ env.APP_URL }}" > "$PACKAGE_DIR/start.sh"
           fi
@@ -268,6 +255,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tv-app-${{ matrix.platform }}-${{ matrix.build_type }}-${{ github.sha }}
-          path: build/tv/${{ matrix.platform }}/
+          name: tv-app-${{ steps.config.outputs.platform }}-${{ steps.config.outputs.build_type }}-${{ github.sha }}
+          path: build/tv/${{ steps.config.outputs.platform }}/
           retention-days: 30
