@@ -91,6 +91,13 @@ jobs:
             libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev \
             libxi-dev libgl-dev libegl-dev libgles2-mesa-dev
 
+      - name: Setup Java 17
+        if: steps.config.outputs.platform == 'android-arm'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Setup Android SDK + NDK
         if: steps.config.outputs.platform == 'android-arm'
         run: |
