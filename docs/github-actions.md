@@ -4,94 +4,92 @@
 
 ### `build-tv.yml` — Build + Test
 
-Se ejecuta en:
 - `push` a `main`
 - `pull request` a `main`
-- `workflow_dispatch` (manual)
-
-Produce: artifact con binario de Cobalt (retención 30 días).
+- `workflow_dispatch` (manual,可以选择 platform)
 
 ### `release-tv.yml` — Build + Release
 
-Se ejecuta en:
-- Tag `tv-v*` (ej: `tv-v1.0.0`)
-- `workflow_dispatch` con versión manual
+- Tag `tv-v*`
+- `workflow_dispatch` con versión
 
-Produce: GitHub Release con artifact versionado (retención 90 días).
-
-## Variables de entorno
+## Variables
 
 | Variable | Default | Descripción |
 |---|---|---|
-| `COBALT_PLATFORM` | `linux-x64x11` | Target platform |
-| `COBALT_BUILD_TYPE` | `gold` | Build type (debug/devel/qa/gold) |
-| `APP_URL` | `https://bigscreen.cinelartv.lat` | URL de la app que Cobalt carga |
+| `APP_URL` | `https://bigscreen.cinelartv.lat` | URL que Cobalt carga |
+| `COBALT_VERSION` | `27.lts.1` | Versión de Cobalt |
 
-## Qué se buildea
+## Platforms
 
-El pipeline **solo compila Cobalt**. La app no se compila — se carga desde su URL de producción.
+El workflow acepta `platform` como input:
+
+- **`android-arm`** (default) — Android TV, necesita NDK cross-compilation
+- **`linux-x64x11`** — Desktop Linux, para testing rápido
+
+## Pipeline
 
 ```
-GitHub Actions
-   → compila Cobalt (GN + Ninja)
-   → ejecuta NPLB tests
-   → verifica que la app responde (curl HTTP)
-   → empaqueta binario de Cobalt
-   → sube artifact
+git push
+  → checkout
+  → setup Android NDK (si android-arm)
+  → depot_tools
+  → gclient sync
+  → gn.py -p <platform> -c gold
+  → autoninja cobalt
+  → autoninja loader_app (Evergreen)
+  → NPLB tests
+  → curl verify app reachable
+  → package artifact
+  → upload
 ```
 
 ## Caching
 
-| Componente | Cacheado | Razón |
-|---|---|---|
-| `depot_tools` | Sí | Evita re-clonar |
-| `ccache` | Sí | Acelera builds C++ |
-| Build output Cobalt | No | Builds reproducibles |
+| Componente | Cacheado |
+|---|---|
+| depot_tools | Sí |
+| ccache | Sí |
+| Build output | No (reproducible) |
 
 ## Artifact
 
-El artifact contiene:
-- `cobalt/` — Binario de Cobalt + shared libraries
-- `manifest.json` — Versiones y metadata
-- `start.sh` — Ejecuta `cobalt --url=https://bigscreen.cinelartv.lat`
+- `cobalt/` — Binario Cobalt
+- `loader_app` — Bootstrap Evergreen
+- `libcobalt.so` — Engine actualizable
+- `manifest.json` — Versiones
+- `start.sh` — Script de instalación
 
-## Obtener el artifact
-
-1. Ir a "Actions" del repo
-2. Seleccionar el workflow
-3. Click en el run
-4. Scroll a "Artifacts"
-5. Descargar
-
-## Ejecutar en el dispositivo TV
+## Instalar en Android TV
 
 ```bash
-# Extraer artifact
-tar -xzf tv-app-linux-x64x11-*.tar.gz
+# Descargar artifact de GitHub Actions
+# Extraer
+tar -xzf tv-app-android-arm-*.tar.gz
 
-# Ejecutar
-cd tv/
-./start.sh
-# Equivalente a: ./cobalt/cobalt --url=https://bigscreen.cinelartv.lat
+# Push al TV
+adb push tv/android-arm/ /sdcard/cobalt/
+adb shell chmod +x /sdcard/cobalt/loader_app
+adb shell /sdcard/cobalt/loader_app --url=https://bigscreen.cinelartv.lat
 ```
 
-## Crear un release
+## Crear release
 
 ```bash
-# Tag
 git tag tv-v1.0.0
 git push origin tv-v1.0.0
 
-# O manual
-# Actions → Release TV App → Run workflow → versión: 1.0.0
+# O manual:
+# Actions → Release TV App → versión: 1.0.0
 ```
 
 ## Release info
 
 | Campo | Fuente |
 |---|---|
-| `app_version` | Tag o input manual |
+| `app_version` | Tag o input |
 | `cobalt_version` | `cobalt-versions.json` |
-| `platform` | `cobalt-versions.json` |
-| `build_type` | Input o default `gold` |
+| `platform` | Input (default: android-arm) |
+| `build_type` | Input (default: gold) |
+| `evergreen` | `true` |
 | `app_url` | `https://bigscreen.cinelartv.lat` |

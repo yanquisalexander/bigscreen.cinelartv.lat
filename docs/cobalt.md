@@ -1,6 +1,6 @@
 # Cobalt
 
-Cobalt es un contenedor HTML5 ligero basado en Chromium/Blink, diseñado para dispositivos de sala de estar (Smart TVs, STB, consolas). Implementa un subconjunto de W3C HTML5 optimizado para SPAs a pantalla completa.
+Cobalt es un contenedor HTML5 ligero basado en Chromium/Blink, diseñado para dispositivos de sala de estar (Smart TVs, STB, consolas).
 
 ## Cómo funciona
 
@@ -14,46 +14,54 @@ Cobalt (Blink + V8)
    Carga URL → https://bigscreen.cinelartv.lat
 ```
 
-- **Cobalt core**: Motor web (Chromium/Blink/V8) como biblioteca compartida (`libcobalt.so`)
-- **Starboard**: Capa de porting que abstrae el OS/hardware
-- **Contenido**: Cobalt carga contenido vía URL. Nuestra app ya está deployada en `https://bigscreen.cinelartv.lat`
+## Evergreen (self-updating)
 
-## Capacidades web soportadas
+Evergreen es la arquitectura de auto-actualización de Cobalt:
+
+```
+Android TV (firmware permanente)
+   └── loader_app (bootstrap, permanente)
+          └── libcobalt.so (se actualiza OTA desde Google)
+```
+
+- Google puede actualizar Cobalt sin firmware del OEM
+-YouTube on TV requiere Evergreen para certificación
+- Nosotros lo usamos para tener actualizaciones automáticas
+
+## Capacidades web
 
 - DOM, CSS Flexbox, Animaciones
 - JavaScript (V8, ES2015+)
 - `fetch()`, `XMLHttpRequest`
 - `localStorage`, `sessionStorage`
-- `MediaSource Extensions` (MSE) para streaming adaptativo
-- `Encrypted Media Extensions` (EME) para DRM (Widevine, PlayReady)
-- Canvas 2D, WebGL (via GLES2)
+- MSE (streaming adaptativo)
+- EME (DRM: Widevine, PlayReady)
+- Canvas 2D, WebGL
 - Web Audio API
 - Custom Elements v1
 
-## Lo que NO soporta
+## NO soporta
 
-- No es un browser general (sin pestañas, extensions, address bar)
-- No WebAssembly (deshabilitado por defecto)
+- No es un browser general
+- No WebAssembly
 - No WebRTC
 - No Pointer Lock
 - No Service Workers
-- No multi-process (single-process)
 
 ## Nuestra integración
 
-Cobalt carga directamente `https://bigscreen.cinelartv.lat`. No compilamos la app dentro del pipeline de Cobalt — la app se sirve desde su URL de producción.
+Cobalt carga `https://bigscreen.cinelartv.lat` directamente. La app no se compila dentro del pipeline.
 
 ```bash
 cobalt --url=https://bigscreen.cinelartv.lat
 ```
 
-## Plataformas oficiales
+## Plataformas
 
-| Plataforma | Familia | Variante | Uso |
+| Plataforma | OS | CPU | Uso |
 |---|---|---|---|
-| `linux-x64x11` | linux | x64x11 | Desktop Linux (Ubuntu x64 + X11) |
-| `android-arm` | android | arm | Android TV |
-| `raspi-2` | raspi | 2 | Raspberry Pi |
+| `android-arm` | Android | ARM | **Android TV** (target principal) |
+| `linux-x64x11` | Linux | x86_64 | CI testing / desktop |
 
 ## Links
 
