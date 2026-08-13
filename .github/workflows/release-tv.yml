@@ -166,6 +166,12 @@ jobs:
           restore-keys: |
             ccache-release-${{ runner.os }}-${{ steps.config.outputs.platform }}-
 
+      - name: Prepare src directory
+        working-directory: ${{ runner.workspace }}/cobalt-build
+        run: |
+          mkdir -p src/build/config
+          touch src/build/config/gclient_args.gni
+
       - name: Sync Cobalt dependencies (gclient sync)
         working-directory: ${{ runner.workspace }}/cobalt-build
         run: |
