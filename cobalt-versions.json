@@ -6,43 +6,44 @@
     "starboard_api_version": 16
   },
   "platforms": {
-    "android-arm": {
-      "family": "android",
+    "aosp-arm": {
+      "family": "aosp",
       "binary_variant": "arm",
-      "name": "android-arm",
-      "os": "Android",
-      "cpu": "arm",
+      "os": "Android (AOSP)",
+      "cpu": "ARM",
       "architecture": "armv7",
       "graphics": "EGL + OpenGL ES 2.0",
-      "description": "Android TV (ARM). Primary target.",
-      "android": {
-        "ndk_version": "26.1.10909125",
-        "sdk_platform": "android-34",
-        "abi": "armeabi-v7a",
-        "min_sdk": 21
-      }
+      "description": "Android TV (ARM 32-bit). Primary target.",
+      "output": "apks/cobalt.apk",
+      "package": "dev.cobalt.coat"
     },
-    "linux-x64x11": {
-      "family": "linux",
-      "binary_variant": "x64x11",
-      "name": "linux-x64x11",
-      "os": "Linux",
-      "cpu": "x86_64",
-      "architecture": "x64",
+    "aosp-arm64": {
+      "family": "aosp",
+      "binary_variant": "arm64",
+      "os": "Android (AOSP)",
+      "cpu": "ARM 64-bit",
+      "architecture": "armv8",
       "graphics": "EGL + OpenGL ES 2.0",
-      "windowing": "X11",
-      "description": "Reference platform for CI testing."
+      "description": "Android TV (ARM 64-bit).",
+      "output": "apks/cobalt.apk",
+      "package": "dev.cobalt.coat"
+    },
+    "aosp-x86": {
+      "family": "aosp",
+      "binary_variant": "x86",
+      "os": "Android (AOSP)",
+      "cpu": "x86",
+      "architecture": "x86",
+      "graphics": "EGL + OpenGL ES 2.0",
+      "description": "Android x86 (emulator/testing).",
+      "output": "apks/cobalt.apk",
+      "package": "dev.cobalt.coat"
     }
-  },
-  "evergreen": {
-    "enabled": true,
-    "description": "Self-updating architecture. Cobalt core (libcobalt.so) updates OTA without firmware updates.",
-    "max_install_slots": 3,
-    "update_channel": "stable"
   },
   "build": {
     "default_type": "gold",
     "supported_types": ["debug", "devel", "qa", "gold"],
-    "app_url": "https://bigscreen.cinelartv.lat"
+    "app_url": "https://bigscreen.cinelartv.lat",
+    "build_target": "cobalt_loader"
   }
 }

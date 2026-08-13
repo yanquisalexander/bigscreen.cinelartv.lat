@@ -1,67 +1,37 @@
 # Cobalt
 
-Cobalt es un contenedor HTML5 ligero basado en Chromium/Blink, diseñado para dispositivos de sala de estar (Smart TVs, STB, consolas).
+Cobalt es un contenedor HTML5 ligero basado en Chromium/Blink para Smart TVs.
 
 ## Cómo funciona
 
 ```
-Cobalt (Blink + V8)
+Cobalt APK (cobalt_loader)
       ↓
    Starboard (abstracción de plataforma)
       ↓
-   OS / Hardware
+   Android TV (AOSP)
       ↓
    Carga URL → https://bigscreen.cinelartv.lat
 ```
 
-## Evergreen (self-updating)
-
-Evergreen es la arquitectura de auto-actualización de Cobalt:
-
-```
-Android TV (firmware permanente)
-   └── loader_app (bootstrap, permanente)
-          └── libcobalt.so (se actualiza OTA desde Google)
-```
-
-- Google puede actualizar Cobalt sin firmware del OEM
--YouTube on TV requiere Evergreen para certificación
-- Nosotros lo usamos para tener actualizaciones automáticas
-
-## Capacidades web
-
-- DOM, CSS Flexbox, Animaciones
-- JavaScript (V8, ES2015+)
-- `fetch()`, `XMLHttpRequest`
-- `localStorage`, `sessionStorage`
-- MSE (streaming adaptativo)
-- EME (DRM: Widevine, PlayReady)
-- Canvas 2D, WebGL
-- Web Audio API
-- Custom Elements v1
-
-## NO soporta
-
-- No es un browser general
-- No WebAssembly
-- No WebRTC
-- No Pointer Lock
-- No Service Workers
-
-## Nuestra integración
-
-Cobalt carga `https://bigscreen.cinelartv.lat` directamente. La app no se compila dentro del pipeline.
-
-```bash
-cobalt --url=https://bigscreen.cinelartv.lat
-```
-
 ## Plataformas
 
-| Plataforma | OS | CPU | Uso |
-|---|---|---|---|
-| `android-arm` | Android | ARM | **Android TV** (target principal) |
-| `linux-x64x11` | Linux | x86_64 | CI testing / desktop |
+| Plataforma | CPU | Uso |
+|---|---|---|
+| `aosp-arm` | ARM 32-bit | **Android TV** (principal) |
+| `aosp-arm64` | ARM 64-bit | Android TV (64-bit) |
+| `aosp-x86` | x86 | Emulador / testing |
+
+## Output
+
+El build produce un APK: `out/<platform>_<type>/apks/cobalt.apk`
+
+## Instalación
+
+```bash
+adb install -r out/aosp-arm_gold/apks/cobalt.apk
+adb shell am start --esa commandLineArgs "url=https://bigscreen.cinelartv.lat" dev.cobalt.coat/dev.cobalt.app.MainActivity
+```
 
 ## Links
 

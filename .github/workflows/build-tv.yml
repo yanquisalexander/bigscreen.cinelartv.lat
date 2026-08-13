@@ -20,11 +20,12 @@ on:
       platform:
         description: "Target platform"
         required: false
-        default: "android-arm"
+        default: "aosp-arm"
         type: choice
         options:
-          - android-arm
-          - linux-x64x11
+          - aosp-arm
+          - aosp-arm64
+          - aosp-x86
 
 env:
   APP_URL: https://bigscreen.cinelartv.lat
@@ -44,7 +45,7 @@ jobs:
       - name: Resolve platform and build type
         id: config
         run: |
-          PLATFORM="${{ inputs.platform || 'android-arm' }}"
+          PLATFORM="${{ inputs.platform || 'aosp-arm' }}"
           BUILD_TYPE="${{ inputs.cobalt_build_type || 'gold' }}"
           echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
           echo "build_type=$BUILD_TYPE" >> "$GITHUB_OUTPUT"
@@ -69,14 +70,14 @@ jobs:
             libxi-dev libgl-dev libegl-dev libgles2-mesa-dev
 
       - name: Setup Java 17
-        if: steps.config.outputs.platform == 'android-arm'
+        if: startsWith(steps.config.outputs.platform, 'aosp-')
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Setup Android SDK + NDK
-        if: steps.config.outputs.platform == 'android-arm'
+        if: startsWith(steps.config.outputs.platform, 'aosp-')
         run: |
           ANDROID_HOME="${{ runner.workspace }}/android-sdk"
           mkdir -p "$ANDROID_HOME"
@@ -113,7 +114,7 @@ jobs:
             git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git "$DEPOT_PATH"
           fi
           echo "$DEPOT_PATH" >> "$GITHUB_PATH"
-          echo "depot_tools ready at $DEPOT_PATH"
+          echo "depot_tools ready"
 
       - name: Create Cobalt working directory
         run: |
@@ -124,7 +125,14 @@ jobs:
       - name: Initialize Cobalt (gclient config)
         working-directory: ${{ runner.workspace }}/cobalt-build
         run: |
-          printf 'solutions = [{\n  "url": "https://github.com/youtube/cobalt.git@%s",\n  "managed": False,\n  "name": "src/cobalt",\n}]\n' "${{ env.COBALT_VERSION }}" > .gclient
+          cat > .gclient << 'EOF'
+          solutions = [{
+            "url": "https://github.com/youtube/cobalt.git@27.lts.1",
+            "managed": False,
+            "name": "src/cobalt",
+          }]
+          target_os = [ "linux", "android" ]
+          EOF
           cat .gclient
 
       - name: Cache ccache
@@ -146,15 +154,10 @@ jobs:
         run: |
           PLATFORM="${{ steps.config.outputs.platform }}"
           BUILD_TYPE="${{ steps.config.outputs.build_type }}"
-          GN_ARGS=""
-          if [ "$PLATFORM" = "android-arm" ]; then
-            GN_ARGS="target_os=\"android\" target_cpu=\"arm\" android_ndk_root=\"$ANDROID_NDK_HOME\" android_sdk_root=\"$ANDROID_HOME\""
-          fi
           python3 cobalt/build/gn.py \
             -p "$PLATFORM" \
             -c "$BUILD_TYPE" \
-            --no-rbe \
-            --args="$GN_ARGS"
+            --no-rbe
           echo "GN configuration done"
 
       - name: Build Cobalt (Ninja)
@@ -162,16 +165,8 @@ jobs:
         run: |
           PLATFORM="${{ steps.config.outputs.platform }}"
           BUILD_TYPE="${{ steps.config.outputs.build_type }}"
-          autoninja -C "out/${PLATFORM}_${BUILD_TYPE}" cobalt
+          autoninja -C "out/${PLATFORM}_${BUILD_TYPE}" cobalt_loader
           echo "Cobalt build done"
-
-      - name: Build Evergreen loader
-        working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
-        run: |
-          PLATFORM="${{ steps.config.outputs.platform }}"
-          BUILD_TYPE="${{ steps.config.outputs.build_type }}"
-          BUILD_DIR="out/${PLATFORM}_${BUILD_TYPE}"
-          autoninja -C "$BUILD_DIR" loader_app || echo "loader_app not available"
 
       - name: Verify Cobalt build
         working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
@@ -180,35 +175,25 @@ jobs:
           BUILD_TYPE="${{ steps.config.outputs.build_type }}"
           BUILD_DIR="out/${PLATFORM}_${BUILD_TYPE}"
           echo "=== Build output ==="
-          ls -lh "$BUILD_DIR/" | head -20
-
-          for f in cobalt loader_app libcobalt.so; do
-            if [ -f "$BUILD_DIR/$f" ]; then
-              file "$BUILD_DIR/$f"
-              echo "  -> $f OK"
+          ls -lh "$BUILD_DIR/"
+          echo ""
+          echo "=== APKs ==="
+          ls -lh "$BUILD_DIR/apks/" 2>/dev/null || echo "No apks/ dir"
+          echo ""
+          for f in "$BUILD_DIR"/apks/*.apk; do
+            if [ -f "$f" ]; then
+              file "$f"
+              echo "  -> $(basename $f) OK"
             fi
           done
 
-      - name: Run NPLB smoke tests
-        working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
-        run: |
-          PLATFORM="${{ steps.config.outputs.platform }}"
-          BUILD_TYPE="${{ steps.config.outputs.build_type }}"
-          BUILD_DIR="out/${PLATFORM}_${BUILD_TYPE}"
-          if [ -f "$BUILD_DIR/nplb" ]; then
-            file "$BUILD_DIR/nplb"
-            echo "NPLB tests available (skipping cross-compiled binary)"
-          else
-            echo "NPLB not found, skipping"
-          fi
-
-      - name: Smoke test - verify app reachable
+      - name: Smoke test - verify app
         run: |
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.APP_URL }}" || true)
           if [ "$HTTP_CODE" = "200" ]; then
-            echo "Smoke test PASSED: ${{ env.APP_URL }} returns HTTP $HTTP_CODE"
+            echo "PASSED: ${{ env.APP_URL }} -> HTTP $HTTP_CODE"
           else
-            echo "Smoke test WARNING: ${{ env.APP_URL }} returned HTTP $HTTP_CODE"
+            echo "WARNING: ${{ env.APP_URL }} -> HTTP $HTTP_CODE"
           fi
 
       - name: Package artifact
@@ -219,11 +204,11 @@ jobs:
           PACKAGE_DIR="build/tv/${PLATFORM}"
           mkdir -p "$PACKAGE_DIR"
 
-          for f in cobalt loader_app libcobalt.so; do
-            cp "$BUILD_DIR/$f" "$PACKAGE_DIR/" 2>/dev/null || true
-          done
+          # Copy APKs
+          cp -r "$BUILD_DIR/apks/"*.apk "$PACKAGE_DIR/" 2>/dev/null || true
+
+          # Copy shared libs for Evergreen
           cp -r "$BUILD_DIR/"*.so "$PACKAGE_DIR/" 2>/dev/null || true
-          cp -r "$BUILD_DIR/"*.apk "$PACKAGE_DIR/" 2>/dev/null || true
 
           python3 -c "
           import json, os
@@ -233,7 +218,6 @@ jobs:
               'cobalt_version': '${{ env.COBALT_VERSION }}',
               'starboard_api': ${{ steps.versions.outputs.starboard_api }},
               'app_url': '${{ env.APP_URL }}',
-              'evergreen': True,
               'build_date': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
               'commit': '${{ github.sha }}',
               'run': '${{ github.run_number }}'
@@ -242,11 +226,24 @@ jobs:
               json.dump(manifest, f, indent=2)
           "
 
-          if [ "$PLATFORM" = "android-arm" ]; then
-            printf '#!/bin/bash\nset -e\necho "Android TV artifact - push via adb"\necho "  adb push . /sdcard/cobalt/"\necho "  adb shell /sdcard/cobalt/loader_app --url=%s"\n' "${{ env.APP_URL }}" > "$PACKAGE_DIR/start.sh"
-          else
-            printf '#!/bin/bash\nset -e\nSCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"\n"$SCRIPT_DIR/cobalt" --url="%s"\n' "${{ env.APP_URL }}" > "$PACKAGE_DIR/start.sh"
+          cat > "$PACKAGE_DIR/start.sh" << 'EOF'
+          #!/bin/bash
+          set -e
+          SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+          APK="$SCRIPT_DIR/cobalt.apk"
+          if [ ! -f "$APK" ]; then
+            APK=$(find "$SCRIPT_DIR" -name "*.apk" | head -1)
           fi
+          if [ -z "$APK" ]; then
+            echo "ERROR: No APK found"
+            exit 1
+          fi
+          echo "Installing Cobalt APK..."
+          adb install -r "$APK"
+          echo "Launching with app URL..."
+          adb shell am start --esa commandLineArgs "url=https://bigscreen.cinelartv.lat" dev.cobalt.coat/dev.cobalt.app.MainActivity
+          echo "Done. Check TV screen."
+          EOF
           chmod +x "$PACKAGE_DIR/start.sh"
 
           echo "Package:"
