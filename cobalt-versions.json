@@ -1,0 +1,24 @@
+{
+  "cobalt": {
+    "version": "27.lts.1",
+    "repo": "https://github.com/youtube/cobalt.git",
+    "ref": "27.lts.1",
+    "starboard_api_version": 16
+  },
+  "platform": {
+    "family": "linux",
+    "binary_variant": "x64x11",
+    "name": "linux-x64x11",
+    "os": "Linux",
+    "cpu": "x86_64",
+    "architecture": "x64",
+    "graphics": "EGL + OpenGL ES 2.0",
+    "windowing": "X11",
+    "description": "Reference platform for CI builds. Ubuntu x64 with X11 windowing."
+  },
+  "build": {
+    "default_type": "gold",
+    "supported_types": ["debug", "devel", "qa", "gold"],
+    "app_build_target": "es2018"
+  }
+}

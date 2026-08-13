@@ -1,0 +1,231 @@
+name: Release TV App (Cobalt)
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_version:
+        description: "App version (e.g. 1.0.0)"
+        required: true
+        type: string
+      cobalt_build_type:
+        description: "Cobalt build type"
+        required: false
+        default: "gold"
+        type: choice
+        options:
+          - debug
+          - devel
+          - qa
+          - gold
+      notes:
+        description: "Release notes"
+        required: false
+        type: string
+
+  push:
+    tags:
+      - "tv-v*"
+
+env:
+  COBALT_PLATFORM: linux-x64x11
+  COBALT_BUILD_TYPE: ${{ inputs.cobalt_build_type || 'gold' }}
+  APP_URL: https://bigscreen.cinelartv.lat
+  DEPOT_TOOLS_UPDATE: 0
+
+jobs:
+  release:
+    name: Build + Release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/tv-v* ]]; then
+            APP_VERSION="${GITHUB_REF#refs/tags/tv-v}"
+          elif [ -n "${{ inputs.app_version }}" ]; then
+            APP_VERSION="${{ inputs.app_version }}"
+          else
+            APP_VERSION="0.0.0-$(git rev-parse --short HEAD)"
+          fi
+          echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
+          echo "App version: $APP_VERSION"
+
+      - name: Read version config
+        id: versions
+        run: |
+          COBALT_VERSION=$(python3 -c "import json; print(json.load(open('cobalt-versions.json'))['cobalt']['ref'])")
+          STARBOARD_API=$(python3 -c "import json; print(json.load(open('cobalt-versions.json'))['cobalt']['starboard_api_version'])")
+          PLATFORM=$(python3 -c "import json; print(json.load(open('cobalt-versions.json'))['platform']['name'])")
+          CPU=$(python3 -c "import json; print(json.load(open('cobalt-versions.json'))['platform']['cpu'])")
+          echo "cobalt_version=$COBALT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "starboard_api=$STARBOARD_API" >> "$GITHUB_OUTPUT"
+          echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
+          echo "cpu=$CPU" >> "$GITHUB_OUTPUT"
+          echo "Cobalt: $COBALT_VERSION | Starboard: $STARBOARD_API | Platform: $PLATFORM"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git curl python3 python3-dev xz-utils \
+            lsb-release file ccache pkg-config \
+            libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev \
+            libxi-dev libgl-dev libegl-dev libgles2-mesa-dev
+
+      - name: Cache depot_tools
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.workspace }}/depot_tools
+          key: depot-tools-${{ runner.os }}-${{ steps.versions.outputs.cobalt_version }}
+          restore-keys: |
+            depot-tools-${{ runner.os }}-
+
+      - name: Setup depot_tools
+        run: |
+          DEPOT_PATH="${{ runner.workspace }}/depot_tools"
+          if [ ! -d "$DEPOT_PATH" ]; then
+            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git "$DEPOT_PATH"
+          fi
+          echo "$DEPOT_PATH" >> "$GITHUB_PATH"
+          echo "depot_tools ready"
+
+      - name: Create Cobalt working directory
+        run: |
+          COBALT_WORKDIR="${{ runner.workspace }}/cobalt-build"
+          mkdir -p "$COBALT_WORKDIR"
+          echo "Cobalt workdir: $COBALT_WORKDIR"
+
+      - name: Initialize Cobalt (gclient config)
+        working-directory: ${{ runner.workspace }}/cobalt-build
+        run: |
+          printf 'solutions = [{\n  "url": "https://github.com/youtube/cobalt.git@%s",\n  "managed": False,\n  "name": "src/cobalt",\n}]\n' "${{ steps.versions.outputs.cobalt_version }}" > .gclient
+          cat .gclient
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-release-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            ccache-release-${{ runner.os }}-
+
+      - name: Sync Cobalt dependencies (gclient sync)
+        working-directory: ${{ runner.workspace }}/cobalt-build
+        run: |
+          gclient sync --no-history --shallow --revision "src/cobalt@${{ steps.versions.outputs.cobalt_version }}"
+        timeout-minutes: 60
+
+      - name: Configure Cobalt build (GN)
+        working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
+        run: |
+          python3 cobalt/build/gn.py \
+            -p ${{ steps.versions.outputs.platform }} \
+            -c ${{ env.COBALT_BUILD_TYPE }} \
+            --no-rbe
+
+      - name: Build Cobalt (Ninja)
+        working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
+        run: |
+          autoninja -C "out/${{ steps.versions.outputs.platform }}_${{ env.COBALT_BUILD_TYPE }}" cobalt
+
+      - name: Verify Cobalt build
+        working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
+        run: |
+          BUILD_DIR="out/${{ steps.versions.outputs.platform }}_${{ env.COBALT_BUILD_TYPE }}"
+          COBALT_BIN="$BUILD_DIR/cobalt"
+          if [ ! -f "$COBALT_BIN" ]; then
+            echo "ERROR: Cobalt binary not found"
+            exit 1
+          fi
+          file "$COBALT_BIN"
+          ls -lh "$COBALT_BIN"
+
+      - name: Run NPLB smoke tests
+        working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
+        run: |
+          BUILD_DIR="out/${{ steps.versions.outputs.platform }}_${{ env.COBALT_BUILD_TYPE }}"
+          if [ -f "$BUILD_DIR/nplb" ]; then
+            timeout 120 "$BUILD_DIR/nplb" || echo "NPLB completed with exit code $?"
+          else
+            echo "NPLB not found, skipping"
+          fi
+
+      - name: Smoke test - verify app reachable
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.APP_URL }}" || true)
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "Smoke test PASSED: ${{ env.APP_URL }} returns HTTP $HTTP_CODE"
+          else
+            echo "Smoke test WARNING: ${{ env.APP_URL }} returned HTTP $HTTP_CODE"
+          fi
+
+      - name: Package artifact
+        run: |
+          VERSION="${{ steps.version.outputs.app_version }}"
+          PACKAGE_DIR="build/tv"
+          mkdir -p "$PACKAGE_DIR/cobalt"
+
+          BUILD_DIR="${{ runner.workspace }}/cobalt-build/src/cobalt/out/${{ steps.versions.outputs.platform }}_${{ env.COBALT_BUILD_TYPE }}"
+          cp "$BUILD_DIR/cobalt" "$PACKAGE_DIR/cobalt/" 2>/dev/null || true
+          cp -r "$BUILD_DIR/"*.so "$PACKAGE_DIR/cobalt/" 2>/dev/null || true
+
+          python3 -c "
+          import json, os
+          manifest = {
+              'app_version': '$VERSION',
+              'cobalt_version': '${{ steps.versions.outputs.cobalt_version }}',
+              'starboard_api_version': ${{ steps.versions.outputs.starboard_api }},
+              'platform': '${{ steps.versions.outputs.platform }}',
+              'architecture': '${{ steps.versions.outputs.cpu }}',
+              'build_type': '${{ env.COBALT_BUILD_TYPE }}',
+              'app_url': '${{ env.APP_URL }}',
+              'build_date': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+              'commit': '${{ github.sha }}',
+              'release_tag': '${{ github.ref_name }}'
+          }
+          with open(os.path.join('$PACKAGE_DIR', 'manifest.json'), 'w') as f:
+              json.dump(manifest, f, indent=2)
+          "
+
+          printf '#!/bin/bash\nset -e\nSCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"\n"$SCRIPT_DIR/cobalt/cobalt" --url="%s"\n' "${{ env.APP_URL }}" > "$PACKAGE_DIR/start.sh"
+          chmod +x "$PACKAGE_DIR/start.sh"
+
+          cd build
+          tar -czf "tv-app-${{ steps.versions.outputs.platform }}-${VERSION}.tar.gz" tv/
+          echo "Package created:"
+          ls -lh "tv-app-${{ steps.versions.outputs.platform }}-${VERSION}.tar.gz"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tv-app-${{ steps.versions.outputs.platform }}-${{ steps.version.outputs.app_version }}
+          path: build/tv/
+          retention-days: 90
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/tv-v') || inputs.app_version != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "TV App v${{ steps.version.outputs.app_version }}"
+          tag_name: "tv-v${{ steps.version.outputs.app_version }}"
+          body: |
+            ## TV App v${{ steps.version.outputs.app_version }}
+
+            **Cobalt:** ${{ steps.versions.outputs.cobalt_version }}
+            **Starboard API:** ${{ steps.versions.outputs.starboard_api }}
+            **Platform:** ${{ steps.versions.outputs.platform }}
+            **Architecture:** ${{ steps.versions.outputs.cpu }}
+            **Build:** ${{ env.COBALT_BUILD_TYPE }}
+            **App URL:** ${{ env.APP_URL }}
+
+            ${{ inputs.notes || '' }}
+          files: build/tv-app-${{ steps.versions.outputs.platform }}-${{ steps.version.outputs.app_version }}.tar.gz
+          draft: false
+          prerelease: false

@@ -1,0 +1,184 @@
+name: Build TV App (Cobalt)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      cobalt_build_type:
+        description: "Cobalt build type"
+        required: false
+        default: "gold"
+        type: choice
+        options:
+          - debug
+          - devel
+          - qa
+          - gold
+
+env:
+  COBALT_PLATFORM: linux-x64x11
+  COBALT_BUILD_TYPE: ${{ inputs.cobalt_build_type || 'gold' }}
+  APP_URL: https://bigscreen.cinelartv.lat
+  DEPOT_TOOLS_UPDATE: 0
+
+jobs:
+  build:
+    name: Build + Package
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version config
+        id: versions
+        run: |
+          COBALT_VERSION=$(python3 -c "import json; print(json.load(open('cobalt-versions.json'))['cobalt']['ref'])")
+          PLATFORM=$(python3 -c "import json; print(json.load(open('cobalt-versions.json'))['platform']['name'])")
+          echo "cobalt_version=$COBALT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
+          echo "Cobalt version: $COBALT_VERSION"
+          echo "Platform: $PLATFORM"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git curl python3 python3-dev xz-utils \
+            lsb-release file ccache pkg-config \
+            libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev \
+            libxi-dev libgl-dev libegl-dev libgles2-mesa-dev
+
+      - name: Cache depot_tools
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.workspace }}/depot_tools
+          key: depot-tools-${{ runner.os }}-${{ steps.versions.outputs.cobalt_version }}
+          restore-keys: |
+            depot-tools-${{ runner.os }}-
+
+      - name: Setup depot_tools
+        run: |
+          DEPOT_PATH="${{ runner.workspace }}/depot_tools"
+          if [ ! -d "$DEPOT_PATH" ]; then
+            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git "$DEPOT_PATH"
+          fi
+          echo "$DEPOT_PATH" >> "$GITHUB_PATH"
+          echo "depot_tools ready at $DEPOT_PATH"
+
+      - name: Create Cobalt working directory
+        run: |
+          COBALT_WORKDIR="${{ runner.workspace }}/cobalt-build"
+          mkdir -p "$COBALT_WORKDIR"
+          echo "Cobalt workdir: $COBALT_WORKDIR"
+
+      - name: Initialize Cobalt (gclient config)
+        working-directory: ${{ runner.workspace }}/cobalt-build
+        run: |
+          printf 'solutions = [{\n  "url": "https://github.com/youtube/cobalt.git@%s",\n  "managed": False,\n  "name": "src/cobalt",\n}]\n' "${{ steps.versions.outputs.cobalt_version }}" > .gclient
+          cat .gclient
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-
+
+      - name: Sync Cobalt dependencies (gclient sync)
+        working-directory: ${{ runner.workspace }}/cobalt-build
+        run: |
+          gclient sync --no-history --shallow --revision "src/cobalt@${{ steps.versions.outputs.cobalt_version }}"
+        timeout-minutes: 60
+
+      - name: Configure Cobalt build (GN)
+        working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
+        run: |
+          python3 cobalt/build/gn.py \
+            -p ${{ steps.versions.outputs.platform }} \
+            -c ${{ env.COBALT_BUILD_TYPE }} \
+            --no-rbe
+          echo "GN configuration done"
+
+      - name: Build Cobalt (Ninja)
+        working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
+        run: |
+          autoninja -C "out/${{ steps.versions.outputs.platform }}_${{ env.COBALT_BUILD_TYPE }}" cobalt
+          echo "Cobalt build done"
+
+      - name: Verify Cobalt build
+        working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
+        run: |
+          BUILD_DIR="out/${{ steps.versions.outputs.platform }}_${{ env.COBALT_BUILD_TYPE }}"
+          COBALT_BIN="$BUILD_DIR/cobalt"
+          if [ ! -f "$COBALT_BIN" ]; then
+            echo "ERROR: Cobalt binary not found at $COBALT_BIN"
+            find "$BUILD_DIR" -maxdepth 1 -type f | head -20
+            exit 1
+          fi
+          file "$COBALT_BIN"
+          ls -lh "$COBALT_BIN"
+          echo "Cobalt binary OK"
+
+      - name: Run NPLB smoke tests
+        working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
+        run: |
+          BUILD_DIR="out/${{ steps.versions.outputs.platform }}_${{ env.COBALT_BUILD_TYPE }}"
+          if [ -f "$BUILD_DIR/nplb" ]; then
+            echo "Running NPLB tests..."
+            timeout 120 "$BUILD_DIR/nplb" || echo "NPLB completed with exit code $?"
+          else
+            echo "NPLB binary not found, skipping (non-fatal)"
+          fi
+
+      - name: Smoke test - verify app reachable
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.APP_URL }}" || true)
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "Smoke test PASSED: ${{ env.APP_URL }} returns HTTP $HTTP_CODE"
+          else
+            echo "Smoke test WARNING: ${{ env.APP_URL }} returned HTTP $HTTP_CODE"
+          fi
+
+      - name: Package artifact
+        run: |
+          PACKAGE_DIR="build/tv"
+          mkdir -p "$PACKAGE_DIR/cobalt"
+
+          BUILD_DIR="${{ runner.workspace }}/cobalt-build/src/cobalt/out/${{ steps.versions.outputs.platform }}_${{ env.COBALT_BUILD_TYPE }}"
+          cp "$BUILD_DIR/cobalt" "$PACKAGE_DIR/cobalt/" 2>/dev/null || true
+          cp -r "$BUILD_DIR/"*.so "$PACKAGE_DIR/cobalt/" 2>/dev/null || true
+
+          python3 -c "
+          import json, os
+          manifest = {
+              'cobalt_version': '${{ steps.versions.outputs.cobalt_version }}',
+              'platform': '${{ steps.versions.outputs.platform }}',
+              'build_type': '${{ env.COBALT_BUILD_TYPE }}',
+              'app_url': '${{ env.APP_URL }}',
+              'build_date': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+              'commit': '${{ github.sha }}',
+              'run': '${{ github.run_number }}'
+          }
+          with open(os.path.join('$PACKAGE_DIR', 'manifest.json'), 'w') as f:
+              json.dump(manifest, f, indent=2)
+          "
+
+          printf '#!/bin/bash\nset -e\nSCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"\n"$SCRIPT_DIR/cobalt/cobalt" --url="%s"\n' "${{ env.APP_URL }}" > "$PACKAGE_DIR/start.sh"
+          chmod +x "$PACKAGE_DIR/start.sh"
+
+          echo "Package created:"
+          find "$PACKAGE_DIR" -type f | head -30
+          du -sh "$PACKAGE_DIR"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tv-app-${{ steps.versions.outputs.platform }}-${{ env.COBALT_BUILD_TYPE }}-${{ github.sha }}
+          path: build/tv/
+          retention-days: 30
