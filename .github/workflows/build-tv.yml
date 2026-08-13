@@ -122,7 +122,7 @@ jobs:
           mkdir -p "$COBALT_WORKDIR"
           echo "Cobalt workdir: $COBALT_WORKDIR"
 
-- name: Initialize Cobalt (gclient config)
+      - name: Initialize Cobalt (gclient config)
         working-directory: ${{ runner.workspace }}/cobalt-build
         run: |
           printf 'solutions = [{\n  "url": "https://github.com/youtube/cobalt.git@27.lts.1",\n  "managed": false,\n  "name": "src/cobalt",\n}]\n' > .gclient
