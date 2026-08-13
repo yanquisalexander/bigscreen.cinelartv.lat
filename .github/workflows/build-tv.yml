@@ -122,10 +122,18 @@ jobs:
           mkdir -p "$COBALT_WORKDIR"
           echo "Cobalt workdir: $COBALT_WORKDIR"
 
-      - name: Initialize Cobalt (gclient config)
+      - name: Clone Cobalt repository
         working-directory: ${{ runner.workspace }}/cobalt-build
         run: |
-          printf 'solutions = [{\n  "url": "https://github.com/youtube/cobalt.git@27.lts.1",\n  "managed": False,\n  "name": "src/cobalt",\n}]\n' > .gclient
+          git clone --single-branch --branch "${{ env.COBALT_VERSION }}" \
+            https://github.com/youtube/cobalt.git src
+          cd src
+          git rev-parse @
+
+      - name: Initialize gclient config
+        working-directory: ${{ runner.workspace }}/cobalt-build
+        run: |
+          printf 'solutions = [{\n  "name": "src",\n  "url": "https://github.com/youtube/cobalt.git",\n  "managed": False,\n}]\ntarget_os = [ "linux", "android" ]\n' > .gclient
           cat .gclient
 
       - name: Cache ccache
@@ -136,20 +144,26 @@ jobs:
           restore-keys: |
             ccache-${{ runner.os }}-${{ steps.config.outputs.platform }}-
 
-      - name: Prepare src directory
-        working-directory: ${{ runner.workspace }}/cobalt-build
-        run: |
-          mkdir -p src/build/config
-          touch src/build/config/gclient_args.gni
-
       - name: Sync Cobalt dependencies (gclient sync)
-        working-directory: ${{ runner.workspace }}/cobalt-build
+        working-directory: ${{ runner.workspace }}/cobalt-build/src
         run: |
-          gclient sync --no-history --shallow
+          gclient sync --no-history -r "$(git rev-parse @)"
         timeout-minutes: 60
 
+      - name: Install build dependencies
+        working-directory: ${{ runner.workspace }}/cobalt-build/src
+        run: |
+          sudo -E build/install-build-deps.sh || echo "install-build-deps warning above (non-fatal)"
+        timeout-minutes: 30
+
+      - name: Run gclient hooks
+        working-directory: ${{ runner.workspace }}/cobalt-build/src
+        run: |
+          gclient runhooks || echo "runhooks warning above (non-fatal)"
+        timeout-minutes: 30
+
       - name: Configure Cobalt build (GN)
-        working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
+        working-directory: ${{ runner.workspace }}/cobalt-build/src
         run: |
           PLATFORM="${{ steps.config.outputs.platform }}"
           BUILD_TYPE="${{ steps.config.outputs.build_type }}"
@@ -160,7 +174,7 @@ jobs:
           echo "GN configuration done"
 
       - name: Build Cobalt (Ninja)
-        working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
+        working-directory: ${{ runner.workspace }}/cobalt-build/src
         run: |
           PLATFORM="${{ steps.config.outputs.platform }}"
           BUILD_TYPE="${{ steps.config.outputs.build_type }}"
@@ -168,7 +182,7 @@ jobs:
           echo "Cobalt build done"
 
       - name: Verify Cobalt build
-        working-directory: ${{ runner.workspace }}/cobalt-build/src/cobalt
+        working-directory: ${{ runner.workspace }}/cobalt-build/src
         run: |
           PLATFORM="${{ steps.config.outputs.platform }}"
           BUILD_TYPE="${{ steps.config.outputs.build_type }}"
@@ -199,7 +213,7 @@ jobs:
         run: |
           PLATFORM="${{ steps.config.outputs.platform }}"
           BUILD_TYPE="${{ steps.config.outputs.build_type }}"
-          BUILD_DIR="${{ runner.workspace }}/cobalt-build/src/cobalt/out/${PLATFORM}_${BUILD_TYPE}"
+          BUILD_DIR="${{ runner.workspace }}/cobalt-build/src/out/${PLATFORM}_${BUILD_TYPE}"
           PACKAGE_DIR="build/tv/${PLATFORM}"
           mkdir -p "$PACKAGE_DIR"
 
