@@ -30,6 +30,17 @@ export function usePlayerEngine() {
       engine.on('buffering', (b) => setIsBuffering(b !== false));
       engine.on('durationchange', (d) => setDuration(d ?? 0));
       engine.on('ended', () => onEndedRef.current());
+    } else if (!el && engineRef.current) {
+      // The <video> unmounted (e.g. stream-limit / player-error screens return
+      // early without it). The engine keeps a reference to the now-detached
+      // element, so destroy it here: otherwise a later remount would reuse the
+      // stale engine and play into an invisible node → black screen.
+      pdbg('hook.attachVideo', 'video unmounted → destroying engine');
+      engineRef.current.destroy();
+      engineRef.current = null;
+      setEngineReady(false);
+      setIsPlaying(false);
+      setIsBuffering(false);
     }
   }, []);
 
