@@ -121,7 +121,7 @@
     if (!watchData?.seasons) return [];
     const result: FlatEpisode[] = [];
     for (const season of watchData.seasons) {
-      const seasonNum = (season.position ?? 0) + 1;
+      const seasonNum = (season.position ?? 1);
       for (const ep of season.episodes ?? []) {
         result.push({ ...ep, seasonNumber: seasonNum });
       }
@@ -139,7 +139,7 @@
     const idx = watchData.seasons.findIndex(
       (s) => s.id === watchData.episode!.season_id,
     );
-    return idx >= 0 ? (watchData.seasons[idx].position ?? idx) + 1 : null;
+    return idx >= 0 ? (watchData.seasons[idx].position ?? idx) : null;
   });
 
   const nextEpisode = $derived.by(() => {
