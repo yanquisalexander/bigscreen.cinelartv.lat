@@ -210,9 +210,9 @@
       />
     {/if}
 
-    <div class="relative z-10 h-[clamp(8rem,14vh,12rem)] -mb-[clamp(10rem,18vh,14rem)] bg-gradient-to-b from-black/95 via-black/70 via-40% via-black/40 via-70% to-transparent pointer-events-none transition-opacity duration-700 {heroImmersive ? 'opacity-0' : ''}"></div>
+    <div class="relative z-10 h-[clamp(12rem,20vh,16rem)] -mb-[clamp(6rem,12vh,10rem)] bg-gradient-to-b from-black via-black/80 to-transparent pointer-events-none transition-opacity duration-700 {heroImmersive ? 'opacity-0' : ''}"></div>
 
-    <div class="relative z-10 pb-[clamp(2rem,5vh,3rem)] transition-all duration-700 will-change-opacity {heroImmersive ? 'opacity-0 pointer-events-none' : ''}">
+    <div class="relative z-10 pb-[clamp(3rem,8vh,4rem)] transition-all duration-700 will-change-opacity {heroImmersive ? 'opacity-0 pointer-events-none' : ''}">
       {#each data?.content ?? [] as category, catIdx (catIdx)}
         {@const preferredChild = category.content?.[0]?.id != null ? `home-row-${catIdx}-item-${category.content[0].id}` : undefined}
 
