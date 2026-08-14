@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { Focusable } from '@/components/tv/Focusable';
 import { resolveBackdrop, resolveLogo } from '@/utils/helpers';
@@ -14,14 +14,20 @@ interface HeroSectionProps {
   onImmersiveChange?: (immersive: boolean) => void;
 }
 
-export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, firstRowFocusKey, sidebarFocusKey, onImmersiveChange }: HeroSectionProps) {
+export function HeroSection({
+  items,
+  onInfo,
+  clientEndpoint,
+  firstRowFocusKey,
+  sidebarFocusKey,
+  onImmersiveChange,
+}: HeroSectionProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showTrailer, setShowTrailer] = useState(false);
-  const [immersiveMode, setImmersiveMode] = useState(false);
-  const [descSpace, setDescSpace] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [prevBannerUrl, setPrevBannerUrl] = useState<string | null>(null);
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const descRef = useRef<HTMLParagraphElement>(null);
 
   const { ref: heroRef, focusKey, hasFocusedChild } = useFocusable({
     focusKey: 'hero-section',
@@ -34,111 +40,85 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
   const hasTrailer = !!(currentItem?.trailer_sources?.length);
   const trailerUrl = hasTrailer ? currentItem.trailer_sources![0].url : null;
 
-  // Resolve banner URL
+  // Banner actual
   const currentBannerUrl = useMemo(() => {
     if (!currentItem) return null;
-    return resolveBackdrop(currentItem.images, currentItem.banner_resized ?? currentItem.banner ?? currentItem.cover_resized ?? currentItem.cover, clientEndpoint, 'xlarge');
+    return resolveBackdrop(
+      currentItem.images,
+      currentItem.banner_resized ?? currentItem.banner ?? currentItem.cover_resized ?? currentItem.cover,
+      clientEndpoint,
+      'xlarge'
+    );
   }, [currentItem, clientEndpoint]);
 
-  // Resolve logo URL
+  // Guardar la imagen anterior para el Crossfade
+  useEffect(() => {
+    if (currentBannerUrl) {
+      const timer = setTimeout(() => {
+        setPrevBannerUrl(currentBannerUrl);
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [currentBannerUrl]);
+
+  // Logo actual
   const currentLogoUrl = useMemo(() => {
     if (!currentItem) return null;
     return resolveLogo(currentItem.images, clientEndpoint);
   }, [currentItem, clientEndpoint]);
-
-  // Crossfade: keep previous banner visible underneath while the new one fades in
-  const prevBannerUrlRef = useRef<string | null>(null);
-  const [prevBannerUrl, setPrevBannerUrl] = useState<string | null>(null);
-
-  useLayoutEffect(() => {
-    if (!currentBannerUrl) return;
-
-    // Preload next banner
-    if (items.length > 1) {
-      const nextItem = items[(currentIndex + 1) % items.length];
-      if (nextItem) {
-        const url = resolveBackdrop(nextItem.images, nextItem.banner_resized ?? nextItem.banner ?? nextItem.cover_resized ?? nextItem.cover, clientEndpoint, 'xlarge');
-        if (url) {
-          const img = new Image();
-          img.src = url;
-        }
-      }
-    }
-
-    // Keep the previous banner visible underneath while the new one fades in.
-    // The fade itself is pure CSS (hero-fade-in) and starts on img mount.
-    const oldUrl = prevBannerUrlRef.current;
-    if (oldUrl && oldUrl !== currentBannerUrl) {
-      setPrevBannerUrl(oldUrl);
-    }
-    prevBannerUrlRef.current = currentBannerUrl;
-  }, [currentBannerUrl, currentIndex, items, clientEndpoint]);
 
   const goTo = useCallback(
     (index: number) => {
       setShowTrailer(false);
       setCurrentIndex((index + items.length) % items.length);
     },
-    [items.length],
+    [items.length]
   );
 
-  const focusSidebarFromHero = useCallback((direction: string) => {
-    if (direction !== 'left' || !sidebarFocusKey) return true;
-    setFocus(sidebarFocusKey);
-    return false;
-  }, [sidebarFocusKey]);
+  const focusSidebarFromHero = useCallback(
+    (direction: string) => {
+      if (direction !== 'left' || !sidebarFocusKey) return true;
+      setFocus(sidebarFocusKey);
+      return false;
+    },
+    [sidebarFocusKey]
+  );
 
   const handleTrailerEnded = useCallback(() => {
     setShowTrailer(false);
   }, []);
 
-  // Auto-avanza solo si nadie dentro del hero tiene el foco
+  // Auto-advance
   useEffect(() => {
-    if (hasFocusedChild) {
-      heroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [hasFocusedChild, heroRef]);
-
-  useEffect(() => {
-    if (items.length <= 1 || hasFocusedChild) {
+    if (items.length <= 1 || hasFocusedChild || showTrailer) {
       if (timerRef.current) clearTimeout(timerRef.current);
       return;
     }
 
-    const advance = () => {
-      setCurrentIndex(prev => (prev + 1) % items.length);
+    timerRef.current = setTimeout(() => {
+      setCurrentIndex((prev) => (prev + 1) % items.length);
+    }, 8000);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
+  }, [items.length, hasFocusedChild, currentIndex, showTrailer]);
 
-    const schedule = () => {
-      if (items.length <= 1) return;
-      timerRef.current = setTimeout(() => {
-        advance();
-        schedule();
-      }, 7000);
-    };
-
-    schedule();
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [items.length, hasFocusedChild]);
-
-  // Manejar fade del trailer cuando cambia foco o slide
+  // Timer para iniciar el tráiler
   useEffect(() => {
-    if (!hasTrailer) {
+    if (!hasTrailer || !hasFocusedChild) {
       setShowTrailer(false);
       return;
     }
 
-    if (hasFocusedChild) {
-      const timer = setTimeout(() => {
-        setShowTrailer(true);
-      }, 2000);
-      return () => clearTimeout(timer);
-    } else {
-      setShowTrailer(false);
-    }
+    const timer = setTimeout(() => {
+      setShowTrailer(true);
+    }, 2500);
+
+    return () => clearTimeout(timer);
   }, [hasFocusedChild, currentItem?.id, hasTrailer]);
 
-  // Controlar reproducción del video
+  // Reproducción de video
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -148,95 +128,53 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
       video.play().catch(() => { });
     } else {
       video.pause();
-      video.currentTime = 0;
     }
   }, [showTrailer]);
 
-  // Modo inmersivo: 3s después de mostrar el trailer, ocultar descripción y reducir overlays
   useEffect(() => {
-    if (!showTrailer) {
-      setImmersiveMode(false);
-      return;
-    }
-    const timer = setTimeout(() => setImmersiveMode(true), 3_000);
-    return () => { clearTimeout(timer); setImmersiveMode(false); };
-  }, [showTrailer]);
-
-  // Notificar al padre cuando cambia el modo inmersivo
-  useEffect(() => {
-    onImmersiveChange?.(immersiveMode);
-  }, [immersiveMode, onImmersiveChange]);
-
-  // Medir el espacio real de la descripción (altura + margin) para el translate del título
-  useEffect(() => {
-    const el = descRef.current;
-    if (!el || !currentItem?.description) {
-      setDescSpace(0);
-      return;
-    }
-
-    const measure = () => {
-      const style = getComputedStyle(el);
-      const mb = parseFloat(style.marginBottom) || 0;
-      setDescSpace(el.offsetHeight + mb);
-    };
-
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [currentItem?.id, currentItem?.description]);
+    onImmersiveChange?.(showTrailer);
+  }, [showTrailer, onImmersiveChange]);
 
   if (!currentItem) return null;
 
   return (
     <FocusContext.Provider value={focusKey}>
+      {/* 
+        EXPANSIÓN A 100dvh:
+        Al activar showTrailer pasa a 'h-[100dvh]' expandiéndose suavemente.
+      */}
       <div
         ref={heroRef as React.RefObject<HTMLDivElement>}
-        className={`relative w-full overflow-hidden transition-all duration-700 ease-in-out ${immersiveMode ? 'h-screen' : 'h-[clamp(360px,70vh,680px)]'}`}
-        style={{ willChange: 'height' }}
+        className={`relative w-full overflow-hidden bg-black transition-[height] duration-700 ease-in-out ${showTrailer ? 'h-[100dvh]' : 'h-[clamp(420px,68vh,660px)]'
+          }`}
       >
-        {/* Capa 1: Banner images (crossfade) */}
+        {/* CAPA 1: IMÁGENES DE FONDO (CROSSFADE) */}
         <div className="absolute inset-0">
-          {/* Previous banner: stays visible underneath while the new one fades in */}
-          {prevBannerUrl && prevBannerUrl !== currentBannerUrl && (
+          {prevBannerUrl && (
             <img
               src={prevBannerUrl}
               alt=""
               className="absolute inset-0 w-full h-full object-cover"
-              width={1920}
-              height={680}
             />
           )}
-          {/* Current banner (wrapper opacity handles trailer fade) */}
-          {currentBannerUrl ? (
-            <div
-              className="absolute inset-0 transition-opacity duration-500 ease-in-out will-change-opacity"
-              style={{ opacity: showTrailer ? 0 : 1 }}
-            >
-              <img
-                key={currentBannerUrl}
-                src={currentBannerUrl}
-                alt={currentItem.title}
-                className={`absolute inset-0 w-full h-full object-cover ${prevBannerUrl ? 'hero-fade-in' : ''}`}
-                onAnimationEnd={() => setPrevBannerUrl(null)}
-                loading="eager"
-                decoding="async"
-                fetchPriority="high"
-                width={1920}
-                height={680}
-              />
-            </div>
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-accent/30 to-bg" />
+
+          {currentBannerUrl && (
+            <img
+              key={currentBannerUrl}
+              src={currentBannerUrl}
+              alt={currentItem.title}
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${showTrailer ? 'opacity-0' : 'opacity-100'
+                }`}
+              loading="eager"
+            />
           )}
         </div>
 
-        {/* Capa 2: Trailer video */}
+        {/* CAPA 2: VIDEO TRÁILER */}
         {hasTrailer && (
           <div
-            className="absolute inset-0 transition-opacity duration-1000 ease-in-out will-change-opacity"
-            style={{ opacity: showTrailer ? 1 : 0 }}
+            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${showTrailer ? 'opacity-100 z-10' : 'opacity-0 z-0'
+              }`}
           >
             <video
               key={`trailer-${currentItem.id}`}
@@ -249,33 +187,59 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
           </div>
         )}
 
-        {/* Capa 3: Gradientes siempre visibles */}
-        <div className={`absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent pointer-events-none transition-opacity duration-700 will-change-opacity ${immersiveMode ? 'opacity-20' : ''}`} />
-        <div className={`absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/30 pointer-events-none transition-opacity duration-700 will-change-opacity ${immersiveMode ? 'opacity-40' : ''}`} />
+        {/* CAPA 3: GRADIENTES DE CONTRASTE */}
+        <div
+          className={`absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent pointer-events-none transition-opacity duration-700 z-20 ${showTrailer ? 'opacity-20' : 'opacity-100'
+            }`}
+        />
+        <div
+          className={`absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/30 pointer-events-none transition-opacity duration-700 z-20 ${showTrailer ? 'opacity-30' : 'opacity-100'
+            }`}
+        />
 
-        {/* Capa 4: Contenido (título, descripción, botón) */}
-        <div className="absolute bottom-[clamp(3rem,9vh,5rem)] left-[clamp(3rem,7.5vw,6rem)] max-w-[clamp(28rem,46vw,36rem)] z-10">
+        {/* CAPA 4: CONTENIDO (Alineado a la Izquierda) */}
+        <div className="absolute bottom-[clamp(2.5rem,7vh,4.5rem)] left-[clamp(2.5rem,5vw,5rem)] max-w-[clamp(26rem,42vw,36rem)] z-30 flex flex-col items-start text-left">
+
+          {/* Metadatos */}
+          <div className="flex items-center gap-3 mb-3 text-xs font-semibold text-text-secondary">
+            {currentItem.year && (
+              <span className="px-2 py-0.5 rounded bg-white/10 text-white backdrop-blur-md">
+                {currentItem.year}
+              </span>
+            )}
+            {currentItem.duration && <span>{currentItem.duration} min</span>}
+            <span className="border border-white/30 px-1.5 py-0.2 rounded text-[10px] text-white">
+              HD
+            </span>
+          </div>
+
+          {/* Logo o Título (Siempre Visible) */}
           {currentLogoUrl ? (
             <img
               src={currentLogoUrl}
               alt={currentItem.title}
-              className="h-[clamp(3rem,6vh,5rem)] max-w-[70%] object-contain mb-[clamp(0.75rem,2vh,1rem)] drop-shadow-lg transition-all duration-700 will-change-transform"
-              style={{ transform: immersiveMode && descSpace > 0 ? `translateY(${descSpace}px)` : undefined }}
+              className="h-[clamp(3.5rem,8vh,5.5rem)] max-w-[85%] object-contain object-left mb-3 drop-shadow-2xl"
             />
           ) : (
-            <h2
-              className="text-[clamp(2rem,3.2vw,2.5rem)] font-extrabold text-white leading-tight mb-[clamp(0.75rem,2vh,1rem)] drop-shadow-lg transition-all duration-700 will-change-transform"
-              style={{ transform: immersiveMode && descSpace > 0 ? `translateY(${descSpace}px)` : undefined }}
-            >
+            <h1 className="text-[clamp(2rem,3.2vw,2.8rem)] font-black text-white leading-tight mb-3 drop-shadow-lg tracking-tight text-left">
               {currentItem.title}
-            </h2>
+            </h1>
           )}
-          {currentItem.description && (
-            <p ref={descRef} className={`text-[clamp(1rem,1.45vw,1.125rem)] text-text-secondary line-clamp-3 mb-[clamp(1rem,3vh,1.5rem)] transition-all duration-700 will-change-transform will-change-opacity ${immersiveMode ? 'opacity-0 translate-y-4 pointer-events-none' : ''}`}>
-              {currentItem.description}
-            </p>
-          )}
-          <div className="flex gap-[clamp(0.75rem,1.5vw,1rem)]">
+
+          {/* Descripción (Plegado animado) */}
+          <div
+            className={`transition-all duration-700 ease-in-out overflow-hidden w-full ${showTrailer ? 'max-h-0 opacity-0 mb-0' : 'max-h-36 opacity-100 mb-6'
+              }`}
+          >
+            {currentItem.description && (
+              <p className="text-[clamp(0.95rem,1.2vw,1.05rem)] text-gray-300 line-clamp-3 leading-relaxed font-normal drop-shadow text-left">
+                {currentItem.description}
+              </p>
+            )}
+          </div>
+
+          {/* Botón Ver detalles (Siempre Visible) */}
+          <div className="flex items-center gap-4">
             <Focusable
               onEnterPress={() => onInfo(currentItem)}
               onArrowPress={(direction) => {
@@ -289,43 +253,34 @@ export function HeroSection({ items, onPlay: _onPlay, onInfo, clientEndpoint, fi
                   return false;
                 }
                 if (direction === 'down') {
-                  if (immersiveMode) {
-                    setShowTrailer(false);
-                    setTimeout(() => {
-                      if (firstRowFocusKey) setFocus(firstRowFocusKey);
-                    }, 700);
-                    return false;
-                  }
                   if (firstRowFocusKey) {
                     setFocus(firstRowFocusKey);
                     return false;
                   }
-                  return true;
                 }
                 return true;
               }}
               autoFocus
               focusKey="hero-view-more"
-              focusedClassName="scale-105 shadow-lg shadow-black/40"
-              className="px-[clamp(1.5rem,3vw,2rem)] py-[clamp(0.625rem,1.4vh,0.75rem)] bg-white text-black text-[clamp(0.875rem,1.25vw,1rem)] font-bold rounded-full transition-transform duration-200"
+              focusedClassName="scale-105 bg-white text-black shadow-2xl shadow-white/20 ring-4 ring-white/50"
+              className="px-7 py-3 bg-white/20 backdrop-blur-md text-white text-sm font-bold rounded-xl transition-all duration-200 border border-white/20 cursor-pointer"
               playSound
             >
-              Ver más
+              Ver detalles
             </Focusable>
           </div>
         </div>
 
-        {/* Capa 5: Indicadores de slide */}
+        {/* CAPA 5: INDICADORES */}
         {items.length > 1 && (
-          <div className="absolute bottom-[clamp(1.25rem,4vh,2rem)] left-1/2 -translate-x-1/2 flex gap-2 z-10">
+          <div
+            className={`absolute bottom-6 right-[clamp(2.5rem,5vw,5rem)] flex items-center gap-2 z-30 transition-opacity duration-500 ${showTrailer ? 'opacity-20' : 'opacity-100'
+              }`}
+          >
             {items.map((_, i) => (
-              <button
+              <div
                 key={i}
-                type="button"
-                tabIndex={-1}
-                aria-label={`Slide ${i + 1}`}
-                onClick={() => goTo(i)}
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${i === currentIndex ? 'bg-white w-6' : 'bg-white/40'
+                className={`h-1.5 rounded-full transition-all duration-500 ${i === currentIndex ? 'w-8 bg-white' : 'w-2 bg-white/30'
                   }`}
               />
             ))}
