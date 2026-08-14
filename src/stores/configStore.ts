@@ -3,6 +3,7 @@ import type { RemoteConfig } from '@/types/config';
 import { DEFAULT_CONFIG } from '@/types/config';
 import { remoteConfig } from '@/services/RemoteConfigService';
 import { setApiConfig } from '@/api/client';
+import { zustandToSvelte } from '@/lib/zustandToSvelte';
 
 interface ConfigState {
   config: RemoteConfig;
@@ -30,5 +31,10 @@ export const useConfigStore = create<ConfigState>((set) => ({
     }
   },
 }));
+
+export const configStore = useConfigStore;
+
+/** Svelte-readable store — use as `$configStore` in Svelte templates */
+export const svelteConfigStore = zustandToSvelte(useConfigStore);
 
 export const IS_DEV = import.meta.env.DEV;

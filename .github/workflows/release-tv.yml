@@ -31,9 +31,10 @@ on:
         required: false
         type: string
 
-  push:
-    tags:
-      - "tv-v*"
+  # Temporarily disabled: Cobalt release builds paused
+  # push:
+  #   tags:
+  #     - "tv-v*"
 
 env:
   APP_URL: https://bigscreen.cinelartv.lat

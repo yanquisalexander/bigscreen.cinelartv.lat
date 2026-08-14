@@ -1,7 +1,7 @@
 import { LitElement, html, css, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
-import { SpatialNavigation, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
+import { SpatialNavigation, getCurrentFocusKey, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
 import { FocusableRegistrar } from './spatialFocus';
 import { formatTime, resolveImageUrl } from '@/utils/helpers';
 import type { Segment } from '@/types/content';
@@ -1141,8 +1141,8 @@ export class PlayerControlsElement extends LitElement {
 
     custom.preventDefault();
     this.railExpanded = true;
-    const activeEp = this._allEpisodes.find((e) => e.id === this._currentEpisodeId) ?? this._allEpisodes[0];
-    if (activeEp) requestAnimationFrame(() => SpatialNavigation.setFocus(`rail-ep-item-${activeEp.id}`));
+    const railFocusKey = this._resolveRailFocusKey();
+    if (railFocusKey) requestAnimationFrame(() => SpatialNavigation.setFocus(railFocusKey));
   };
 
   focusPlayPause() { SpatialNavigation.setFocus('watch-playpause'); }
@@ -1152,11 +1152,20 @@ export class PlayerControlsElement extends LitElement {
 
   toggleSettings() { this.settingsOpen = !this.settingsOpen; }
 
+  private _resolveRailFocusKey(): string | null {
+    const lastKey = this._lastFocusedControlKey;
+    if (lastKey?.startsWith('rail-ep-item-') && doesFocusableExist(lastKey)) {
+      return lastKey;
+    }
+    const activeEp = this._allEpisodes.find((e) => e.id === this._currentEpisodeId) ?? this._allEpisodes[0];
+    return activeEp ? `rail-ep-item-${activeEp.id}` : null;
+  }
+
   toggleEpisodesRail() {
     this.railExpanded = !this.railExpanded;
     if (this.railExpanded) {
-      const activeEp = this._allEpisodes.find((e) => e.id === this._currentEpisodeId) ?? this._allEpisodes[0];
-      if (activeEp) requestAnimationFrame(() => SpatialNavigation.setFocus(`rail-ep-item-${activeEp.id}`));
+      const railFocusKey = this._resolveRailFocusKey();
+      if (railFocusKey) requestAnimationFrame(() => SpatialNavigation.setFocus(railFocusKey));
     } else {
       SpatialNavigation.setFocus('watch-episodes');
     }

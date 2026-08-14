@@ -11,9 +11,12 @@
   },
   "dependencies": {
     "@fluentui/react-icons": "^2.0.331",
+    "@lucide/svelte": "^1.31.0",
     "@m3e/react": "^2.5.13",
     "@m3e/web": "2.5.13",
     "@noriginmedia/norigin-spatial-navigation": "^3.2.1",
+    "@noriginmedia/norigin-spatial-navigation-core": "^4.1.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "abortcontroller-polyfill": "^1.7.8",
     "core-js": "^3.49.0",
     "lit": "^3.3.3",
@@ -23,11 +26,15 @@
     "react-router-dom": "^7.18.1",
     "resize-observer-polyfill": "^1.5.1",
     "shaka-player": "^5.1.13",
+    "svelte": "^5.56.9",
+    "svelte-check": "^4.7.5",
+    "svelte-spa-router": "^5.1.1",
     "whatwg-fetch": "^3.6.20",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.2",
+    "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

@@ -1,4 +1,4 @@
-import { SpatialNavigation, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
+import { SpatialNavigation, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation-core';
 import { FocusableRegistrar } from './spatialFocus';
 import { playFocusSound } from '@/hooks/useNavigationSound';
 

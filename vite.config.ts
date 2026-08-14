@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from 'vite'
-import react from '@vitejs/plugin-react'
+import { svelte } from '@sveltejs/vite-plugin-svelte'
 import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'node:path'
 
@@ -124,7 +124,7 @@ function legacyCssPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), legacyCssPlugin()],
+  plugins: [svelte(), tailwindcss(), legacyCssPlugin()],
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
@@ -136,7 +136,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/') || id.includes('node_modules/react-router')) {
+          if (id.includes('node_modules/svelte')) {
             return 'vendor';
           }
           if (id.includes('norigin-spatial-navigation')) {

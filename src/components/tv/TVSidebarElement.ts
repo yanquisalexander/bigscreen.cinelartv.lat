@@ -1,4 +1,4 @@
-import { SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation';
+import { SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation-core';
 import { FocusableRegistrar } from './spatialFocus';
 
 const ICONS: Record<string, string> = {

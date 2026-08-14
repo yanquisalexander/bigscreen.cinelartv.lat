@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { zustandToSvelte } from '@/lib/zustandToSvelte';
 
 export interface PanelItem {
   id: string;
@@ -65,3 +66,8 @@ export const useOverlayPanelStore = create<OverlayPanelState>((set, get) => ({
     set({ panel: null, history: [] });
   },
 }));
+
+export const overlayPanelStore = useOverlayPanelStore;
+
+/** Svelte-readable store — use as `$overlayPanelStore` in Svelte templates */
+export const svelteOverlayPanelStore = zustandToSvelte(useOverlayPanelStore);

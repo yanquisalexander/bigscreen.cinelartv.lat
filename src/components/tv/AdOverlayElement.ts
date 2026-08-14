@@ -1,4 +1,4 @@
-import { SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation';
+import { SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation-core';
 import { FocusableRegistrar } from './spatialFocus';
 import { trackImpression, trackEvent, trackError, selectMediaFile } from '@/services/player/vast-client';
 import { pdbg } from '@/services/player/playerDebug';

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { zustandToSvelte } from '@/lib/zustandToSvelte';
 
 const MODERN_PLAYBACK_KEY = 'cinelar_prefers_modern_playback';
 const NAV_SOUND_KEY = 'cinelar_navigation_sound';
@@ -55,3 +56,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     set({ navigationSoundEnabled: value });
   },
 }));
+
+export const settingsStore = useSettingsStore;
+export const svelteSettingsStore = zustandToSvelte(useSettingsStore);
+

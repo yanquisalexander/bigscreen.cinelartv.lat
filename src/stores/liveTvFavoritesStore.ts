@@ -1,5 +1,6 @@
 // stores/liveTvFavoritesStore.ts
 import { create } from 'zustand';
+import { zustandToSvelte } from '@/lib/zustandToSvelte';
 
 const STORAGE_KEY = 'livetv-favorites';
 
@@ -40,3 +41,9 @@ export const useLiveTvFavoritesStore = create<LiveTvFavoritesState>((set, get) =
     },
     isFavorite: (channelId) => get().favorites.has(channelId),
 }));
+
+export const liveTvFavoritesStore = useLiveTvFavoritesStore;
+
+/** Svelte-readable store — use as `$liveTvFavoritesStore` in Svelte templates */
+export const svelteLiveTvFavoritesStore = zustandToSvelte(useLiveTvFavoritesStore);
+

@@ -1,10 +1,11 @@
 name: Build TV App (Cobalt)
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  # Temporarily disabled: Cobalt build paused
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
   workflow_dispatch:
     inputs:
       cobalt_build_type:

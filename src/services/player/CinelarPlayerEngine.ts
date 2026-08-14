@@ -287,6 +287,8 @@ export class CinelarPlayerEngine {
 
   public selectQuality(option: number | 'auto') {
     if (!this.player) return;
+    const currentAudioTracks = this.player.getAudioTracks();
+    const activeAudioIndex = currentAudioTracks?.findIndex((t: any) => t.active) ?? -1;
     if (option === 'auto') {
       this.player.configure({ abr: { enabled: true } });
       return;
@@ -297,17 +299,28 @@ export class CinelarPlayerEngine {
       candidates.sort((a: any, b: any) => (b.bandwidth || 0) - (a.bandwidth || 0));
       this.player.selectVariantTrack(candidates[0], true);
     }
+    if (activeAudioIndex >= 0) {
+      const tracks = this.player.getAudioTracks();
+      if (tracks && tracks[activeAudioIndex]) {
+        this.player.selectAudioTrack(tracks[activeAudioIndex], false);
+      }
+    }
   }
 
-  public selectAudioTrack(language: string, role?: string) {
+  public selectAudioTrack(language: string, role?: string, index?: number) {
     if (!this.player) return;
     try {
       const tracks = this.player.getAudioTracks();
-      const target = tracks.find((t: any) => {
-        const langMatch = t.language === language;
-        if (role) return langMatch && (t.roles || []).includes(role);
-        return langMatch;
-      });
+      let target: any = null;
+      if (typeof index === 'number' && index >= 0 && index < tracks.length) {
+        target = tracks[index];
+      } else {
+        target = tracks.find((t: any) => {
+          const langMatch = t.language === language;
+          if (role) return langMatch && (t.roles || []).includes(role);
+          return langMatch;
+        });
+      }
       if (target) {
         this.player.selectAudioTrack(target, false);
         if (this.videoElement?.paused) {

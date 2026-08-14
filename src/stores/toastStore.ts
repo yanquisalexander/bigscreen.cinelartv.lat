@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { zustandToSvelte } from '@/lib/zustandToSvelte';
 
 export type ToastType = 'error' | 'success' | 'info' | 'warning';
 
@@ -39,3 +40,8 @@ export const useToastStore = create<ToastState>((set) => {
     },
   };
 });
+
+export const toastStore = useToastStore;
+
+/** Svelte-readable store — use as `$toastStore` in Svelte templates */
+export const svelteToastStore = zustandToSvelte(useToastStore);

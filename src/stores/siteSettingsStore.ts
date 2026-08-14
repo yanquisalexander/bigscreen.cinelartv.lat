@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getApiConfig } from '@/api/client';
+import { zustandToSvelte } from '@/lib/zustandToSvelte';
 
 export interface SiteSettings {
   enable_stream_limit: boolean;
@@ -51,3 +52,8 @@ export const useSiteSettingsStore = create<SiteSettingsState>((set) => ({
     }
   },
 }));
+
+export const siteSettingsStore = useSiteSettingsStore;
+
+/** Svelte-readable store — use as `$siteSettingsStore` in Svelte templates */
+export const svelteSiteSettingsStore = zustandToSvelte(useSiteSettingsStore);

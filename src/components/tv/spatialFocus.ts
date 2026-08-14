@@ -1,5 +1,5 @@
-import { SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation';
-import type { FocusableComponentLayout, FocusDetails, KeyPressDetails } from '@noriginmedia/norigin-spatial-navigation';
+import { SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation-core';
+import type { FocusableComponentLayout, FocusDetails, KeyPressDetails } from '@noriginmedia/norigin-spatial-navigation-core';
 
 export interface FocusableItem {
   focusKey: string;

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { TokenPair } from '@/types/auth';
 import type { CurrentSessionResponse, Profile } from '@/types/api';
+import { zustandToSvelte } from '@/lib/zustandToSvelte';
 
 const TOKEN_KEY = 'cinelar_access_token';
 const REFRESH_KEY = 'cinelar_refresh_token';
@@ -172,3 +173,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   getRefreshToken: () => get().tokens?.refreshToken ?? null,
 }));
+
+/** Zustand store — use `.getState()` / `.subscribe()` for Zustand/WC consumers */
+export const authStore = useAuthStore;
+
+/** Svelte-readable store — subscribe via `$authStore` in Svelte templates */
+export const svelteAuthStore = zustandToSvelte(useAuthStore);

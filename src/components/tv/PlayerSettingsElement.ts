@@ -1,4 +1,4 @@
-import { SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation';
+import { SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation-core';
 import { FocusableRegistrar } from './spatialFocus';
 
 interface QualityInfo {
@@ -192,7 +192,7 @@ class PlayerSettingsElement extends HTMLElement {
       || (this._quality
         ? 'player-settings-quality-auto'
         : this._audio && this._audio.length
-          ? `player-settings-audio-${this._sanitize(this._audio[0].language)}-${this._sanitize(this._audio[0].role)}`
+          ? `player-settings-audio-0`
           : null);
     if (firstKey) {
       requestAnimationFrame(() => SpatialNavigation.setFocus(firstKey));
@@ -221,8 +221,8 @@ class PlayerSettingsElement extends HTMLElement {
 
     const audioRows = this._audio && this._audio.length
       ? this._audio
-          .map((a) =>
-            this._settingsRow(a.label, `player-settings-audio-${this._sanitize(a.language)}-${this._sanitize(a.role)}`, a.active, 'AUDIO'),
+          .map((a, ai) =>
+            this._settingsRow(a.label, `player-settings-audio-${ai}`, a.active, 'AUDIO'),
           )
           .join('')
       : '<div class="settings-empty">Sin pistas de audio</div>';
@@ -302,12 +302,12 @@ class PlayerSettingsElement extends HTMLElement {
       });
     }
     if (this._audio) {
-      this._audio.forEach((a) => {
-        const key = `player-settings-audio-${this._sanitize(a.language)}-${this._sanitize(a.role)}`;
+      this._audio.forEach((a, ai) => {
+        const key = `player-settings-audio-${ai}`;
         items.push({
           key,
           activate: () => {
-            this._engine?.selectAudioTrack(a.language, a.role || undefined);
+            this._engine?.selectAudioTrack(a.language, a.role || undefined, ai);
             this.refresh(key);
             this.dispatchEvent(
               new CustomEvent('audio-change', { detail: { language: a.language, role: a.role }, bubbles: true, composed: true }),

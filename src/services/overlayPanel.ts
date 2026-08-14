@@ -1,4 +1,4 @@
-import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
 import { useOverlayPanelStore, type PanelConfig, type PanelItem } from '@/stores/overlayPanelStore';
 
 let sequence = 0;
