@@ -83,7 +83,7 @@
   const { appQuality } = getRuntimeConfig();
   const heroMaskStyle = $derived(
     appQuality !== 'LITE'
-      ? 'mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);'
+      ? 'mask-image: linear-gradient(to bottom, black 90%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 90%, transparent 100%);'
       : ''
   );
 </script>
