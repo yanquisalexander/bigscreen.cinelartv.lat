@@ -3,6 +3,7 @@
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import DetailActionButton from './DetailActionButton.svelte';
   import { formatTime, resolveBackdrop, resolvePoster, resolveLogo } from '@/utils/helpers';
+  import { getRuntimeConfig } from '@/runtime';
   import type { ContentDetail } from '@/types/content';
   import { isTVShow } from '@/types/content';
 
@@ -78,9 +79,16 @@
   });
 
   const genreTags = $derived((content.categories ?? []).slice(0, 4).map((c) => c.name));
+
+  const { appQuality } = getRuntimeConfig();
+  const heroMaskStyle = $derived(
+    appQuality !== 'LITE'
+      ? 'mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);'
+      : ''
+  );
 </script>
 
-<div class="relative w-full overflow-hidden min-h-[clamp(36rem,86vh,60rem)] bg-bg">
+<div class="relative w-full overflow-hidden min-h-[clamp(36rem,86vh,60rem)] bg-bg" style={heroMaskStyle}>
   <!-- Backdrop -->
   <div class="absolute inset-0 content-detail-backdrop">
     {#if backdropUrl}

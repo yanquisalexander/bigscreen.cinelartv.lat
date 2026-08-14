@@ -3,6 +3,7 @@
   import Focusable from '@/components/tv/Focusable.svelte';
   import { setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
   import { resolveBackdrop, resolveLogo } from '@/utils/helpers';
+  import { getRuntimeConfig } from '@/runtime';
   import type { ContentItem } from '@/types/content';
 
   interface Props {
@@ -51,6 +52,14 @@
     if (!currentItem) return null;
     return resolveLogo(currentItem.images, clientEndpoint);
   });
+
+  const { appQuality } = getRuntimeConfig();
+  const canAnimate = appQuality !== 'LITE';
+  const heroMaskStyle = $derived(
+    canAnimate && !showTrailer
+      ? 'mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);'
+      : ''
+  );
 
   $effect(() => {
     if (currentBannerUrl) {
@@ -144,6 +153,7 @@
     <div
       bind:this={heroEl}
       class="relative w-full overflow-hidden bg-black transition-[height] duration-700 ease-in-out {showTrailer ? 'h-[100dvh]' : 'h-[clamp(420px,68vh,660px)]'}"
+      style={heroMaskStyle}
     >
       <!-- Layer 1: Background crossfade -->
       <div class="absolute inset-0">

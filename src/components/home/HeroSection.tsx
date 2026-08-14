@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { Focusable } from '@/components/tv/Focusable';
 import { resolveBackdrop, resolveLogo } from '@/utils/helpers';
+import { getRuntimeConfig } from '@/runtime';
 import type { ContentItem } from '@/types/content';
 
 interface HeroSectionProps {
@@ -73,6 +74,16 @@ export function HeroSection({
     if (!currentItem) return null;
     return resolveLogo(currentItem.images, clientEndpoint);
   }, [currentItem, clientEndpoint]);
+
+  const { appQuality } = getRuntimeConfig();
+  const canAnimate = appQuality !== 'LITE';
+  const heroMaskStyle = useMemo(
+    () =>
+      canAnimate && !showTrailer
+        ? 'mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);'
+        : undefined,
+    [canAnimate, showTrailer]
+  );
 
   const goTo = useCallback(
     (index: number) => {
@@ -154,6 +165,7 @@ export function HeroSection({
         ref={heroRef as React.RefObject<HTMLDivElement>}
         className={`relative w-full overflow-hidden bg-black transition-[height] duration-700 ease-in-out ${showTrailer ? 'h-[100dvh]' : 'h-[clamp(420px,68vh,660px)]'
           }`}
+        style={heroMaskStyle}
       >
         {/* CAPA 1: IMÁGENES DE FONDO (CROSSFADE) */}
         <div className="absolute inset-0">

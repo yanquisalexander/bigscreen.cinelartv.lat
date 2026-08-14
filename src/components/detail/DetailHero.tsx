@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react';
 import { FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { LucidePlay, LucideClapperboard, LucidePlus, LucideRotateCcw } from 'lucide-react';
 import { formatTime, classNames, resolveBackdrop, resolvePoster, resolveLogo } from '@/utils/helpers';
+import { getRuntimeConfig } from '@/runtime';
 import { DetailActionButton } from './DetailActionButton';
 import type { ContentDetail } from '@/types/content';
 import { isTVShow } from '@/types/content';
@@ -91,8 +92,17 @@ export const DetailHero = memo(function DetailHero({
     [content.categories],
   );
 
+  const { appQuality } = getRuntimeConfig();
+  const heroMaskStyle = useMemo(
+    () =>
+      appQuality !== 'LITE'
+        ? 'mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);'
+        : undefined,
+    [appQuality]
+  );
+
   return (
-    <div className="relative w-full overflow-hidden min-h-[clamp(36rem,86vh,60rem)] bg-bg">
+    <div className="relative w-full overflow-hidden min-h-[clamp(36rem,86vh,60rem)] bg-bg" style={heroMaskStyle}>
       {/* Fondo optimizado: sin blur, menos capas de degradados */}
       <div className="absolute inset-0 content-detail-backdrop">
         {backdropUrl && (
