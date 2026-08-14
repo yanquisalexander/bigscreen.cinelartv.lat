@@ -27,11 +27,11 @@ function resolveAppQuality(input: RuntimePolicyInput): AppQuality {
 
   if (isSmartTV(device.family)) {
     if (!capabilities.animations) return 'LITE';
-    if (capabilities.webgl2 && capabilities.hardwareVideo) return 'STANDARD';
+    if (capabilities.webgl && capabilities.hardwareVideo) return 'STANDARD';
     return 'LITE';
   }
 
-  if (capabilities.webgl2 && capabilities.hardwareVideo && capabilities.animations) {
+  if (capabilities.webgl && capabilities.hardwareVideo && capabilities.animations) {
     return 'STANDARD';
   }
 
@@ -58,7 +58,7 @@ function resolveRenderer(
       break;
   }
 
-  player = capabilities.webgl2 && capabilities.hardwareVideo ? 'modern' : 'legacy';
+  player = capabilities.webgl && capabilities.hardwareVideo ? 'modern' : 'legacy';
 
   return { ui, player };
 }
