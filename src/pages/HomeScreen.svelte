@@ -7,7 +7,7 @@
   import HeroSection from '@/components/home/HeroSection.svelte';
   import ExitDialog from '@/components/ui/ExitDialog.svelte';
   import CinelarLogo from '@/components/ui/CinelarLogo.svelte';
-  import { authStore, svelteAuthStore } from '@/stores/authStore';
+  import {  svelteAuthStore } from '@/stores/authStore';
   import { svelteConfigStore } from '@/stores/configStore';
   import { toastStore } from '@/stores/toastStore';
   import { getExplore } from '@/features/content/explore';
@@ -210,8 +210,9 @@
       />
     {/if}
 
-    <div class="relative z-10 h-[clamp(12rem,20vh,16rem)] -mb-[clamp(6rem,12vh,10rem)] bg-gradient-to-b from-black via-black/80 to-transparent pointer-events-none transition-opacity duration-700 {heroImmersive ? 'opacity-0' : ''}"></div>
-
+<div
+  class="relative z-10 h-[clamp(14rem,24vh,20rem)] -mt-[clamp(6rem,9vh,7rem)] -mb-[clamp(6rem,12vh,10rem)] bg-gradient-to-b from-transparent via-bg via-bg/70 to-bg/10 pointer-events-none transition-opacity duration-700 {heroImmersive ? 'opacity-0' : ''}"
+></div>
     <div class="relative z-10 pb-[clamp(3rem,8vh,4rem)] transition-all duration-700 will-change-opacity {heroImmersive ? 'opacity-0 pointer-events-none' : ''}">
       {#each data?.content ?? [] as category, catIdx (catIdx)}
         {@const preferredChild = category.content?.[0]?.id != null ? `home-row-${catIdx}-item-${category.content[0].id}` : undefined}
@@ -231,7 +232,7 @@
               focusKey="home-row-{catIdx}-item-{item.id}"
               title={item.title}
               description={item.description}
-              year={item.year}
+              year={item.year!}
               {image}
               {bannerImage}
               ambientImageUrl={ambientImage}

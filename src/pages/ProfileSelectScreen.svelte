@@ -9,6 +9,7 @@
   import { LogOut } from '@lucide/svelte';
   import type { Profile } from '@/types/api';
   import type { ContentItem } from '@/types/content';
+  import CinelarLogo from '@/components/ui/CinelarLogo.svelte';
 
   const ROTATION_INTERVAL = 8000;
   const CROSSFADE_MS = 900;
@@ -110,6 +111,7 @@
 </script>
 
 <div class="relative w-screen h-screen overflow-hidden bg-black flex items-center">
+<CinelarLogo class="fixed top-[clamp(1rem,3vh,1.5rem)] right-[clamp(1.5rem,4vw,2rem)] text-white h-[clamp(1.5rem,2vw,2rem)] z-[999]" />
   <!-- Layer 1: Cinematic Backdrop -->
   <div class="absolute inset-0 z-0">
     {#if prevBannerUrl}

@@ -24,7 +24,7 @@
     launchNativePlayer,
     setOnNativePlayerFinished,
   } from "@/services/NativeBridge";
-  import { fetchVast } from "@/services/player/vast-client";
+  import { prerollAds, postrollAds } from "@/services/player/ad-tags";
   import { pdbg } from "@/services/player/playerDebug";
   import { inputManager } from "@/services/InputManager";
   import {
@@ -42,11 +42,6 @@
   import "@/components/tv/FocusableElement";
   import "@/components/tv/FocusableCardElement";
   import "@/components/tv/AdOverlayElement";
-
-  const AD_PREROLL_TAG =
-    "https://pubads.g.doubleclick.net/gampad/live/ads?iu=/22530741549/CTV_VAST_ADS&description_url=[DESCRIPTION_URL]&tfcd=0&npa=0&sz=400x300%7C640x480&gdfp_req=1&unviewed_position_start=1&output=vast&env=vp&impl=s&correlator=[CACHEBUSTER]";
-  const AD_POSTROLL_TAG =
-    "https://youradexchange.com/video/select.php?r=11621170";
 
   interface Props {
     params?: {
@@ -68,6 +63,11 @@
   let settingsOpen = $state(false);
   let debugVisible = $state(
     typeof window !== "undefined" && window.location.search.includes("debug=1"),
+  );
+
+  const forceShowAds = $derived(
+    typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("_force_show_ads") === "true",
   );
 
   let controlsEl = $state<any>(null);
@@ -352,14 +352,15 @@
 
   // Preroll
   $effect(() => {
-    if (!streamUrl || prerollChecked || adPhase !== "none" || isAdmin) {
-      if (isAdmin) prerollChecked = true;
+    if (!streamUrl || prerollChecked || adPhase !== "none" || (isAdmin && !forceShowAds)) {
+      if (isAdmin && !forceShowAds) prerollChecked = true;
       return;
     }
     pdbg("watch.preroll", "fetching VAST");
-    fetchVast(AD_PREROLL_TAG)
+    prerollAds
+      .next(7000)
       .then((ad) => {
-        pdbg("watch.preroll", "vast settled", ad ? "ad found" : "no ad");
+        pdbg("watch.preroll", "vast settled", ad ? "ad found" : "no ad", prerollAds.currentLabel);
         prerollChecked = true;
         if (ad) {
           adPhase = "preroll";
@@ -481,7 +482,7 @@
   // On ended
   $effect(() => {
     engine.setOnEnded(() => {
-      if (isAdmin) {
+      if (isAdmin && !forceShowAds) {
         if (nextEpisode) {
           replace(`/watch/${contentId}/${nextEpisode.id}`);
         } else {
@@ -489,7 +490,8 @@
         }
         return;
       }
-      fetchVast(AD_POSTROLL_TAG)
+      postrollAds
+        .next(7000)
         .then((ad) => {
           if (ad) {
             pendingNavigation = nextEpisode
