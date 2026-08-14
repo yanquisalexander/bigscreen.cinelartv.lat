@@ -37,6 +37,13 @@ export function HeroSection({
   });
 
   const currentItem = items[currentIndex];
+  // Scroll hero into view when it receives focus
+  useEffect(() => {
+    if (hasFocusedChild) {
+      heroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [hasFocusedChild, heroRef]);
+
   const hasTrailer = !!(currentItem?.trailer_sources?.length);
   const trailerUrl = hasTrailer ? currentItem.trailer_sources![0].url : null;
 
