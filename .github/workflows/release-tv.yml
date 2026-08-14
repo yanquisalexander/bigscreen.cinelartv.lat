@@ -186,6 +186,18 @@ jobs:
           gclient runhooks || echo "runhooks warning above (non-fatal)"
         timeout-minutes: 30
 
+      - name: Install Linux sysroot
+        working-directory: ${{ runner.workspace }}/cobalt-build/src
+        run: |
+          PLATFORM="${{ steps.config.outputs.platform }}"
+          case "$PLATFORM" in
+            aosp-arm64) ARCH="arm64" ;;
+            aosp-x86) ARCH="x86" ;;
+            *) ARCH="arm" ;;
+          esac
+          python3 build/linux/sysroot_scripts/install-sysroot.py --arch="$ARCH"
+          echo "Sysroot for $PLATFORM (arch $ARCH) ready"
+
       - name: Configure Cobalt build (GN)
         working-directory: ${{ runner.workspace }}/cobalt-build/src
         run: |
