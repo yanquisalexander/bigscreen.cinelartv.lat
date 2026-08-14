@@ -1,0 +1,142 @@
+@font-face {
+    font-family: "CTV-Icons";
+    src: url("CTV-Icons.woff2") format("woff2");
+    font-weight: normal;
+    font-style: normal;
+    font-display: block;
+}
+@font-palette-values --palette0 {
+    font-family: "CTV-Icons";
+    base-palette: 0;
+}
+.ctv-icon {
+    /* Use !important to prevent extensions from overriding this font. */
+    font-family: "CTV-Icons" !important;
+    font-style: normal;
+    font-weight: normal;
+    font-variant: normal;
+    text-transform: none;
+    line-height: 1;
+
+    /* Better Font Rendering =========== */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+@font-palette-values --palette0 {
+    font-family: "CTV-Icons";
+    base-palette: 0;
+}
+.ctv-icon, [class^="ctv-"], [class*=" ctv-"] {
+    /* Use !important to prevent extensions from overriding this font. */
+    font-family: "CTV-Icons" !important;
+    font-style: normal;
+    font-weight: normal;
+    font-variant: normal;
+    text-transform: none;
+    line-height: 1;
+
+    /* Better Font Rendering =========== */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+.palette0 {
+    font-palette: --palette0;
+    color: currentColor;
+}
+.ctv-backspace:before {
+    content: "\f017";
+    content: "\f017" / "";
+}
+.ctv-play-outline:before {
+    content: "\f016";
+    content: "\f016" / "";
+}
+.ctv-info:before {
+    content: "\f015";
+    content: "\f015" / "";
+}
+.ctv-palette:before {
+    content: "\f014";
+    content: "\f014" / "";
+}
+.ctv-shield:before {
+    content: "\f013";
+    content: "\f013" / "";
+}
+.ctv-arrow-clockwise:before {
+    content: "\f012";
+    content: "\f012" / "";
+}
+.ctv-arrow-counter-clockwise:before {
+    content: "\f011";
+    content: "\f011" / "";
+}
+.ctv-audio-outlined:before {
+    content: "\f010";
+    content: "\f010" / "";
+}
+.ctv-audio:before {
+    content: "\f00f";
+    content: "\f00f" / "";
+}
+.ctv-user:before {
+    content: "\f00e";
+    content: "\f00e" / "";
+}
+.ctv-episodes-list:before {
+    content: "\f00d";
+    content: "\f00d" / "";
+}
+.ctv-chat-enabled:before {
+    content: "\f00c";
+    content: "\f00c" / "";
+}
+.ctv-chat:before {
+    content: "\f00b";
+    content: "\f00b" / "";
+}
+.ctv-sparkles:before {
+    content: "\f00a";
+    content: "\f00a" / "";
+}
+.ctv-sparkles-fill:before {
+    content: "\f009";
+    content: "\f009" / "";
+}
+.ctv-plus:before {
+    content: "\f008";
+    content: "\f008" / "";
+}
+.ctv-settings:before {
+    content: "\f007";
+    content: "\f007" / "";
+}
+.ctv-tv:before {
+    content: "\f006";
+    content: "\f006" / "";
+}
+.ctv-pause:before {
+    content: "\f005";
+    content: "\f005" / "";
+}
+.ctv-play:before {
+    content: "\f002";
+    content: "\f002" / "";
+}
+.ctv-seek-forward:before {
+    content: "\f004";
+    content: "\f004" / "";
+}
+.ctv-seek-previus:before {
+    content: "\f003";
+    content: "\f003" / "";
+}
+.ctv-search:before {
+    content: "\f001";
+    content: "\f001" / "";
+}
+.ctv-home:before {
+    content: "\f000";
+    content: "\f000" / "";
+}

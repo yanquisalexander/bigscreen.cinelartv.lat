@@ -16,10 +16,10 @@
 
   let hasFocusedChild = $state(false);
 
-  const NAV_ITEMS = [
-    { key: 'home', label: 'Inicio', icon: House, path: '/home' },
-    { key: 'search', label: 'Buscar', icon: Search, path: '/search' },
-    { key: 'live', label: 'TV en Vivo', icon: Tv, path: '/live' },
+  const NAV_ITEMS: { key: string; label: string; icon:  string; path: string }[] = [
+    { key: 'home', label: 'Inicio', icon: 'ctv-home', path: '/home' },
+    { key: 'search', label: 'Buscar', icon: 'ctv-search', path: '/search' },
+    { key: 'live', label: 'TV en Vivo', icon: 'ctv-tv', path: '/live' },
   ];
 
   function focusKeyForPath(path: string): string {
@@ -77,7 +77,6 @@
     <nav class="flex-1 flex flex-col gap-1 justify-center">
       {#each NAV_ITEMS as item (item.key)}
         {@const isActive = router.location.startsWith(item.path)}
-        {@const IconComponent = item.icon}
         <Focusable
           focusKey="nav-{item.key}"
           onEnterPress={() => push(item.path)}
@@ -88,7 +87,7 @@
         >
           {#snippet children()}
             <span class="w-6 flex items-center justify-center flex-shrink-0">
-              <IconComponent class="w-5 h-5" />
+                <i class="{item.icon} text-xl"></i>
             </span>
             <span
               class="truncate whitespace-nowrap"

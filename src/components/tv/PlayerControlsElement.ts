@@ -6,6 +6,7 @@ import { FocusableRegistrar } from './spatialFocus';
 import { formatTime, resolveImageUrl } from '@/utils/helpers';
 import type { Segment } from '@/types/content';
 import type { FlatEpisode } from './RailEpisodeItem';
+import { ctvIconSheet } from '@/lib/ctvIcons';
 
 const PARENT_FOCUS_KEY = 'watch-root';
 const CONTROLS_HIDE_DELAY = 5000;
@@ -118,6 +119,8 @@ export class PlayerControlsElement extends LitElement {
     .pill-btn { padding: clamp(0.4rem, 1vh, 0.6rem) clamp(1rem, 2vw, 1.5rem); border-radius: 9999px; font-size: clamp(0.8rem, 1vw, 0.9rem); font-weight: 600; letter-spacing: 0.01em; }
 
     .control-btn svg { width: clamp(1.1rem, 2vw, 1.3rem); height: clamp(1.1rem, 2vw, 1.3rem); stroke: currentColor; fill: none; }
+    .control-btn .ctv-icon { font-size: clamp(1.1rem, 2vw, 1.3rem); line-height: 1; color: inherit; }
+    .control-btn.play-pause-btn .ctv-icon { font-size: clamp(1.3rem, 2.4vw, 1.5rem); }
     .control-btn.play-pause-btn svg { width: clamp(1.3rem, 2.4vw, 1.5rem); height: clamp(1.3rem, 2.4vw, 1.5rem); fill: currentColor; stroke: none; }
 
     .bottom-scrim {
@@ -205,6 +208,15 @@ export class PlayerControlsElement extends LitElement {
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
   `;
+
+  protected createRenderRoot(): Element | ShadowRoot {
+    const root = super.createRenderRoot();
+    const shadow = root as ShadowRoot;
+    if (shadow.adoptedStyleSheets) {
+      shadow.adoptedStyleSheets = [ctvIconSheet, ...shadow.adoptedStyleSheets];
+    }
+    return root;
+  }
 
   private registrar = new FocusableRegistrar();
   private rafId = 0;
@@ -435,13 +447,9 @@ export class PlayerControlsElement extends LitElement {
                 <tv-focusable focus-key="watch-playpause" parent-focus-key="watch-root" data-focused="false" class="control-btn circle-btn play-pause-btn"
                   focusable=${this.showControls ? 'true' : 'false'}>
                   ${this._isPlaying ? html`
-                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0">
-                      <rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>
-                    </svg>
+                    <i class="ctv-icon ctv-pause"></i>
                   ` : html`
-                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0">
-                      <path d="M8 5.2v13.6L18.8 12z"></path>
-                    </svg>
+                    <i class="ctv-icon ctv-play"></i>
                   `}
                 </tv-focusable>
               </div>
@@ -449,10 +457,7 @@ export class PlayerControlsElement extends LitElement {
               <div class="controls-row-right">
                 <tv-focusable focus-key="watch-settings" parent-focus-key="watch-root" data-focused="false" class="control-btn circle-btn settings-btn"
                   focusable=${this.showControls ? 'true' : 'false'}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                  </svg>
+                  <i class="ctv-icon ctv-settings"></i>
                 </tv-focusable>
               </div>
             </div>

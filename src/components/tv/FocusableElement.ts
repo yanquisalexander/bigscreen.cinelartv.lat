@@ -86,7 +86,7 @@ class FocusableElement extends HTMLElement {
         onArrowPress: (direction: string) => {
           const event = new CustomEvent('arrow-press', { bubbles: true, composed: true, detail: { direction }, cancelable: true });
           const notCancelled = this.dispatchEvent(event);
-          return notCancelled; // true si nadie llamó preventDefault()
+          return notCancelled;
         },
         onFocus: () => {
           if (this.getAttribute('play-sound') === 'true') {

@@ -10,7 +10,7 @@ import { CollectionsEmptyRegular, SearchFilled, SettingsRegular, TvRegular } fro
 import { memo, useCallback, useEffect, useMemo } from 'react';
 
 const NAV_ITEMS = [
-  { key: 'home', label: 'Inicio', icon: CollectionsEmptyRegular, path: '/home' },
+  { key: 'home', label: 'Inicio', icon: "home", path: '/home' },
   { key: 'search', label: 'Buscar', icon: SearchFilled, path: '/search' },
   { key: 'live', label: 'TV en Vivo', icon: TvRegular, path: '/live' },
 ];
