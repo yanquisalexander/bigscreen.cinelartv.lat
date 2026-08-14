@@ -43,6 +43,7 @@ if (import.meta.env.DEV) {
 */
 const runtimeConfig = getRuntimeConfig()
 const { appQuality } = runtimeConfig
-$body?.classList.add(`app-quality--${appQuality.toLowerCase()}`)
-
+$body?.classList.add(
+  `app-quality-${appQuality.toLowerCase().replaceAll('_', '-')}`
+)
 createRoot(document.getElementById('root')!).render(<App />)

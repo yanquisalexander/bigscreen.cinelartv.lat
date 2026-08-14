@@ -302,3 +302,32 @@ html, body, #root {
 .detail-section + .detail-section {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
+
+
+/* 
+  CSS capabilities
+
+  body puede tener app-quality-lite, app-quality-standard, o app-quality-full-animation
+*/
+
+body {
+  --backdrop-blur: 8px;
+  --animation-duration: 300ms;
+  --shadow-opacity: 0.3;
+}
+
+body.app-quality-standard {
+  --backdrop-blur: 4px;
+  --animation-duration: 150ms;
+  --shadow-opacity: 0.2;
+}
+
+body.app-quality-lite {
+  --backdrop-blur: 0px;
+  --animation-duration: 0ms;
+  --shadow-opacity: 0;
+}
+
+.content-detail-backdrop {
+  filter: blur(var(--backdrop-blur));
+}

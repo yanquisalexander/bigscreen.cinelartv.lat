@@ -94,7 +94,7 @@ export const DetailHero = memo(function DetailHero({
   return (
     <div className="relative w-full overflow-hidden min-h-[clamp(36rem,86vh,60rem)] bg-bg">
       {/* Fondo optimizado: sin blur, menos capas de degradados */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 content-detail-backdrop">
         {backdropUrl && (
           <img
             src={backdropUrl}
