@@ -160,12 +160,12 @@
   focusable={false}
   trackChildren={true}
   saveLastFocusedChild={true}
-  class="w-full h-dvh hide-scrollbar bg-bg transition-all duration-700 {heroImmersive ? 'overflow-hidden' : 'overflow-y-auto'}"
+  class="w-full h-dvh hide-scrollbar transition-all duration-700 {heroImmersive ? 'overflow-hidden' : 'overflow-y-auto'}"
 >
   <CinelarLogo class="fixed top-[clamp(1rem,3vh,1.5rem)] right-[clamp(1.5rem,4vw,2rem)] text-white h-[clamp(1.5rem,2vw,2rem)] z-[999]" />
 
   {#if loading}
-    <div class="w-full h-full flex flex-col">
+    <div class="w-full h-full flex flex-col bg-bg">
       <div class="w-full h-[clamp(360px,70vh,680px)] bg-surface animate-pulse-slow"></div>
       <div class="px-[clamp(3rem,7.5vw,6rem)] py-[clamp(1.25rem,4vh,2rem)] space-y-[clamp(1.5rem,4vh,2rem)]">
         {#each [1, 2, 3] as i (i)}
@@ -181,7 +181,7 @@
       </div>
     </div>
   {:else if error}
-    <div class="w-full h-full flex flex-col items-center justify-center gap-8 px-8">
+    <div class="w-full h-full flex flex-col items-center justify-center gap-8 px-8 bg-bg">
       <p class="text-text-secondary text-[clamp(1rem,1.4vw,1.25rem)] text-center max-w-md">
         No se pudo cargar el contenido. Verifica tu conexión e intenta de nuevo.
       </p>
@@ -210,7 +210,9 @@
       />
     {/if}
 
-    <div class="mt-[clamp(1.5rem,4vh,3rem)] relative z-10 pb-[clamp(3rem,8vh,4rem)] transition-all duration-700 will-change-opacity {heroImmersive ? 'opacity-0 pointer-events-none' : ''}">
+    <div class="relative z-10 h-[clamp(8rem,16vh,12rem)] -mb-[clamp(4rem,8vh,6rem)] bg-gradient-to-b from-bg via-bg/50 to-transparent pointer-events-none transition-opacity duration-700 {heroImmersive ? 'opacity-0' : ''}"></div>
+
+    <div class="relative z-10 pb-[clamp(3rem,8vh,4rem)] transition-all duration-700 will-change-opacity {heroImmersive ? 'opacity-0 pointer-events-none' : ''}">
       {#each data?.content ?? [] as category, catIdx (catIdx)}
         {@const preferredChild = category.content?.[0]?.id != null ? `home-row-${catIdx}-item-${category.content[0].id}` : undefined}
 
@@ -222,6 +224,7 @@
           {#each category.content ?? [] as item, itemIdx (item.id)}
             {@const image = resolvePoster(item.images, item.cover_resized ?? item.cover, clientEndpoint)}
             {@const bannerImage = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint, 'medium')}
+            {@const ambientImage = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint, 'thumbnail')}
 
             <FocusableCard
               variant="row"
@@ -231,6 +234,7 @@
               year={item.year}
               {image}
               {bannerImage}
+              ambientImageUrl={ambientImage}
               progress={progressPercent(item)}
               onArrowPress={(direction) => {
                 if (catIdx === 0 && direction === 'up') return focusHeroFromFirstRow(direction);

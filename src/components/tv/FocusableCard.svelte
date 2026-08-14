@@ -1,10 +1,12 @@
 <script lang="ts">
   import Focusable from '@/components/tv/Focusable.svelte';
+  import { useAmbientStore } from '@/stores/ambientStore';
 
   interface Props {
     title: string;
     image?: string | null;
     bannerImage?: string | null;
+    ambientImageUrl?: string | null;
     description?: string;
     year?: number;
     subtitle?: string;
@@ -23,6 +25,7 @@
     title,
     image,
     bannerImage,
+    ambientImageUrl,
     description,
     year,
     subtitle,
@@ -46,6 +49,7 @@
       const img = new Image();
       img.src = bannerImage;
     }
+    useAmbientStore.getState().setBackdropUrl(ambientImageUrl ?? bannerImage ?? null);
     onFocus?.();
   }
 </script>
