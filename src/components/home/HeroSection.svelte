@@ -27,6 +27,7 @@
   let currentIndex = $state(0);
   let showTrailer = $state(false);
   let prevBannerUrl = $state<string | null>(null);
+  let heroSlot = $state<'prev' | 'current'>('current');
   let hasFocusedChild = $state(false);
   let heroEl = $state<HTMLDivElement | null>(null);
   let videoEl = $state<HTMLVideoElement | null>(null);
@@ -53,12 +54,15 @@
   });
 
   $effect(() => {
-    if (currentBannerUrl) {
-      const timer = setTimeout(() => {
-        prevBannerUrl = currentBannerUrl;
-      }, 700);
-      return () => clearTimeout(timer);
+    const url = currentBannerUrl;
+    if (!url) return;
+    if (prevBannerUrl && prevBannerUrl !== url) {
+      heroSlot = heroSlot === 'current' ? 'prev' : 'current';
     }
+    const timer = setTimeout(() => {
+      prevBannerUrl = url;
+    }, 800);
+    return () => clearTimeout(timer);
   });
 
   function goTo(index: number) {
@@ -151,7 +155,9 @@
           <img
             src={prevBannerUrl}
             alt=""
-            class="absolute inset-0 w-full h-full object-cover"
+            class="absolute inset-0 w-full h-full object-cover transition-opacity duration-800 ease-in-out"
+            class:opacity-100={heroSlot === 'prev'}
+            class:opacity-0={heroSlot !== 'prev'}
           />
         {/if}
 
@@ -159,7 +165,9 @@
           <img
             src={currentBannerUrl}
             alt={currentItem.title}
-            class="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out {showTrailer ? 'opacity-0' : 'opacity-100'}"
+            class="absolute inset-0 w-full h-full object-cover transition-opacity duration-800 ease-in-out"
+            class:opacity-100={heroSlot === 'current' && !showTrailer}
+            class:opacity-0={heroSlot !== 'current' || showTrailer}
             loading="eager"
           />
         {/if}

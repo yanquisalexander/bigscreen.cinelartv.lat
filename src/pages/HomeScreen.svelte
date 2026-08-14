@@ -210,7 +210,7 @@
       />
     {/if}
 
-    <div class="relative z-10 h-[clamp(8rem,16vh,12rem)] -mb-[clamp(4rem,8vh,6rem)] bg-gradient-to-b from-bg via-bg/50 to-transparent pointer-events-none transition-opacity duration-700 {heroImmersive ? 'opacity-0' : ''}"></div>
+    <div class="relative z-10 h-[clamp(16rem,28vh,22rem)] -mt-[clamp(6rem,12vh,8rem)] -mb-[clamp(8rem,14vh,12rem)] bg-gradient-to-b from-bg via-bg/50 to-transparent pointer-events-none transition-opacity duration-700 {heroImmersive ? 'opacity-0' : ''}"></div>
 
     <div class="relative z-10 pb-[clamp(3rem,8vh,4rem)] transition-all duration-700 will-change-opacity {heroImmersive ? 'opacity-0 pointer-events-none' : ''}">
       {#each data?.content ?? [] as category, catIdx (catIdx)}
