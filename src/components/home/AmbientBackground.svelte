@@ -60,6 +60,8 @@
         class:opacity-0={activeSlot !== 'b'}
       />
     {/if}
-    <div class="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-bg/75"></div>
+    {#if hasContent}
+      <div class="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-bg/75"></div>
+    {/if}
   </div>
 {/if}
