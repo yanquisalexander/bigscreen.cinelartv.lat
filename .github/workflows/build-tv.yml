@@ -114,6 +114,7 @@ jobs:
             git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git "$DEPOT_PATH"
           fi
           echo "$DEPOT_PATH" >> "$GITHUB_PATH"
+          "$DEPOT_PATH/ensure_bootstrap"
           echo "depot_tools ready"
 
       - name: Create Cobalt working directory
