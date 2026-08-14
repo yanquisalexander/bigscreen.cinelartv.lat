@@ -262,8 +262,8 @@ export function HeroSection({
               }}
               autoFocus
               focusKey="hero-view-more"
-              focusedClassName="scale-105 bg-white text-black shadow-2xl shadow-white/20 ring-4 ring-white/50"
-              className="px-7 py-3 bg-white/20 backdrop-blur-md text-white text-sm font-bold rounded-xl transition-all duration-200 border border-white/20 cursor-pointer"
+              focusedClassName="scale-105 bg-white text-black ring-4 ring-white/50"
+              className="px-7 py-3 bg-white text-black text-sm font-bold rounded-xl transition-all duration-200 border border-white/20 cursor-pointer"
               playSound
             >
               Ver detalles
