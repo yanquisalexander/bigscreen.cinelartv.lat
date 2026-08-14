@@ -219,6 +219,51 @@ html, body, #root {
   animation: hero-fade-in 0.5s ease-out;
 }
 
+/* Ken Burns effect for cinematic backdrop */
+@keyframes ken-burns {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  50% {
+    transform: scale(1.08) translate(-1%, -0.5%);
+  }
+  100% {
+    transform: scale(1) translate(0, 0);
+  }
+}
+
+.animate-ken-burns {
+  animation: ken-burns 12s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Crossfade on mount: the new backdrop fades in (0 -> 0.5) while the
+   previous one fades out (0.5 -> 0) simultaneously. Both run on mount,
+   so no double-image ghosting and constant perceived brightness. */
+@keyframes backdrop-fade-in {
+  from { opacity: 0; }
+  to { opacity: 0.5; }
+}
+
+@keyframes backdrop-fade-out {
+  from { opacity: 0.5; }
+  to { opacity: 0; }
+}
+
+.animate-backdrop {
+  animation:
+    ken-burns 12s ease-in-out infinite,
+    backdrop-fade-in 0.8s ease-out;
+  will-change: transform, opacity;
+}
+
+.animate-backdrop-out {
+  animation:
+    ken-burns 12s ease-in-out infinite,
+    backdrop-fade-out 0.8s ease-out forwards;
+  will-change: transform, opacity;
+}
+
 /* Pulse animation for skeletons */
 @keyframes pulse {
   0%, 100% { opacity: 0.4; }
