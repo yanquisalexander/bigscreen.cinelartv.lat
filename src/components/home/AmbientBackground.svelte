@@ -46,7 +46,7 @@
       <img
         src={urlA}
         alt=""
-        class="ambient-blur absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out brightness-[0.15]"
+        class="ambient-blur absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out brightness-[0.06] saturate-[0.35]"
         class:opacity-100={activeSlot === 'a'}
         class:opacity-0={activeSlot !== 'a'}
       />
@@ -55,11 +55,11 @@
       <img
         src={urlB}
         alt=""
-        class="ambient-blur absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out brightness-[0.15]"
+        class="ambient-blur absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out brightness-[0.06] saturate-[0.35]"
         class:opacity-100={activeSlot === 'b'}
         class:opacity-0={activeSlot !== 'b'}
       />
     {/if}
-    <div class="absolute inset-0 bg-gradient-to-t from-bg/90 via-bg/30 to-bg/60"></div>
+    <div class="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-bg/75"></div>
   </div>
 {/if}
