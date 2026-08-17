@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import Router, { push } from 'svelte-spa-router';
+  import Router, { push, router } from 'svelte-spa-router';
   import type { RouteDetail } from 'svelte-spa-router';
   import { routes, geoBlockedRoutes } from '@/router/routes';
   import { authStore } from '@/stores/authStore';
@@ -11,11 +11,13 @@
   import { checkGeoBlock } from '@/services/geoblocking';
   import { initNativeBridgeSync } from '@/services/nativeBridgeSync';
   import { initSpatialNavigation } from '@/lib/spatial/init';
+  import { trackScreenView } from '@/lib/analytics';
   import TVToast from '@/components/ui/TVToast.svelte';
   import OverlayPanelHost from '@/components/overlay/OverlayPanelHost.svelte';
   import IncompatibleBrowserScreen from '@/components/ui/IncompatibleBrowserScreen.svelte';
   import CinelarLogo from '@/components/ui/CinelarLogo.svelte';
   import GeoBlockedLayout from '@/components/layout/GeoBlockedLayout.svelte';
+  import AppShell from '@/components/layout/AppShell.svelte';
 
   // ── Compat check (sync, before anything renders) ────────────────────────────
   const compatResult = checkCompat();
@@ -24,6 +26,13 @@
   let geoBlocked = $state(false);
   let geoCheckDone = $state(false);
   let betaToastShown = false;
+
+  // Standalone routes that don't show AppShell sidebar
+  const STANDALONE_PREFIXES = ['/auth', '/blocked', '/select-profile', '/watch'];
+  const isStandaloneRoute = $derived(
+    router.location === '/' || router.location === '/auth' ||
+    STANDALONE_PREFIXES.some(p => router.location.startsWith(p))
+  );
 
   // ── Derived from stores ──────────────────────────────────────────────────────
   const authState = $derived(authStore.getState());
@@ -46,10 +55,18 @@
     // Spatial navigation
     initSpatialNavigation();
 
+    // Track screen views on route changes
+    const unsubRouter = router.subscribe((detail) => {
+      if (detail?.location) {
+        trackScreenView(detail.location);
+      }
+    });
+
     return () => {
       unsubAuth();
       unsubConfig();
       unsubBridge();
+      unsubRouter();
     };
   });
 
@@ -112,7 +129,9 @@
     <CinelarLogo class="logo" />
   </div>
 {:else}
-  <Router {routes} onConditionsFailed={conditionsFailed} />
+  <AppShell hideSidebar={isStandaloneRoute}>
+    <Router {routes} onConditionsFailed={conditionsFailed} />
+  </AppShell>
   <OverlayPanelHost />
   <TVToast />
 {/if}

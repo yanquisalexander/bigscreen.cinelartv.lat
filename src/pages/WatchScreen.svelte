@@ -37,6 +37,17 @@
   import type { VastAd } from "@/types/vast";
   import { MonitorPlay, AlertTriangle } from "@lucide/svelte";
   import PlayerSettingsPanel from "@/components/player/PlayerSettingsPanel.svelte";
+  import {
+    trackPlayIntent,
+    trackPlaybackStart,
+    trackPlaybackError,
+    trackPlaybackComplete,
+    trackPlaybackExit,
+    trackPlaybackBuffer,
+    trackPlaybackPause,
+    trackPlaybackResume,
+    trackPlaybackSeek,
+  } from "@/lib/analytics";
 
   import "@/components/tv/PlayerControlsElement";
   import "@/components/tv/FocusableElement";
@@ -55,6 +66,7 @@
   const episodeId = $derived(params?.episodeId);
 
   const engine = createPlayerEngine();
+  const engineInstance = $derived(engine.getEngine());
 
   let watchData = $state<WatchData | null>(null);
   let currentAd = $state<VastAd | null>(null);
@@ -89,6 +101,14 @@
       ? crypto.randomUUID()
       : `cr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   let pingIntervalId: ReturnType<typeof setInterval> | null = null;
+
+  // ── Analytics tracking state ──────────────────────────────────────────────
+  let _playbackStartTime = 0;
+  let _playbackStarted = false;
+  let _bufferCount = 0;
+  let _bufferTotalMs = 0;
+  let _lastBufferStart = 0;
+  let _playIntentTracked = false;
 
   const tokens = $derived($svelteAuthStore.tokens);
   const isAdmin = $derived(
@@ -157,6 +177,18 @@
     const contentSegs = watchData?.content?.segments ?? [];
     return [...epSegs, ...contentSegs];
   });
+
+  function classifyPlayerError(err: any): 'DRM' | 'MANIFEST' | 'MEDIA' | 'NETWORK' | 'PLAYER' | 'UNKNOWN' {
+    const code = err?.code ?? err?.status ?? 0;
+    const msg = String(err?.message ?? err?.name ?? '').toLowerCase();
+    if (code >= 2000 && code < 3000) return 'DRM';
+    if (code >= 3000 && code < 4000) return 'MANIFEST';
+    if (code >= 4000 && code < 5000) return 'MEDIA';
+    if (msg.includes('network') || msg.includes('fetch') || msg.includes('cors') || code === 1002) return 'NETWORK';
+    if (msg.includes('drm') || msg.includes('license') || msg.includes('encrypted')) return 'DRM';
+    if (msg.includes('manifest') || msg.includes('mpd') || msg.includes('m3u8')) return 'MANIFEST';
+    return 'PLAYER';
+  }
 
   function stopStreamPing() {
     if (pingIntervalId) {
@@ -246,6 +278,7 @@
     prerollChecked = false;
     adPhase = "none";
     currentAd = null;
+    _playIntentTracked = false;
     clientRequestId =
       typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
@@ -259,6 +292,24 @@
     streamLimitError = null;
     streamLimitSessions = [];
     stopStreamPing();
+    _playbackStarted = false;
+    _bufferCount = 0;
+    _bufferTotalMs = 0;
+    _lastBufferStart = 0;
+
+    // Track play_intent (once per content load)
+    if (!_playIntentTracked) {
+      _playIntentTracked = true;
+      const source = (watchData?.continue_watching?.progress ?? 0) > 0
+        ? 'continue_watching'
+        : 'detail';
+      trackPlayIntent(
+        contentId,
+        (watchData?.content?.content_type ?? watchData?.content?.contentType ?? 'movie') as 'movie' | 'series' | 'live',
+        source as any,
+        episodeId,
+      );
+    }
 
     const storedToken = getStoredSessionToken();
     const opts = {
@@ -395,6 +446,7 @@
       .then(() => {
         if (cancelled) return;
         pdbg("watch.load", "engine.load resolved -> play()");
+        _playbackStartTime = performance.now();
         engine.play();
         engine.applyPreferredAudioLanguage(userLang);
       })
@@ -482,6 +534,13 @@
   // On ended
   $effect(() => {
     engine.setOnEnded(() => {
+      // Track playback complete
+      const video = videoEl;
+      if (video && video.duration) {
+        const contentType = (watchData?.content?.content_type ?? watchData?.content?.contentType ?? 'movie') as string;
+        trackPlaybackComplete(contentId, contentType, video.duration, 100, episodeId);
+      }
+
       if (isAdmin && !forceShowAds) {
         if (nextEpisode) {
           replace(`/watch/${contentId}/${nextEpisode.id}`);
@@ -546,6 +605,49 @@
       if (name === "AbortError" || name === "NotAllowedError") return;
       pdbg("watch.player-error", "showing overlay", err?.code, err?.message);
       playerError = { code: err?.code, message: err?.message };
+
+      // Track playback error
+      const errorCategory = classifyPlayerError(err);
+      const phase = _playbackStarted ? 'running' : 'load';
+      trackPlaybackError(contentId, err?.code, err?.message, errorCategory, phase);
+    });
+    return unsub;
+  });
+
+  // Playback start listener (first frame)
+  $effect(() => {
+    const rawEngine = engine.getEngine();
+    if (!rawEngine || _playbackStarted) return;
+    const unsub = rawEngine.on("playing", () => {
+      if (_playbackStarted) return;
+      _playbackStarted = true;
+      const startupMs = Math.round(performance.now() - _playbackStartTime);
+      const contentType = (watchData?.content?.content_type ?? watchData?.content?.contentType ?? 'movie') as string;
+      trackPlaybackStart(
+        contentId,
+        contentType as any,
+        'detail',
+        startupMs,
+        undefined,
+        undefined,
+        episodeId,
+      );
+    });
+    return unsub;
+  });
+
+  // Buffer tracking
+  $effect(() => {
+    const rawEngine = engine.getEngine();
+    if (!rawEngine) return;
+    const unsub = rawEngine.on("buffering", (buffering: boolean) => {
+      if (buffering) {
+        _bufferCount++;
+        _lastBufferStart = performance.now();
+      } else if (_lastBufferStart > 0) {
+        _bufferTotalMs += performance.now() - _lastBufferStart;
+        _lastBufferStart = 0;
+      }
     });
     return unsub;
   });
@@ -685,6 +787,14 @@
         controlsEl.showControls = false;
         return;
       }
+
+      // Track playback exit
+      const video = videoEl;
+      if (video && video.duration) {
+        const watchedPct = (video.currentTime / video.duration) * 100;
+        trackPlaybackExit(contentId, video.currentTime, video.duration, watchedPct, 'back');
+      }
+
       window.history.back();
     };
 
@@ -909,7 +1019,7 @@
       ></tv-player-controls>
     {/if}
 
-    <PlayerSettingsPanel engine={engine.getEngine()} open={settingsOpen} />
+    <PlayerSettingsPanel engine={engineInstance} open={settingsOpen} />
 
     {#if currentAd}
       <tv-ad-overlay bind:this={adOverlayEl}></tv-ad-overlay>

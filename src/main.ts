@@ -7,6 +7,7 @@ import { initRuntime, getRuntimeConfig } from './runtime';
 import { $body } from './lib/dom-selector';
 import { authStore } from '@/stores/authStore';
 import { configStore } from '@/stores/configStore';
+import { initAnalytics, trackAppLaunch, trackAppError } from '@/lib/analytics';
 
 // ── Initialize stores immediately ───────────────────────────────────────────
 authStore.getState().initialize();
@@ -15,6 +16,18 @@ configStore.getState().loadConfig();
 // ── Runtime & CTV tools ──────────────────────────────────────────────────────
 initRuntime();
 initCtvTools();
+
+// ── Analytics ────────────────────────────────────────────────────────────────
+initAnalytics();
+trackAppLaunch();
+
+// ── Global error tracking ────────────────────────────────────────────────────
+window.addEventListener('unhandledrejection', (e) => {
+  trackAppError('unhandled_rejection', String(e.reason?.message ?? e.reason ?? 'Unknown'), e.reason?.stack);
+});
+window.addEventListener('error', (e) => {
+  trackAppError('uncaught_error', e.message ?? 'Unknown', e.error?.stack);
+});
 
 // ── Dev: mock CinelarNative bridge ───────────────────────────────────────────
 if (import.meta.env.DEV) {

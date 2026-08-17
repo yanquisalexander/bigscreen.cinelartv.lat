@@ -15,6 +15,7 @@
   import { syncContinueWatching, syncRecommendations, exitApp, type AndroidTvHomeItem } from '@/services/NativeBridge';
   import { setFocus, getCurrentFocusKey, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
   import type { ContentItem, ExploreResponse } from '@/types/content';
+  import { trackHomeLoaded, trackContentSelect, trackContentImpression } from '@/lib/analytics';
 
   let data = $state<ExploreResponse | null>(null);
   let loading = $state(true);
@@ -33,12 +34,17 @@
   async function fetchData() {
     error = false;
     loading = true;
+    const startTime = performance.now();
     try {
       const explore = await getExplore(tokens?.accessToken, {
         include_trailers: true,
         img_variants: ['xlarge', 'large', 'medium'],
       });
       data = explore;
+      const loadDuration = Math.round(performance.now() - startTime);
+      const contentRows = explore.content?.length ?? 0;
+      const hasBanner = (explore.banner_content?.length ?? 0) > 0;
+      trackHomeLoaded(loadDuration, contentRows, hasBanner);
     } catch (e: any) {
       error = true;
       const errStr = String(e?.message ?? e ?? '');
@@ -57,6 +63,22 @@
 
   $effect(() => {
     fetchData();
+  });
+
+  // Track content impressions when data loads
+  $effect(() => {
+    if (!data) return;
+    for (const [catIdx, category] of (data.content ?? []).entries()) {
+      for (const [itemIdx, item] of (category.content ?? []).entries()) {
+        trackContentImpression(
+          item.id,
+          item.content_type ?? item.contentType ?? 'movie',
+          `home-row-${catIdx}`,
+          itemIdx,
+          'home',
+        );
+      }
+    }
   });
 
   $effect(() => {
@@ -93,10 +115,12 @@
   });
 
   function handlePlay(item: ContentItem) {
+    trackContentSelect(item.id, item.content_type ?? item.contentType ?? 'movie', 'hero', item.title);
     push(`/watch/${item.id}`);
   }
 
   function handleInfo(item: ContentItem) {
+    trackContentSelect(item.id, item.content_type ?? item.contentType ?? 'movie', 'home', item.title);
     push(`/content/${item.id}`);
   }
 

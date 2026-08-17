@@ -12,6 +12,7 @@
   import FocusableButton from '@/components/tv/FocusableButton.svelte';
   import Focusable from '@/components/tv/Focusable.svelte';
   import { formatUserCode } from '@/utils/helpers';
+  import { trackAuthStarted, trackAuthCompleted } from '@/lib/analytics';
 
   let userCode = $state('');
   let qrUrl = $state('');
@@ -24,6 +25,7 @@
     try {
       loading = true;
       error = '';
+      trackAuthStarted();
       const clientId = $svelteConfigStore.config.CLIENT_ID ?? 'xvk9JnMaS5f0y0aiiLZ6kx8-boITuK8zoQcPRHbkX6Y';
       const response = await requestDeviceCode(clientId);
 
@@ -46,6 +48,7 @@
           switch (status) {
             case 'success':
               polling = false;
+              trackAuthCompleted('device_code');
               authStore.getState().login({
                 accessToken: tokenResponse.access_token,
                 refreshToken: tokenResponse.refresh_token,
@@ -101,6 +104,7 @@
 
   function handleGuestMode() {
     polling = false;
+    trackAuthCompleted('guest');
     authStore.getState().enterGuestMode();
     replace('/home');
   }

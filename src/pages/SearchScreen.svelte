@@ -12,6 +12,7 @@
   import { setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
   import type { ContentItem } from '@/types/content';
   import { isTVShow } from '@/types/content';
+  import { trackSearchSubmit, trackSearchResultSelect, trackContentSelect } from '@/lib/analytics';
 
   const KEYBOARD_ROWS = [
     ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
@@ -41,6 +42,7 @@
     try {
       const data = await searchContent(tokens.accessToken, q);
       results = data.data ?? [];
+      trackSearchSubmit(q, results.length);
     } catch {
       results = [];
     } finally {
@@ -79,6 +81,9 @@
   }
 
   function handleInfo(item: ContentItem) {
+    const position = results.findIndex(r => r.id === item.id);
+    trackSearchResultSelect(query, item.id, position >= 0 ? position : 0);
+    trackContentSelect(item.id, isTVShow(item) ? 'series' : 'movie', 'search', item.title);
     push(`/content/${item.id}`);
   }
 
