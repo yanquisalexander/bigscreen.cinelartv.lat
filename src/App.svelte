@@ -55,18 +55,20 @@
     // Spatial navigation
     initSpatialNavigation();
 
-    // Track screen views on route changes
-    const unsubRouter = router.subscribe((detail) => {
-      if (detail?.location) {
-        trackScreenView(detail.location);
-      }
-    });
+    // Track screen views on route changes (hash-based)
+    const handleHashChange = () => {
+      const path = window.location.hash.slice(1) || '/';
+      trackScreenView(path);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    // Track initial route
+    handleHashChange();
 
     return () => {
       unsubAuth();
       unsubConfig();
       unsubBridge();
-      unsubRouter();
+      window.removeEventListener('hashchange', handleHashChange);
     };
   });
 
