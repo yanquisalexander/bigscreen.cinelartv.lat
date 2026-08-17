@@ -29,27 +29,16 @@ function getClientId(): string {
   }
 }
 
-// ── Send to GA4 Measurement Protocol ─────────────────────────────────────────
-function send(event: AnalyticsEvent): void {
-  if (!_measurementId) return;
+// ── Build URL with api_secret (always) + debug_secret (only in debug) ────────
+function buildUrl(): string {
+  const apiSecret = import.meta.env.VITE_GA_API_SECRET ?? '';
+  const debugSecret = _debugMode ? (import.meta.env.VITE_GA_DEBUG_SECRET ?? '') : '';
+  return `${ENDPOINT}?measurement_id=${_measurementId}&api_secret=${apiSecret}${debugSecret ? `&debug_secret=${debugSecret}` : ''}`;
+}
 
-  const ctx = buildContext();
-  const params: Record<string, unknown> = {
-    ...ctx,
-    ...event.params,
-  };
-
-  const payload = {
-    client_id: getClientId(),
-    events: [{
-      name: event.event,
-      params,
-    }],
-  };
-
-  const secret = _debugMode ? import.meta.env.VITE_GA_DEBUG_SECRET : '';
-  const url = `${ENDPOINT}?measurement_id=${_measurementId}${secret ? `&debug_secret=${secret}` : ''}`;
-
+// ── Send payload ─────────────────────────────────────────────────────────────
+function post(payload: object): void {
+  const url = buildUrl();
   try {
     if (_debugMode) {
       fetch(url, { method: 'POST', body: JSON.stringify(payload), keepalive: true });
@@ -63,6 +52,22 @@ function send(event: AnalyticsEvent): void {
   } catch {
     // Silently fail — TV networks can be unreliable
   }
+}
+
+// ── Send to GA4 Measurement Protocol ─────────────────────────────────────────
+function send(event: AnalyticsEvent): void {
+  if (!_measurementId) return;
+
+  const ctx = buildContext();
+  const params: Record<string, unknown> = {
+    ...ctx,
+    ...event.params,
+  };
+
+  post({
+    client_id: getClientId(),
+    events: [{ name: event.event, params }],
+  });
 }
 
 // ── Flush queue ──────────────────────────────────────────────────────────────
@@ -79,41 +84,19 @@ function flush(): void {
   const batch = _queue.splice(0, MAX_BATCH_SIZE);
 
   if (batch.length === 1) {
-    // Single event — send directly
     send(batch[0]);
     return;
   }
 
-  // Multiple events — batch into single request
   const events = batch.map(evt => ({
     name: evt.event,
-    params: {
-      ...ctx,
-      ...evt.params,
-    },
+    params: { ...ctx, ...evt.params },
   }));
 
-  const payload = {
+  post({
     client_id: getClientId(),
     events,
-  };
-
-  const secret = _debugMode ? import.meta.env.VITE_GA_DEBUG_SECRET : '';
-  const url = `${ENDPOINT}?measurement_id=${_measurementId}${secret ? `&debug_secret=${secret}` : ''}`;
-
-  try {
-    if (_debugMode) {
-      fetch(url, { method: 'POST', body: JSON.stringify(payload), keepalive: true });
-    } else if (navigator.sendBeacon) {
-      navigator.sendBeacon(url, JSON.stringify(payload));
-    } else {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', url, true);
-      xhr.send(JSON.stringify(payload));
-    }
-  } catch {
-    // Silently fail
-  }
+  });
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
