@@ -38,7 +38,6 @@ function send(event: AnalyticsEvent): void {
     ...ctx,
     ...event.params,
   };
-  if (_debugMode) params.debug_mode = true;
 
   const payload = {
     client_id: getClientId(),
@@ -48,11 +47,11 @@ function send(event: AnalyticsEvent): void {
     }],
   };
 
-  const url = `${ENDPOINT}?measurement_id=${_measurementId}&api_secret=unused`;
+  const secret = _debugMode ? import.meta.env.VITE_GA_DEBUG_SECRET : '';
+  const url = `${ENDPOINT}?measurement_id=${_measurementId}${secret ? `&debug_secret=${secret}` : ''}`;
 
   try {
     if (_debugMode) {
-      // Debug: use fetch so it appears in Network tab
       fetch(url, { method: 'POST', body: JSON.stringify(payload), keepalive: true });
     } else if (navigator.sendBeacon) {
       navigator.sendBeacon(url, JSON.stringify(payload));
@@ -91,7 +90,6 @@ function flush(): void {
     params: {
       ...ctx,
       ...evt.params,
-      ...(_debugMode ? { debug_mode: true } : {}),
     },
   }));
 
@@ -100,7 +98,8 @@ function flush(): void {
     events,
   };
 
-  const url = `${ENDPOINT}?measurement_id=${_measurementId}&api_secret=unused`;
+  const secret = _debugMode ? import.meta.env.VITE_GA_DEBUG_SECRET : '';
+  const url = `${ENDPOINT}?measurement_id=${_measurementId}${secret ? `&debug_secret=${secret}` : ''}`;
 
   try {
     if (_debugMode) {
