@@ -1,23 +1,17 @@
 import wrap from 'svelte-spa-router/wrap';
 
-// Pages
+import { authStore } from '@/stores/authStore';
+import type { RouteDetail } from 'svelte-spa-router';
+
+// Eager: lightweight screens always needed
 import BootScreen from '@/pages/BootScreen.svelte';
 import AuthScreen from '@/pages/AuthScreen.svelte';
 import BlockedScreen from '@/pages/BlockedScreen.svelte';
+import FallbackScreen from '@/pages/FallbackScreen.svelte';
 import ProfileSelectScreen from '@/pages/ProfileSelectScreen.svelte';
 import HomeScreen from '@/pages/HomeScreen.svelte';
 import SearchScreen from '@/pages/SearchScreen.svelte';
-import LiveTVScreen from '@/pages/LiveTVScreen.svelte';
 import SettingsScreen from '@/pages/SettingsScreen.svelte';
-import ContentDetailScreen from '@/pages/ContentDetailScreen.svelte';
-import WatchScreen from '@/pages/WatchScreen.svelte';
-import FallbackScreen from '@/pages/FallbackScreen.svelte';
-
-// Layout wrappers
-import ShellWrapper from '@/components/layout/ShellWrapper.svelte';
-
-import { authStore } from '@/stores/authStore';
-import type { RouteDetail } from 'svelte-spa-router';
 
 const GUEST_ALLOWED_PATHS = ['/home', '/search', '/live'];
 const GUEST_BLOCKED_PREFIXES = ['/watch', '/select-profile'];
@@ -28,15 +22,13 @@ function isGuestAllowed(pathname: string): boolean {
   return !GUEST_BLOCKED_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
-/** Returns true if the user is authenticated (or guest on allowed paths). */
 function requireAuth(_detail: RouteDetail): boolean {
   const state = authStore.getState();
   if (!state.isReady) return false;
-  if (state.isGuest) return false; // guests can't access protected routes
+  if (state.isGuest) return false;
   return state.isAuthenticated && !!state.selectedProfile;
 }
 
-/** Returns true if the user is authenticated or a guest on an allowed path. */
 function requireAuthOrGuest(detail: RouteDetail): boolean {
   const state = authStore.getState();
   if (!state.isReady) return false;
@@ -61,42 +53,37 @@ export const routes = {
   }),
 
   '/home': wrap({
-    component: ShellWrapper,
-    props: { component: HomeScreen },
+    component: HomeScreen,
     conditions: [requireAuthOrGuest],
   }),
 
   '/search': wrap({
-    component: ShellWrapper,
-    props: { component: SearchScreen },
+    component: SearchScreen,
     conditions: [requireAuthOrGuest],
   }),
 
   '/live': wrap({
-    component: ShellWrapper,
-    props: { component: LiveTVScreen },
+    asyncComponent: () => import('@/pages/LiveTVScreen.svelte'),
     conditions: [requireAuthOrGuest],
   }),
 
   '/settings': wrap({
-    component: ShellWrapper,
-    props: { component: SettingsScreen },
+    component: SettingsScreen,
     conditions: [requireAuth],
   }),
 
   '/content/:contentId': wrap({
-    component: ShellWrapper,
-    props: { component: ContentDetailScreen },
+    asyncComponent: () => import('@/pages/ContentDetailScreen.svelte'),
     conditions: [requireAuthOrGuest],
   }),
 
   '/watch/:contentId': wrap({
-    component: WatchScreen,
+    asyncComponent: () => import('@/pages/WatchScreen.svelte'),
     conditions: [requireAuth],
   }),
 
   '/watch/:contentId/:episodeId': wrap({
-    component: WatchScreen,
+    asyncComponent: () => import('@/pages/WatchScreen.svelte'),
     conditions: [requireAuth],
   }),
 
@@ -104,6 +91,6 @@ export const routes = {
 };
 
 export const geoBlockedRoutes = {
-  '/live': LiveTVScreen,
-  '*': LiveTVScreen,
+  '/live': () => import('@/pages/LiveTVScreen.svelte'),
+  '*': () => import('@/pages/LiveTVScreen.svelte'),
 };

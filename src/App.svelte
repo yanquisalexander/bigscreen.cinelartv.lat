@@ -26,12 +26,13 @@
   let geoBlocked = $state(false);
   let geoCheckDone = $state(false);
   let betaToastShown = false;
+  let currentPath = $state(window.location.hash.slice(1) || '/');
 
   // Standalone routes that don't show AppShell sidebar
   const STANDALONE_PREFIXES = ['/auth', '/blocked', '/select-profile', '/watch'];
   const isStandaloneRoute = $derived(
-    router.location === '/' || router.location === '/auth' ||
-    STANDALONE_PREFIXES.some(p => router.location.startsWith(p))
+    currentPath === '/' || currentPath === '/auth' ||
+    STANDALONE_PREFIXES.some(p => currentPath.startsWith(p))
   );
 
   // ── Derived from stores ──────────────────────────────────────────────────────
@@ -58,6 +59,7 @@
     // Track screen views on route changes (hash-based)
     const handleHashChange = () => {
       const path = window.location.hash.slice(1) || '/';
+      currentPath = path;
       trackScreenView(path);
     };
     window.addEventListener('hashchange', handleHashChange);
