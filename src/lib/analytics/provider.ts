@@ -15,10 +15,14 @@ const MAX_QUEUE_SIZE = 20;
 let _queue: AnalyticsEvent[] = [];
 let _flushTimer: ReturnType<typeof setInterval> | null = null;
 let _enabled = false;
+let _debugMode = false;
 
 // ── GA4 script loader ────────────────────────────────────────────────────────
 function loadGA4(measurementId: string): void {
   if (typeof document === 'undefined') return;
+
+  _debugMode = import.meta.env.DEV ||
+    new URLSearchParams(window.location.search).has('debug');
 
   // Initialize dataLayer
   window.dataLayer = window.dataLayer || [];
@@ -38,7 +42,7 @@ function loadGA4(measurementId: string): void {
     send_page_view: false,
     app_name: 'CinelarTV',
     app_version: import.meta.env.VITE_APP_VERSION ?? 'dev',
-    debug_mode: import.meta.env.DEV,
+    debug_mode: _debugMode,
   });
 
   _enabled = true;
@@ -63,6 +67,7 @@ function flush(): void {
         ...ctx,
         ...evt.params,
       };
+      if (_debugMode) params.debug_mode = true;
       window.gtag('event', evt.event, params);
     } catch {
       // Individual event failed — continue with rest
