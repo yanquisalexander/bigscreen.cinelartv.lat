@@ -100,28 +100,23 @@ function detectVideoTexture(): boolean {
     const gl = (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) as WebGLRenderingContext | null;
     if (!gl) return false;
 
+    // Check for video texture extensions (preferred: no side effects)
+    const ext = gl.getExtension('WEBGL_video_texture') || gl.getExtension('EXT_texture_video_image');
+    if (ext) {
+      destroyGlContext(gl);
+      return true;
+    }
+
+    // Fallback: test with a 1x1 canvas texture (video element not needed)
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
 
-    // Creamos un elemento de video dummy para probar la firma
-    const video = document.createElement('video');
-
-    // Invocamos texImage2D intencionalmente dentro del try/catch.
-    // En entornos que soportan videoTexture, la llamada no arrojará un error de tipo de parámetro invalido.
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      video
-    );
+    const pixel = new Uint8Array([255, 255, 255, 255]);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
 
     destroyGlContext(gl);
     return true;
   } catch {
-    // Si la TV o runtime falla al procesar el video element como textura (o el lienzo está vacío),
-    // caerá en el catch y retornará false de forma segura.
     return false;
   }
 }
