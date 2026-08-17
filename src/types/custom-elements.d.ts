@@ -7,9 +7,4 @@ declare module 'react' {
   }
 }
 
-interface Window {
-  dataLayer?: unknown[];
-  gtag?: (...args: unknown[]) => void;
-}
-
 export {};

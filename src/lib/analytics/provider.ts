@@ -1,83 +1,124 @@
 import { buildContext } from './context';
 import type { AnalyticsEvent } from './types';
 
-// ── GA4 gtag.js integration ──────────────────────────────────────────────────
-declare global {
-  interface Window {
-    dataLayer?: unknown[];
-    gtag?: (...args: unknown[]) => void;
-  }
-}
+// ── Minimal GA4 — Measurement Protocol (no gtag.js, no GTM) ──────────────────
+// Sends events directly to google-analytics.com/mp/collect
+// ~1.5kB vs 73kB for the full gtag.js library
 
+const ENDPOINT = 'https://www.google-analytics.com/mp/collect';
 const FLUSH_INTERVAL_MS = 2000;
-const MAX_QUEUE_SIZE = 20;
+const MAX_BATCH_SIZE = 20;
+const CLIENT_ID_KEY = 'cinelar_ga_cid';
 
+let _measurementId = '';
 let _queue: AnalyticsEvent[] = [];
 let _flushTimer: ReturnType<typeof setInterval> | null = null;
 let _enabled = false;
 let _debugMode = false;
 
-// ── GA4 script loader ────────────────────────────────────────────────────────
-function loadGA4(measurementId: string): void {
-  if (typeof document === 'undefined') return;
-
-  _debugMode = import.meta.env.DEV ||
-    new URLSearchParams(window.location.search).has('debug');
-
-  // Initialize dataLayer
-  window.dataLayer = window.dataLayer || [];
-  function gtag(...args: unknown[]) {
-    window.dataLayer!.push(args);
+// ── Client ID (persistent per device) ────────────────────────────────────────
+function getClientId(): string {
+  try {
+    let cid = localStorage.getItem(CLIENT_ID_KEY);
+    if (cid) return cid;
+    cid = `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+    localStorage.setItem(CLIENT_ID_KEY, cid);
+    return cid;
+  } catch {
+    return `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
   }
-  window.gtag = gtag;
-
-  // gtag.js snippet
-  const script = document.createElement('script');
-  script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
-  document.head.appendChild(script);
-
-  gtag('js', new Date());
-  gtag('config', measurementId, {
-    send_page_view: false,
-    app_name: 'CinelarTV',
-    app_version: import.meta.env.VITE_APP_VERSION ?? 'dev',
-    debug_mode: _debugMode,
-  });
-
-  _enabled = true;
 }
 
-// ── Flush queue to GA4 ──────────────────────────────────────────────────────
+// ── Send to GA4 Measurement Protocol ─────────────────────────────────────────
+function send(event: AnalyticsEvent): void {
+  if (!_measurementId) return;
+
+  const ctx = buildContext();
+  const params: Record<string, unknown> = {
+    ...ctx,
+    ...event.params,
+  };
+  if (_debugMode) params.debug_mode = true;
+
+  const payload = {
+    client_id: getClientId(),
+    events: [{
+      name: event.event,
+      params,
+    }],
+  };
+
+  const url = `${ENDPOINT}?measurement_id=${_measurementId}&api_secret=unused`;
+
+  try {
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(url, JSON.stringify(payload));
+    } else {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.send(JSON.stringify(payload));
+    }
+  } catch {
+    // Silently fail — TV networks can be unreliable
+  }
+}
+
+// ── Flush queue ──────────────────────────────────────────────────────────────
 function flush(): void {
-  if (!_enabled || !window.gtag || _queue.length === 0) return;
+  if (!_enabled || _queue.length === 0) return;
 
   let ctx: Record<string, unknown> = {};
   try {
     ctx = buildContext();
   } catch {
-    // Context unavailable — still send events with minimal data
+    // Context unavailable
   }
 
-  const events = _queue.splice(0, MAX_QUEUE_SIZE);
+  const batch = _queue.splice(0, MAX_BATCH_SIZE);
 
-  for (const evt of events) {
-    try {
-      const params: Record<string, unknown> = {
-        ...ctx,
-        ...evt.params,
-      };
-      if (_debugMode) params.debug_mode = true;
-      window.gtag('event', evt.event, params);
-    } catch {
-      // Individual event failed — continue with rest
+  if (batch.length === 1) {
+    // Single event — send directly
+    send(batch[0]);
+    return;
+  }
+
+  // Multiple events — batch into single request
+  const events = batch.map(evt => ({
+    name: evt.event,
+    params: {
+      ...ctx,
+      ...evt.params,
+      ...(_debugMode ? { debug_mode: true } : {}),
+    },
+  }));
+
+  const payload = {
+    client_id: getClientId(),
+    events,
+  };
+
+  const url = `${ENDPOINT}?measurement_id=${_measurementId}&api_secret=unused`;
+
+  try {
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(url, JSON.stringify(payload));
+    } else {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.send(JSON.stringify(payload));
     }
+  } catch {
+    // Silently fail
   }
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
 export function initProvider(measurementId: string): void {
-  loadGA4(measurementId);
+  _measurementId = measurementId;
+  _debugMode = import.meta.env.DEV ||
+    (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug'));
+
+  _enabled = true;
 
   // Periodic flush
   _flushTimer = setInterval(flush, FLUSH_INTERVAL_MS);
@@ -95,8 +136,7 @@ export function enqueue(event: AnalyticsEvent): void {
   if (!_enabled) return;
   _queue.push(event);
 
-  // Flush immediately if queue is getting large
-  if (_queue.length >= MAX_QUEUE_SIZE) flush();
+  if (_queue.length >= MAX_BATCH_SIZE) flush();
 }
 
 export function flushProvider(): void {
