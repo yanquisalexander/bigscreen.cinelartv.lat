@@ -41,21 +41,34 @@ function loadGA4(measurementId: string): void {
   });
 
   _enabled = true;
+  if (import.meta.env.DEV) {
+    console.log(`[analytics] GA4 initialized — ID: ${measurementId}`);
+  }
 }
 
 // ── Flush queue to GA4 ──────────────────────────────────────────────────────
 function flush(): void {
   if (!_enabled || !window.gtag || _queue.length === 0) return;
 
-  const ctx = buildContext();
+  let ctx: Record<string, unknown> = {};
+  try {
+    ctx = buildContext();
+  } catch {
+    // Context unavailable — still send events with minimal data
+  }
+
   const events = _queue.splice(0, MAX_QUEUE_SIZE);
 
   for (const evt of events) {
-    const params: Record<string, unknown> = {
-      ...ctx,
-      ...evt.params,
-    };
-    window.gtag('event', evt.event, params);
+    try {
+      const params: Record<string, unknown> = {
+        ...ctx,
+        ...evt.params,
+      };
+      window.gtag('event', evt.event, params);
+    } catch {
+      // Individual event failed — continue with rest
+    }
   }
 }
 
