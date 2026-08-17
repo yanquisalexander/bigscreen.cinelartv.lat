@@ -51,7 +51,10 @@ function send(event: AnalyticsEvent): void {
   const url = `${ENDPOINT}?measurement_id=${_measurementId}&api_secret=unused`;
 
   try {
-    if (navigator.sendBeacon) {
+    if (_debugMode) {
+      // Debug: use fetch so it appears in Network tab
+      fetch(url, { method: 'POST', body: JSON.stringify(payload), keepalive: true });
+    } else if (navigator.sendBeacon) {
       navigator.sendBeacon(url, JSON.stringify(payload));
     } else {
       const xhr = new XMLHttpRequest();
@@ -100,7 +103,9 @@ function flush(): void {
   const url = `${ENDPOINT}?measurement_id=${_measurementId}&api_secret=unused`;
 
   try {
-    if (navigator.sendBeacon) {
+    if (_debugMode) {
+      fetch(url, { method: 'POST', body: JSON.stringify(payload), keepalive: true });
+    } else if (navigator.sendBeacon) {
       navigator.sendBeacon(url, JSON.stringify(payload));
     } else {
       const xhr = new XMLHttpRequest();
