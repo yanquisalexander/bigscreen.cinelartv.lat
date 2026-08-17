@@ -35,15 +35,13 @@ function loadGA4(measurementId: string): void {
 
   gtag('js', new Date());
   gtag('config', measurementId, {
-    send_page_view: false, // SPA — we control page views manually
+    send_page_view: false,
     app_name: 'CinelarTV',
     app_version: import.meta.env.VITE_APP_VERSION ?? 'dev',
+    debug_mode: import.meta.env.DEV,
   });
 
   _enabled = true;
-  if (import.meta.env.DEV) {
-    console.log(`[analytics] GA4 initialized — ID: ${measurementId}`);
-  }
 }
 
 // ── Flush queue to GA4 ──────────────────────────────────────────────────────
