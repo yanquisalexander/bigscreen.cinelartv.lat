@@ -198,7 +198,7 @@
           <div class="mt-2 h-[clamp(2.5rem,4vh,3rem)] w-[clamp(8rem,10vw,10rem)] rounded-xl bg-white/10 animate-pulse-slow"></div>
         </div>
       </div>
-      <div class="px-[clamp(3rem,7.5vw,6rem)] py-[clamp(1.25rem,4vh,2rem)] space-y-[clamp(1.5rem,4vh,2rem)]">
+      <div class="relative px-[clamp(3rem,7.5vw,6rem)] pt-[clamp(1rem,2vh,1.5rem)] pb-[clamp(3rem,8vh,4rem)] space-y-[clamp(1.5rem,4vh,2rem)]">
         {#each [1, 2, 3] as i (i)}
           <div>
             <div class="h-[clamp(1.125rem,2.4vh,1.5rem)] w-[clamp(10rem,15vw,12rem)] bg-surface rounded mb-[clamp(0.75rem,2vh,1rem)] animate-pulse-slow"></div>
