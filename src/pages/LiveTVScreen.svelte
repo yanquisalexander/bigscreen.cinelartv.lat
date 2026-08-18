@@ -3,6 +3,9 @@
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import Focusable from '@/components/tv/Focusable.svelte';
   import FocusableRow from '@/components/tv/FocusableRow.svelte';
+  import ChannelCardEpg from '@/components/tv/ChannelCardEpg.svelte';
+  import NowAndNextRow from '@/components/tv/NowAndNextRow.svelte';
+  import EpgProgressBar from '@/components/tv/EpgProgressBar.svelte';
   import { svelteAuthStore } from '@/stores/authStore';
   import { svelteLiveTvFavoritesStore, liveTvFavoritesStore } from '@/stores/liveTvFavoritesStore';
   import { getApiConfig } from '@/api/client';
@@ -10,7 +13,7 @@
   import { getLiveTvChannels, type LiveTvChannel } from '@/api/live';
   import { isBackKey } from '@/utils/helpers';
   import { setFocus, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
-  import { Tv, RefreshCw, Search, Star, Play, X, Clock } from '@lucide/svelte';
+  import { Tv, RefreshCw, Search, X, Play, Clock } from '@lucide/svelte';
 
   interface Props {
     geoblockedSidebarKey?: string;
@@ -24,6 +27,7 @@
   let searchOpen = $state(false);
   let searchQuery = $state('');
   let scrollContainerEl = $state<HTMLDivElement | null>(null);
+  let activeCategory = $state<string>('Todos');
 
   const nativeSupported = supportsLiveTV();
   const tokens = $derived($svelteAuthStore.tokens);
@@ -75,26 +79,45 @@
     return () => window.removeEventListener('keydown', handleBack);
   });
 
+  const isGuideView = $derived(activeCategory === 'Guía');
+
   const filteredChannels = $derived.by(() => {
-    if (!searchQuery.trim()) return channels;
-    const q = searchQuery.trim().toLowerCase();
-    return channels.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.current_program?.title.toLowerCase().includes(q),
-    );
+    let result = channels;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.current_program?.title.toLowerCase().includes(q),
+      );
+    }
+    if (!isGuideView && activeCategory !== 'Todos') {
+      if (activeCategory === 'Favoritos') {
+        result = result.filter((c) => favorites.has(c.id));
+      } else {
+        result = result.filter((c) => channelCategory(c) === activeCategory);
+      }
+    }
+    return result;
   });
 
-  const favoriteChannels = $derived(filteredChannels.filter((c) => favorites.has(c.id)));
+  const categories = $derived.by(() => {
+    const cats = new Set<string>();
+    for (const ch of channels) {
+      cats.add(channelCategory(ch));
+    }
+    return ['Todos', 'Guía', 'Favoritos', ...Array.from(cats).sort()];
+  });
 
-  const featuredChannel = $derived(
-    favoriteChannels.length > 0 ? favoriteChannels[0] : filteredChannels[0] ?? null
+  const favoriteChannels = $derived(channels.filter((c) => favorites.has(c.id)));
+
+  const nowPlayingChannels = $derived(
+    channels.filter((c) => c.current_program && favorites.has(c.id)).slice(0, 10),
   );
 
   const channelsByCategory = $derived.by(() => {
     const map = new Map<string, LiveTvChannel[]>();
     for (const ch of filteredChannels) {
-      if (ch.id === featuredChannel?.id) continue;
       const cat = channelCategory(ch);
       if (!map.has(cat)) map.set(cat, []);
       map.get(cat)!.push(ch);
@@ -105,10 +128,28 @@
   $effect(() => {
     if (channels.length > 0 && !searchOpen) {
       setTimeout(() => {
-        setFocus('live-hero-play');
+        if (doesFocusableExist('live-cat-Todos')) {
+          setFocus('live-cat-Todos');
+        }
       }, 50);
     }
   });
+
+  let rafId = 0;
+
+  function scrollFollow(node: HTMLElement) {
+    const observer = new MutationObserver(() => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const focused = node.querySelector<HTMLElement>('[data-focused="true"]');
+        if (focused) {
+          focused.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      });
+    });
+    observer.observe(node, { attributes: true, subtree: true, attributeFilter: ['data-focused'] });
+    return { destroy() { observer.disconnect(); cancelAnimationFrame(rafId); } };
+  }
 
   function handlePlayChannel(channel: LiveTvChannel) {
     const { CLIENT_ENDPOINT } = getApiConfig();
@@ -122,19 +163,12 @@
     };
     playLiveChannel(info);
   }
-
-  function handleHeroFocus() {
-    setFocus('live-hero-play');
-    requestAnimationFrame(() => {
-      scrollContainerEl?.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-  }
 </script>
 
 <FocusContainer
   focusKey="livetv-root"
   focusable={false}
-  preferredChildFocusKey="live-hero-play"
+  preferredChildFocusKey="live-cat-Todos"
   trackChildren={true}
   saveLastFocusedChild={true}
   class="w-full h-dvh flex flex-col bg-bg"
@@ -153,9 +187,7 @@
         </p>
         <Focusable
           focusKey="livetv-back"
-          onEnterPress={() => {
-            push('/home');
-          }}
+          onEnterPress={() => push('/home')}
           focusedClass="!bg-white !text-black"
           class="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium flex items-center justify-center cursor-pointer"
           playSound={true}
@@ -169,7 +201,7 @@
   {:else if loading}
     <div class="w-full h-dvh flex flex-col bg-bg">
       <div class="px-[clamp(3rem,7.5vw,6rem)] pt-[clamp(1.5rem,3vh,3rem)] pb-4 shrink-0">
-        <div class="w-full h-[clamp(300px,45vh,500px)] rounded-3xl bg-surface"></div>
+        <div class="w-full h-[clamp(200px,30vh,320px)] rounded-3xl bg-surface"></div>
       </div>
       <div class="flex-1 px-[clamp(3rem,7.5vw,6rem)] space-y-6 overflow-hidden">
         {#each [1, 2] as i (i)}
@@ -211,7 +243,7 @@
     </div>
   {:else}
     <!-- Header -->
-    <div class="flex items-center gap-[clamp(0.75rem,1.5vw,1rem)] px-[clamp(3rem,7.5vw,6rem)] pt-[calc(var(--topnav-h)+1.5rem)] pb-[clamp(0.75rem,1.5vh,1rem)] shrink-0">
+    <div class="flex items-center gap-[clamp(0.75rem,1.5vw,1rem)] px-[clamp(3rem,7.5vw,6rem)] pt-[calc(var(--topnav-h)+1.5rem)] pb-[clamp(0.5rem,1vh,0.75rem)] shrink-0">
       <div class="w-[clamp(2rem,3.5vw,3rem)] h-[clamp(2rem,3.5vw,3rem)] rounded-full bg-surface flex items-center justify-center shrink-0">
         <Tv class="w-[clamp(1rem,1.5vw,1.25rem)] h-[clamp(1rem,1.5vw,1.25rem)] text-accent-light" />
       </div>
@@ -227,18 +259,10 @@
       {#if !searchOpen}
         <Focusable
           focusKey="live-search-toggle"
-          onEnterPress={() => {
-            searchOpen = true;
-            requestAnimationFrame(() => {
-              const first = filteredChannels[0];
-              if (first && doesFocusableExist('live-ch-' + first.id)) {
-                setFocus('live-ch-' + first.id);
-              }
-            });
-          }}
+          onEnterPress={() => { searchOpen = true; }}
           onArrowPress={(direction) => {
             if (direction === 'down') {
-              setFocus('live-hero-play');
+              setFocus('live-cat-Todos');
               return false;
             }
             if (direction === 'up') {
@@ -270,6 +294,62 @@
       {/if}
     </div>
 
+    <!-- Category filter bar -->
+    <div class="px-[clamp(3rem,7.5vw,6rem)] pb-[clamp(0.5rem,1vh,0.75rem)] shrink-0">
+      <FocusContainer
+        focusKey="live-categories"
+        focusable={false}
+        trackChildren={true}
+        saveLastFocusedChild={true}
+        preferredChildFocusKey="live-cat-Todos"
+      >
+        <div class="flex gap-2 overflow-x-auto hide-scrollbar py-1">
+          {#each categories as cat, idx (cat)}
+            <Focusable
+              focusKey="live-cat-{cat}"
+              onEnterPress={() => { activeCategory = cat; }}
+              onArrowPress={(direction) => {
+                if (direction === 'up') {
+                  setFocus('live-search-toggle');
+                  return false;
+                }
+                if (direction === 'down') {
+                  if (isGuideView) {
+                    const firstGuide = filteredChannels[0];
+                    if (firstGuide && doesFocusableExist('guide-ch-' + firstGuide.id)) {
+                      setFocus('guide-ch-' + firstGuide.id);
+                    }
+                  } else {
+                    const firstCard = filteredChannels[0];
+                    if (firstCard && doesFocusableExist('live-ch-' + firstCard.id)) {
+                      setFocus('live-ch-' + firstCard.id);
+                    }
+                  }
+                  return false;
+                }
+                if (direction === 'left' && idx > 0) {
+                  setFocus(`live-cat-${categories[idx - 1]}`);
+                  return false;
+                }
+                if (direction === 'right' && idx < categories.length - 1) {
+                  setFocus(`live-cat-${categories[idx + 1]}`);
+                  return false;
+                }
+                return true;
+              }}
+              focusedClass="!ring-2 !ring-white !ring-offset-2 !ring-offset-bg"
+              class="shrink-0 h-[clamp(1.75rem,3vh,2.25rem)] px-4 rounded-full text-[clamp(0.7rem,0.9vw,0.8rem)] font-medium flex items-center justify-center cursor-pointer transition-all {activeCategory === cat ? 'bg-white text-black' : 'bg-surface text-text-secondary'}"
+              playSound={true}
+            >
+              {#snippet children()}
+                {cat}
+              {/snippet}
+            </Focusable>
+          {/each}
+        </div>
+      </FocusContainer>
+    </div>
+
     <!-- Scrollable content -->
     {#if filteredChannels.length === 0}
       <div class="flex-1 flex flex-col items-center justify-center">
@@ -278,197 +358,138 @@
           Ningún canal coincide con "{searchQuery}"
         </p>
       </div>
-    {:else}
-      <div bind:this={scrollContainerEl} class="flex-1 overflow-y-auto hide-scrollbar pb-8">
-        <!-- Hero -->
-        {#if featuredChannel}
-          <div class="px-0 pt-2 pb-6">
-            <div class="relative w-full h-[clamp(300px,45vh,500px)] shrink-0 overflow-hidden rounded-3xl mx-auto max-w-[calc(100%-6rem)]">
-              <div class="absolute inset-0 bg-gradient-to-br from-accent/30 via-surface to-bg"></div>
-              <div class="absolute inset-0 flex items-center gap-[clamp(2rem,5vw,5rem)] px-[clamp(2rem,5vw,4rem)]">
-                <!-- Channel Logo -->
-                <div class="shrink-0">
-                  {#if featuredChannel.logo_url}
-                    <img
-                      src={featuredChannel.logo_url}
-                      alt={featuredChannel.name}
-                      class="w-[clamp(5rem,10vw,9rem)] h-[clamp(5rem,10vw,9rem)] object-contain"
-                    />
-                  {:else}
-                    <div class="w-[clamp(5rem,10vw,9rem)] h-[clamp(5rem,10vw,9rem)] rounded-2xl bg-surface-elevated flex items-center justify-center">
-                      <Tv class="w-12 h-12 text-text-secondary" />
-                    </div>
-                  {/if}
-                </div>
-
-                <!-- Channel Info -->
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 mb-2">
-                    <div class="flex items-center gap-1.5 bg-live/90 rounded-full px-2.5 py-1">
-                      <span class="text-white text-[10px] font-bold uppercase tracking-wider">
-                        En vivo
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      tabindex={-1}
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        liveTvFavoritesStore.getState().toggleFavorite(featuredChannel.id);
-                      }}
-                      class="p-1"
-                    >
-                      <Star
-                        class="w-5 h-5 {favorites.has(featuredChannel.id) ? 'fill-accent text-accent' : 'text-white/40'}"
-                      />
-                    </button>
-                  </div>
-
-                  <h2 class="text-white text-[clamp(1.5rem,3vw,2.5rem)] font-bold leading-tight mb-1">
-                    {featuredChannel.name}
-                  </h2>
-
-                  {#if featuredChannel.current_program}
-                    <div class="mb-4">
-                      <p class="text-white text-[clamp(1rem,1.8vw,1.35rem)] font-medium">
-                        {featuredChannel.current_program.title}
-                      </p>
-                      <div class="flex items-center gap-2 mt-1">
-                        <Clock class="w-3.5 h-3.5 text-accent-light" />
-                        <p class="text-accent-light text-[clamp(0.75rem,1vw,0.9rem)]">
-                          {formatTime(featuredChannel.current_program.start_time)} – {formatTime(featuredChannel.current_program.end_time)}
-                        </p>
-                      </div>
-                      {#if featuredChannel.current_program.description}
-                        <p class="text-text-secondary text-[clamp(0.75rem,1vw,0.9rem)] mt-2 line-clamp-2 max-w-[500px]">
-                          {featuredChannel.current_program.description}
-                        </p>
-                      {/if}
-                    </div>
-                  {/if}
-
-                  <Focusable
-                    focusKey="live-hero-play"
-                    onEnterPress={() => handlePlayChannel(featuredChannel)}
-                    onArrowPress={(direction) => {
-                      if (direction === 'up') {
-                        setFocus('topnav');
-                        return false;
-                      }
-                      if (direction === 'down') {
-                        const firstChannel = filteredChannels.find((c) => c.id !== featuredChannel?.id);
-                        if (firstChannel && doesFocusableExist('live-ch-' + firstChannel.id)) {
-                          setFocus('live-ch-' + firstChannel.id);
-                          return false;
-                        }
-                      }
-                      return true;
-                    }}
-                    focusedClass="!bg-white !text-black"
-                    class="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white/10 text-white text-[clamp(0.875rem,1.2vw,1rem)] font-semibold border border-white/20 cursor-pointer"
-                    playSound={true}
-                  >
-                    {#snippet children()}
-                      <Play class="w-5 h-5" />
-                      Ver ahora
-                    {/snippet}
-                  </Focusable>
-                </div>
-              </div>
-
-              {#if featuredChannel.upcoming_programs && featuredChannel.upcoming_programs.length > 0}
-                <div class="absolute bottom-0 left-0 right-0 px-[clamp(2rem,5vw,4rem)] pb-4">
-                  <p class="text-text-secondary text-[10px] uppercase tracking-widest mb-2 font-semibold">
-                    Siguiente
-                  </p>
-                  <div class="flex gap-3">
-                    {#each featuredChannel.upcoming_programs.slice(0, 3) as prog (prog.id)}
-                      <div class="flex items-center gap-2 min-w-0">
-                        <span class="text-accent-light text-[clamp(0.65rem,0.8vw,0.75rem)] shrink-0">
-                          {formatTime(prog.start_time)}
-                        </span>
-                        <span class="text-text-secondary text-[clamp(0.65rem,0.8vw,0.75rem)] truncate">
-                          {prog.title}
-                        </span>
-                      </div>
-                    {/each}
-                  </div>
-                </div>
-              {/if}
-            </div>
-          </div>
-        {/if}
-
-        <!-- Favorites rail -->
-        {#if favoriteChannels.length > 1}
-          <FocusableRow
-            title="Favoritos"
-            focusKey="live-favorites"
-            preferredChildFocusKey={favoriteChannels[1] ? `live-ch-${favoriteChannels[1].id}` : undefined}
-          >
-            {#each favoriteChannels.slice(1) as ch, idx (ch.id)}
+    {:else if isGuideView}
+      <!-- EPG Guide list view -->
+      <div
+        bind:this={scrollContainerEl}
+        class="flex-1 overflow-y-auto hide-scrollbar pb-8 px-[clamp(3rem,7.5vw,6rem)]"
+        use:scrollFollow
+      >
+        <FocusContainer
+          focusKey="guide-list"
+          focusable={false}
+          trackChildren={true}
+          saveLastFocusedChild={true}
+          preferredChildFocusKey="guide-ch-{filteredChannels[0].id}"
+        >
+          <div class="space-y-2">
+            {#each filteredChannels as ch, idx (ch.id)}
               <Focusable
-                focusKey="live-ch-{ch.id}"
+                focusKey="guide-ch-{ch.id}"
                 onEnterPress={() => handlePlayChannel(ch)}
                 onArrowPress={(direction) => {
-                  if (direction === 'up') {
-                    handleHeroFocus();
+                  if (direction === 'up' && idx === 0) {
+                    setFocus('live-cat-Guía');
                     return false;
                   }
                   return true;
                 }}
-                focusedClass="!border-white/40"
-                class="shrink-0 w-[clamp(160px,14vw,200px)] h-[clamp(200px,22vh,260px)] rounded-2xl overflow-hidden snap-start flex flex-col items-center justify-center gap-3 p-4 relative bg-surface border-2 border-transparent cursor-pointer"
+                focusedClass="!bg-white/10 !border-white/30"
+                class="flex items-center gap-4 rounded-xl border border-transparent bg-surface/50 px-4 py-3 cursor-pointer transition-colors"
                 playSound={true}
               >
-                {#snippet children()}
-                  <button
-                    type="button"
-                    tabindex={-1}
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      liveTvFavoritesStore.getState().toggleFavorite(ch.id);
-                    }}
-                    class="absolute top-3 right-3 p-1 z-10"
-                  >
-                    <Star class="w-5 h-5 fill-accent text-accent" />
-                  </button>
+                {#snippet children({ focused })}
+                  <div class="shrink-0">
+                    {#if ch.logo_url}
+                      <img
+                        src={ch.logo_url}
+                        alt={ch.name}
+                        class="w-10 h-10 object-contain"
+                        loading="lazy"
+                      />
+                    {:else}
+                      <div class="w-10 h-10 rounded-lg bg-surface-elevated flex items-center justify-center">
+                        <Tv class="w-5 h-5 text-text-secondary" />
+                      </div>
+                    {/if}
+                  </div>
 
-                  {#if ch.logo_url}
-                    <img
-                      src={ch.logo_url}
-                      alt={ch.name}
-                      class="w-[clamp(3.5rem,5vw,4.5rem)] h-[clamp(3.5rem,5vw,4.5rem)] object-contain shrink-0"
-                      loading="lazy"
-                    />
-                  {:else}
-                    <div class="w-[clamp(3.5rem,5vw,4.5rem)] h-[clamp(3.5rem,5vw,4.5rem)] rounded-xl bg-surface-elevated flex items-center justify-center shrink-0">
-                      <Tv class="w-6 h-6 text-text-secondary" />
-                    </div>
-                  {/if}
-
-                  <p class="text-white text-[clamp(0.8rem,1.1vw,0.95rem)] font-semibold text-center leading-tight line-clamp-2">
-                    {ch.name}
-                  </p>
-
-                  {#if ch.current_program}
-                    <div class="text-center">
-                      <p class="text-accent-light text-[clamp(0.65rem,0.8vw,0.75rem)] font-medium">
-                        {formatTime(ch.current_program.start_time)} – {formatTime(ch.current_program.end_time)}
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <p class="text-white text-[clamp(0.85rem,1.1vw,0.95rem)] font-semibold truncate">
+                        {ch.name}
                       </p>
-                      <p class="text-text-secondary text-[clamp(0.65rem,0.8vw,0.75rem)] mt-0.5 line-clamp-2 max-w-[140px]">
+                      {#if ch.current_program?.category}
+                        <span class="text-[9px] font-medium uppercase tracking-wider text-accent-light bg-accent/15 rounded-full px-2 py-0.5 shrink-0">
+                          {ch.current_program.category}
+                        </span>
+                      {/if}
+                    </div>
+                    {#if ch.current_program}
+                      <p class="text-text-secondary text-[clamp(0.7rem,0.9vw,0.8rem)] mt-0.5 truncate">
                         {ch.current_program.title}
                       </p>
+                    {/if}
+                  </div>
+
+                  <div class="shrink-0 text-right w-[clamp(100px,12vw,160px)]">
+                    {#if ch.current_program}
+                      <div class="flex items-center gap-1.5 justify-end mb-1">
+                        <Clock class="w-3 h-3 text-accent-light shrink-0" />
+                        <p class="text-accent-light text-[clamp(0.6rem,0.75vw,0.7rem)]">
+                          {formatTime(ch.current_program.start_time)} – {formatTime(ch.current_program.end_time)}
+                        </p>
+                      </div>
+                      <EpgProgressBar program={ch.current_program} size="sm" showLabel={false} />
+                    {:else}
+                      <p class="text-text-tertiary text-[clamp(0.6rem,0.7vw,0.65rem)]">Sin programación</p>
+                    {/if}
+                  </div>
+
+                  {#if focused}
+                    <div class="shrink-0 w-8 h-8 rounded-full bg-white/15 flex items-center justify-center">
+                      <Play class="w-4 h-4 text-white ml-0.5" />
                     </div>
                   {/if}
-
-                  <div class="absolute top-3 left-3 flex items-center gap-1.5 bg-live/90 rounded-full px-2 py-0.5">
-                    <span class="text-white text-[9px] font-bold uppercase tracking-wider">
-                      Live
-                    </span>
-                  </div>
                 {/snippet}
               </Focusable>
+            {/each}
+          </div>
+        </FocusContainer>
+      </div>
+    {:else}
+      <div bind:this={scrollContainerEl} class="flex-1 overflow-y-auto hide-scrollbar pb-8">
+        <!-- Now playing row (favorites) -->
+        {#if nowPlayingChannels.length > 0 && activeCategory === 'Todos'}
+          <NowAndNextRow
+            channels={nowPlayingChannels}
+            {favorites}
+            onPlay={handlePlayChannel}
+            onToggleFavorite={(id) => liveTvFavoritesStore.getState().toggleFavorite(id)}
+            focusKey="live-now-next"
+            onArrowUp={() => {
+              if (doesFocusableExist('live-cat-Todos')) {
+                setFocus('live-cat-Todos');
+              }
+              return false;
+            }}
+          />
+        {/if}
+
+        <!-- Favorites rail -->
+        {#if favoriteChannels.length > 0 && activeCategory === 'Todos'}
+          <FocusableRow
+            title="Favoritos"
+            focusKey="live-favorites"
+            preferredChildFocusKey={`live-ch-${favoriteChannels[0].id}`}
+          >
+            {#each favoriteChannels as ch (ch.id)}
+              <ChannelCardEpg
+                channel={ch}
+                isFavorite={true}
+                onPlay={handlePlayChannel}
+                onToggleFavorite={(id) => liveTvFavoritesStore.getState().toggleFavorite(id)}
+                onArrowPress={(direction) => {
+                  if (direction === 'up') {
+                    if (doesFocusableExist('live-cat-Todos')) {
+                      setFocus('live-cat-Todos');
+                    }
+                    return false;
+                  }
+                  return true;
+                }}
+                focusKey="live-ch-{ch.id}"
+              />
             {/each}
           </FocusableRow>
         {/if}
@@ -477,72 +498,26 @@
         {#each channelsByCategory as [category, cats] (category)}
           <FocusableRow
             title={category}
-            focusKey="live-cat-{category}"
+            focusKey="live-catrow-{category}"
             preferredChildFocusKey="live-ch-{cats[0].id}"
           >
-            {#each cats as ch, idx (ch.id)}
-              <Focusable
-                focusKey="live-ch-{ch.id}"
-                onEnterPress={() => handlePlayChannel(ch)}
+            {#each cats as ch (ch.id)}
+              <ChannelCardEpg
+                channel={ch}
+                isFavorite={favorites.has(ch.id)}
+                onPlay={handlePlayChannel}
+                onToggleFavorite={(id) => liveTvFavoritesStore.getState().toggleFavorite(id)}
                 onArrowPress={(direction) => {
                   if (direction === 'up') {
-                    handleHeroFocus();
+                    if (doesFocusableExist('live-cat-Todos')) {
+                      setFocus('live-cat-Todos');
+                    }
                     return false;
                   }
                   return true;
                 }}
-                focusedClass="!border-white/40"
-                class="shrink-0 w-[clamp(160px,14vw,200px)] h-[clamp(200px,22vh,260px)] rounded-2xl overflow-hidden snap-start flex flex-col items-center justify-center gap-3 p-4 relative bg-surface border-2 border-transparent cursor-pointer"
-                playSound={true}
-              >
-                {#snippet children()}
-                  <button
-                    type="button"
-                    tabindex={-1}
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      liveTvFavoritesStore.getState().toggleFavorite(ch.id);
-                    }}
-                    class="absolute top-3 right-3 p-1 z-10"
-                  >
-                    <Star class="w-5 h-5 {favorites.has(ch.id) ? 'fill-accent text-accent' : 'text-white/40'}" />
-                  </button>
-
-                  {#if ch.logo_url}
-                    <img
-                      src={ch.logo_url}
-                      alt={ch.name}
-                      class="w-[clamp(3.5rem,5vw,4.5rem)] h-[clamp(3.5rem,5vw,4.5rem)] object-contain shrink-0"
-                      loading="lazy"
-                    />
-                  {:else}
-                    <div class="w-[clamp(3.5rem,5vw,4.5rem)] h-[clamp(3.5rem,5vw,4.5rem)] rounded-xl bg-surface-elevated flex items-center justify-center shrink-0">
-                      <Tv class="w-6 h-6 text-text-secondary" />
-                    </div>
-                  {/if}
-
-                  <p class="text-white text-[clamp(0.8rem,1.1vw,0.95rem)] font-semibold text-center leading-tight line-clamp-2">
-                    {ch.name}
-                  </p>
-
-                  {#if ch.current_program}
-                    <div class="text-center">
-                      <p class="text-accent-light text-[clamp(0.65rem,0.8vw,0.75rem)] font-medium">
-                        {formatTime(ch.current_program.start_time)} – {formatTime(ch.current_program.end_time)}
-                      </p>
-                      <p class="text-text-secondary text-[clamp(0.65rem,0.8vw,0.75rem)] mt-0.5 line-clamp-2 max-w-[140px]">
-                        {ch.current_program.title}
-                      </p>
-                    </div>
-                  {/if}
-
-                  <div class="absolute top-3 left-3 flex items-center gap-1.5 bg-live/90 rounded-full px-2 py-0.5">
-                    <span class="text-white text-[9px] font-bold uppercase tracking-wider">
-                      Live
-                    </span>
-                  </div>
-                {/snippet}
-              </Focusable>
+                focusKey="live-ch-{ch.id}"
+              />
             {/each}
           </FocusableRow>
         {/each}
