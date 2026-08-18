@@ -99,6 +99,12 @@
       rafId = requestAnimationFrame(() => {
         const focused = el.querySelector<HTMLElement>('[data-focused="true"]');
         if (!focused) return;
+
+        if (focused.closest('[data-focus-key^="detail-hero"]')) {
+          el.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+
         const rect = focused.getBoundingClientRect();
         const containerRect = el.getBoundingClientRect();
         const topSafeArea = Math.min(80, window.innerHeight * 0.1);
@@ -257,12 +263,6 @@
     if (direction !== 'up') return true;
     return focusContentTarget(firstEpisodeFocusKey ?? selectedSeasonFocusKey ?? 'detail-hero-play');
   }
-
-  function handleHeroFocus() {
-    requestAnimationFrame(() => {
-      containerEl?.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-  }
 </script>
 
 {#if loading}
@@ -311,7 +311,6 @@
         onNavigateLeft={focusSidebarFromLeftEdge}
         onNavigateUp={() => true}
         onPlayFocus={handlePlayFocus}
-        onHeroFocus={handleHeroFocus}
         {firstEpisodeFocusKey}
         firstSeasonFocusKey={selectedSeasonFocusKey}
       />

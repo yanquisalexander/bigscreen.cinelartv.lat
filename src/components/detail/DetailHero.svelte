@@ -18,7 +18,6 @@
     onNavigateLeft: (direction: string) => boolean;
     onNavigateUp: (direction: string) => boolean;
     onPlayFocus: () => void;
-    onHeroFocus: () => void;
     firstEpisodeFocusKey?: string;
     firstSeasonFocusKey?: string;
   }
@@ -34,8 +33,28 @@
     onNavigateLeft,
     onNavigateUp,
     onPlayFocus,
-    onHeroFocus,
   }: Props = $props();
+
+  const { appQuality } = getRuntimeConfig();
+  const enabled = appQuality !== 'LITE';
+  const canvasSize = appQuality === 'FULL_ANIMATION'
+    ? { w: 64, h: 36 }
+    : { w: 32, h: 18 };
+
+  let canvasEl: HTMLCanvasElement;
+  let hasBackdrop = $state(false);
+
+  function drawToCanvas(canvas: HTMLCanvasElement, url: string) {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      requestAnimationFrame(() => { hasBackdrop = true; });
+    };
+    img.src = url;
+  }
 
   function formatDuration(c: ContentDetail): string | null {
     if (c.duration) return formatTime(c.duration);
@@ -52,6 +71,16 @@
   const logoUrl = $derived(resolveLogo(content.images, clientEndpoint));
   const duration = $derived(formatDuration(content));
   const hasTrailer = $derived(Boolean(content.trailer_sources?.length || content.trailer_video_sources?.length));
+
+  $effect(() => {
+    if (!enabled) return;
+    const url = backdropUrl;
+    if (!url || !canvasEl) {
+      hasBackdrop = false;
+      return;
+    }
+    drawToCanvas(canvasEl, url);
+  });
 
   const continuePercent = $derived.by(() => {
     if (!content.continue_watching) return null;
@@ -80,9 +109,8 @@
 
   const genreTags = $derived((content.categories ?? []).slice(0, 4).map((c) => c.name));
 
-  const { appQuality } = getRuntimeConfig();
   const heroMaskStyle = $derived(
-    appQuality !== 'LITE'
+    enabled
       ? 'mask-image: linear-gradient(to bottom, black 90%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 90%, transparent 100%);'
       : ''
   );
@@ -90,17 +118,28 @@
 
 <div class="relative w-full overflow-hidden min-h-[clamp(36rem,86vh,60rem)] bg-bg" style={heroMaskStyle}>
   <!-- Backdrop -->
-  <div class="absolute inset-0 content-detail-backdrop">
-    {#if backdropUrl}
-      <img
-        src={backdropUrl}
-        alt=""
+  {#if enabled}
+    <div
+      class="absolute inset-0 overflow-hidden content-detail-backdrop transition-opacity duration-700 ease-in-out"
+      style="opacity: {hasBackdrop ? 1 : 0};"
+    >
+      <canvas
+        width={canvasSize.w}
+        height={canvasSize.h}
+        bind:this={canvasEl}
         aria-hidden="true"
-        class="absolute inset-0 w-full h-full object-cover opacity-40"
-      />
-    {/if}
-    <div class="absolute inset-0 bg-gradient-to-r from-bg via-bg/80 to-transparent"></div>
-  </div>
+        class="absolute inset-0 w-full h-full object-cover"
+      ></canvas>
+    </div>
+  {:else if backdropUrl}
+    <img
+      src={backdropUrl}
+      alt=""
+      aria-hidden="true"
+      class="absolute inset-0 w-full h-full object-cover opacity-40"
+    />
+  {/if}
+  <div class="absolute inset-0 bg-gradient-to-r from-bg via-bg/80 to-transparent"></div>
 
   <!-- Content grid -->
   <div
@@ -200,10 +239,7 @@
             variant="primary"
             label={content.continue_watching ? 'Reanudar' : isTVShow(content) ? 'Episodio 1' : 'Reproducir'}
             onEnterPress={onPlay}
-            onFocus={() => {
-              onPlayFocus();
-              onHeroFocus();
-            }}
+            onFocus={onPlayFocus}
             onArrowPress={(dir) => {
               if (dir === 'left') return onNavigateLeft(dir);
               if (dir === 'up') return onNavigateUp(dir);
@@ -223,7 +259,6 @@
             variant="secondary"
             label="Tráiler"
             onEnterPress={onPlayTrailer}
-            onFocus={onHeroFocus}
             onArrowPress={(dir) => {
               if (dir === 'left') return true;
               if (dir === 'up') return onNavigateUp(dir);
@@ -242,7 +277,6 @@
           variant="ghost"
           label="Mi Lista"
           onEnterPress={onToggleList}
-          onFocus={onHeroFocus}
           onArrowPress={(dir) => {
             if (dir === 'left') return true;
             if (dir === 'up') return onNavigateUp(dir);
