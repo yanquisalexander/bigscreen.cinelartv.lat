@@ -1,6 +1,6 @@
 import { SpatialNavigation, setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
 import type { KeyPressDetails, FocusableComponentLayout, FocusDetails } from '@noriginmedia/norigin-spatial-navigation-core';
-import { playFocusSound } from '@/hooks/useNavigationSound';
+import { playFocusSound } from '@/lib/sounds';
 
 export interface SpatialNavParams {
   focusKey: string;

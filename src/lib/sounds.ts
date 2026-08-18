@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import { useSettingsStore } from '@/stores/settingsStore';
 
 const SOUND_SRC = '/resources/sounds/cursor.wav';
@@ -17,15 +16,4 @@ export function playFocusSound(): void {
   } catch {
     // cloneNode can fail in some WebView environments — degrade silently
   }
-}
-
-export function useFocusSound() {
-  const wrap = useCallback((userOnFocus?: () => void) => {
-    return () => {
-      playFocusSound();
-      userOnFocus?.();
-    };
-  }, []);
-
-  return wrap;
 }

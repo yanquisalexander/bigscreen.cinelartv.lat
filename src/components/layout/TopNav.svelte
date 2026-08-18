@@ -6,6 +6,7 @@
   import { svelteConfigStore } from '@/stores/configStore';
   import { deassignProfile } from '@/features/auth/session';
   import { setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
+  import { subscribeScrolled } from '@/stores/scrollStore';
   import CinelarLogo from '@/components/ui/CinelarLogo.svelte';
 
   interface Props {
@@ -59,6 +60,12 @@
   const avatarUrl = $derived(
     profile ? `${clientEndpoint}/assets/default/avatars/${profile.avatar_id ?? 'coolCat'}.png` : ''
   );
+
+  let scrolled = $state(false);
+
+  $effect(() => {
+    return subscribeScrolled((v) => { scrolled = v; });
+  });
 </script>
 
 <FocusContainer
@@ -67,7 +74,7 @@
   trackChildren={true}
   saveLastFocusedChild={true}
   {onUpdateHasFocusedChild}
-  class="absolute top-0 left-0 right-0 w-full flex items-center justify-between px-[clamp(2.5rem,5vw,4rem)] h-[var(--topnav-h)] py-[clamp(0.75rem,1.5vh,1.25rem)] z-50"
+  class="absolute top-0 left-0 right-0 w-full flex items-center justify-between px-[clamp(2.5rem,5vw,4rem)] h-[var(--topnav-h)] pt-[clamp(1rem,2vh,1.75rem)] pb-[clamp(0.5rem,1vh,0.75rem)] z-50 transition-colors duration-300 {scrolled ? 'bg-gradient-to-b from-black/80 via-black/50 to-transparent' : ''}"
 >
   <!-- Left: Logo + Search -->
   <div class="topnav-actions flex items-center gap-[clamp(0.75rem,1.5vw,1.25rem)] transition-opacity duration-500">

@@ -41,7 +41,7 @@ function post(payload: object): void {
   const url = buildUrl();
   try {
     if (_debugMode) {
-      fetch(url, { method: 'POST', body: JSON.stringify(payload), keepalive: true });
+      fetch(url, { method: 'POST', body: JSON.stringify(payload), keepalive: true }).catch(() => {});
     } else if (navigator.sendBeacon) {
       navigator.sendBeacon(url, JSON.stringify(payload));
     } else {
@@ -83,20 +83,24 @@ function flush(): void {
 
   const batch = _queue.splice(0, MAX_BATCH_SIZE);
 
-  if (batch.length === 1) {
-    send(batch[0]);
-    return;
+  try {
+    if (batch.length === 1) {
+      send(batch[0]);
+      return;
+    }
+
+    const events = batch.map(evt => ({
+      name: evt.event,
+      params: { ...ctx, ...evt.params },
+    }));
+
+    post({
+      client_id: getClientId(),
+      events,
+    });
+  } catch {
+    // Silently fail
   }
-
-  const events = batch.map(evt => ({
-    name: evt.event,
-    params: { ...ctx, ...evt.params },
-  }));
-
-  post({
-    client_id: getClientId(),
-    events,
-  });
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -123,11 +127,13 @@ export function enqueue(event: AnalyticsEvent): void {
   if (!_enabled) return;
   _queue.push(event);
 
-  if (_queue.length >= MAX_BATCH_SIZE) flush();
+  if (_queue.length >= MAX_BATCH_SIZE) {
+    try { flush(); } catch { /* silently fail */ }
+  }
 }
 
 export function flushProvider(): void {
-  flush();
+  try { flush(); } catch { /* silently fail */ }
 }
 
 export function isProviderEnabled(): boolean {

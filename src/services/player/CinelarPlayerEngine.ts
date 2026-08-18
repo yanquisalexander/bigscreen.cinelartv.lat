@@ -24,6 +24,8 @@ export class CinelarPlayerEngine {
   private player: any = null;
   private videoElement: HTMLVideoElement | null = null;
   private eventListeners: Map<PlayerEvent, EventCallback[]> = new Map();
+  private _videoListeners: Array<[string, EventListener]> = [];
+  private _bufferingState = false;
 
   /** Resolves when `attach()` settles (never rejects); error stored in `attachError`. */
   private attachState: Promise<void> | null = null;
@@ -111,15 +113,38 @@ export class CinelarPlayerEngine {
       }
     })();
 
-    this.videoElement.addEventListener('play', () => this.emit('playing'));
-    this.videoElement.addEventListener('pause', () => this.emit('paused'));
-    this.videoElement.addEventListener('waiting', () => this.emit('buffering', true));
-    this.videoElement.addEventListener('playing', () => this.emit('buffering', false));
-    this.videoElement.addEventListener('canplay', () => this.emit('buffering', false));
-    this.videoElement.addEventListener('canplaythrough', () => this.emit('buffering', false));
-    this.videoElement.addEventListener('timeupdate', () => this.emit('timeupdate', this.videoElement?.currentTime));
-    this.videoElement.addEventListener('durationchange', () => this.emit('durationchange', this.videoElement?.duration));
-    this.videoElement.addEventListener('ended', () => this.emit('ended'));
+    const emitBuffering = (val: boolean) => {
+      if (this._bufferingState !== val) {
+        this._bufferingState = val;
+        this.emit('buffering', val);
+      }
+    };
+
+    const onPlay = () => this.emit('playing');
+    const onPause = () => this.emit('paused');
+    const onWaiting = () => emitBuffering(true);
+    const onPlaying = () => emitBuffering(false);
+    const onCanplay = () => emitBuffering(false);
+    const onCanplaythrough = () => emitBuffering(false);
+    const onTimeupdate = () => this.emit('timeupdate', this.videoElement?.currentTime);
+    const onDurationchange = () => this.emit('durationchange', this.videoElement?.duration);
+    const onEnded = () => this.emit('ended');
+
+    this._videoListeners = [
+      ['play', onPlay],
+      ['pause', onPause],
+      ['waiting', onWaiting],
+      ['playing', onPlaying],
+      ['canplay', onCanplay],
+      ['canplaythrough', onCanplaythrough],
+      ['timeupdate', onTimeupdate],
+      ['durationchange', onDurationchange],
+      ['ended', onEnded],
+    ];
+
+    for (const [event, handler] of this._videoListeners) {
+      this.videoElement.addEventListener(event, handler);
+    }
   }
 
   private isAdaptiveManifest(url: string): boolean {
@@ -346,6 +371,15 @@ export class CinelarPlayerEngine {
   public destroy() {
     pdbg('engine.destroy');
     this.loadToken++; // invalidate any queued loads
+    this._bufferingState = false;
+
+    if (this.videoElement) {
+      for (const [event, handler] of this._videoListeners) {
+        this.videoElement.removeEventListener(event, handler);
+      }
+      this._videoListeners = [];
+    }
+
     if (this.player) {
       this.player.destroy();
       this.player = null;

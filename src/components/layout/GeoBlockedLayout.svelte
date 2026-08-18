@@ -10,7 +10,7 @@
   import { exitApp } from '@/services/NativeBridge';
   import { isBackKey } from '@/utils/helpers';
   import { Tv, RefreshCw, MapPinOff } from '@lucide/svelte';
-  import { SIDEBAR_FOCUS_KEY } from './geoblockedModeContext';
+  import { SIDEBAR_FOCUS_KEY } from './geoblockedConstants';
 
   interface Props {
     children?: Snippet;

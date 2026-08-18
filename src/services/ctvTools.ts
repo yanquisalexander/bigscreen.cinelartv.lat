@@ -1,5 +1,5 @@
 import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
-import { router } from '@/router';
+import { push } from 'svelte-spa-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useConfigStore } from '@/stores/configStore';
 import { useToastStore, type ToastType } from '@/stores/toastStore';
@@ -119,7 +119,7 @@ export function initCtvTools(): void {
 
     navigate: (path) => {
       try {
-        router.navigate(path);
+        push(path);
       } catch {
         window.location.href = path;
       }

@@ -1,6 +1,6 @@
 import { SpatialNavigation, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation-core';
 import { FocusableRegistrar } from './spatialFocus';
-import { playFocusSound } from '@/hooks/useNavigationSound';
+import { playFocusSound } from '@/lib/sounds';
 
 class FocusableElement extends HTMLElement {
   static get observedAttributes() {

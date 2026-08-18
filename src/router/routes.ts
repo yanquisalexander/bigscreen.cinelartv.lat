@@ -12,6 +12,10 @@ import ProfileSelectScreen from '@/pages/ProfileSelectScreen.svelte';
 import HomeScreen from '@/pages/HomeScreen.svelte';
 import SearchScreen from '@/pages/SearchScreen.svelte';
 import SettingsScreen from '@/pages/SettingsScreen.svelte';
+import LiveTVScreen from '@/pages/LiveTVScreen.svelte';
+
+// Loading placeholder for async routes
+import RouteLoadingPlaceholder from '@/components/loading/RouteLoadingPlaceholder.svelte';
 
 const GUEST_ALLOWED_PATHS = ['/home', '/search', '/live'];
 const GUEST_BLOCKED_PREFIXES = ['/watch', '/select-profile'];
@@ -63,7 +67,7 @@ export const routes = {
   }),
 
   '/live': wrap({
-    asyncComponent: () => import('@/pages/LiveTVScreen.svelte'),
+    component: LiveTVScreen,
     conditions: [requireAuthOrGuest],
   }),
 
@@ -74,16 +78,19 @@ export const routes = {
 
   '/content/:contentId': wrap({
     asyncComponent: () => import('@/pages/ContentDetailScreen.svelte'),
+    loadingComponent: RouteLoadingPlaceholder,
     conditions: [requireAuthOrGuest],
   }),
 
   '/watch/:contentId': wrap({
     asyncComponent: () => import('@/pages/WatchScreen.svelte'),
+    loadingComponent: RouteLoadingPlaceholder,
     conditions: [requireAuth],
   }),
 
   '/watch/:contentId/:episodeId': wrap({
     asyncComponent: () => import('@/pages/WatchScreen.svelte'),
+    loadingComponent: RouteLoadingPlaceholder,
     conditions: [requireAuth],
   }),
 

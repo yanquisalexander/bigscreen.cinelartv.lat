@@ -142,6 +142,12 @@ export default defineConfig({
           if (id.includes('norigin-spatial-navigation')) {
             return 'tv';
           }
+          if (id.includes('shaka-player')) {
+            return 'media';
+          }
+          if (id.includes('node_modules/lit') || id.includes('node_modules/@lit')) {
+            return 'lit';
+          }
         },
       },
     },

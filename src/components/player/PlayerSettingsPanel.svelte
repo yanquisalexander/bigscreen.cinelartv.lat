@@ -36,6 +36,7 @@
   let audio = $state<AudioInfo[] | null>(null);
   let panelBodyEl = $state<HTMLDivElement | null>(null);
   let didFocus = false;
+  let _scrollObserver: MutationObserver | null = null;
 
   function refresh() {
     if (!engine) return;
@@ -43,13 +44,10 @@
     audio = engine.getAudioTracksInfo();
   }
 
-  function sanitize(s: string): string {
-    return (s || 'und').replace(/[^a-z0-9]/gi, '');
-  }
-
   function scrollToFocused() {
     const container = panelBodyEl;
     if (!container) return;
+    if (_scrollObserver) { _scrollObserver.disconnect(); _scrollObserver = null; }
     const tryScroll = () => {
       const focused = container.querySelector('[data-focused="true"]') as HTMLElement | null;
       if (focused) {
@@ -60,10 +58,11 @@
     };
     if (tryScroll()) return;
     const observer = new MutationObserver(() => {
-      if (tryScroll()) observer.disconnect();
+      if (tryScroll()) { observer.disconnect(); _scrollObserver = null; }
     });
+    _scrollObserver = observer;
     observer.observe(container, { attributes: true, subtree: true, attributeFilter: ['data-focused'] });
-    setTimeout(() => observer.disconnect(), 1000);
+    setTimeout(() => { observer.disconnect(); _scrollObserver = null; }, 1000);
   }
 
   $effect(() => {
@@ -130,7 +129,7 @@
             }}
             onFocus={scrollToFocused}
             focusedClass="bg-white/10 scale-105"
-            class="flex items-center justify-between p-3 my-1 rounded-xl cursor-pointer transition-all duration-200"
+            class="flex items-center justify-between p-3 my-1 rounded-xl cursor-pointer transition-colors duration-200"
             playSound={true}
           >
             {#snippet children()}
@@ -155,7 +154,7 @@
               }}
               onFocus={scrollToFocused}
               focusedClass="bg-white/10 scale-105"
-              class="flex items-center justify-between p-3 my-1 rounded-xl cursor-pointer transition-all duration-200"
+              class="flex items-center justify-between p-3 my-1 rounded-xl cursor-pointer transition-colors duration-200"
               playSound={true}
             >
               {#snippet children()}
@@ -189,7 +188,7 @@
               }}
               onFocus={scrollToFocused}
               focusedClass="bg-white/10 scale-105"
-              class="flex items-center justify-between p-3 my-1 rounded-xl cursor-pointer transition-all duration-200"
+              class="flex items-center justify-between p-3 my-1 rounded-xl cursor-pointer transition-colors duration-200"
               playSound={true}
             >
               {#snippet children()}

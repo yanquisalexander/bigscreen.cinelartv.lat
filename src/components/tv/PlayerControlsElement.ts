@@ -87,7 +87,7 @@ export class PlayerControlsElement extends LitElement {
       margin-top: clamp(0.25rem, 0.6vh, 0.5rem);
       flex-shrink: 0;
       max-height: clamp(3.5rem, 6vw, 4rem);
-      transition: opacity 250ms ease, max-height 250ms ease;
+      transition: opacity 250ms ease;
     }
 
     .controls-row-left, .controls-row-right { display: flex; align-items: center; gap: clamp(0.5rem, 1vw, 0.75rem); flex: 1; }
@@ -172,11 +172,11 @@ export class PlayerControlsElement extends LitElement {
     
     .episode-card-title { display: block; box-sizing: border-box; width: 100%; margin: 0.4rem 0 0; color: rgba(255,255,255,0.9); font-size: clamp(0.75rem, 1.1vw, 0.875rem); font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    .seekbar-view { display: flex; align-items: center; gap: clamp(0.75rem, 1.5vw, 1rem); height: clamp(2.25rem, 3.5vh, 2.75rem); max-height: clamp(2.25rem, 3.5vh, 2.75rem); flex-shrink: 0; transition: opacity 250ms ease, max-height 250ms ease; pointer-events: auto; }
+    .seekbar-view { display: flex; align-items: center; gap: clamp(0.75rem, 1.5vw, 1rem); height: clamp(2.25rem, 3.5vh, 2.75rem); max-height: clamp(2.25rem, 3.5vh, 2.75rem); flex-shrink: 0; transition: opacity 250ms ease; pointer-events: auto; }
     .seekbar-view.hidden { opacity: 0; max-height: 0; pointer-events: none; }
     .controls-row.hidden { opacity: 0; max-height: 0; pointer-events: none; }
 
-    .expanded-view { display: flex; flex-direction: column; justify-content: center; flex-shrink: 0; max-height: clamp(80px, 12vh, 100px); padding-bottom: clamp(0.25rem, 0.6vh, 0.5rem); transition: opacity 250ms ease, max-height 250ms ease, transform 250ms ease; transform-origin: left center; pointer-events: auto; }
+    .expanded-view { display: flex; flex-direction: column; justify-content: center; flex-shrink: 0; max-height: clamp(80px, 12vh, 100px); padding-bottom: clamp(0.25rem, 0.6vh, 0.5rem); transition: opacity 250ms ease, transform 250ms ease; transform-origin: left center; pointer-events: auto; }
     .expanded-view[data-focused="false"] { opacity: 0.78; transform: scale(0.96); }
     .expanded-view[data-focused="true"] { opacity: 1; transform: scale(1); }
     .expanded-view.hidden { opacity: 0; max-height: 0; padding-bottom: 0; pointer-events: none; }
@@ -372,8 +372,11 @@ export class PlayerControlsElement extends LitElement {
       'episodes',
       'skipSegment',
       'nextEpisode',
-      'isBuffering',
     ].some((p) => changedProperties.has(p));
+
+    if (changedProperties.has('isBuffering')) {
+      this._syncOverlayFocusability();
+    }
 
     if (needsSync) {
       this._syncOverlayFocusability();
@@ -464,7 +467,10 @@ export class PlayerControlsElement extends LitElement {
 
             <div class="episode-rail" data-episode-rail data-expanded=${this.railExpanded} aria-label="Episodios">
               <div class="episode-rail-list" data-episode-list>
-                ${this.showControls ? this._allEpisodes.map((episode, index) => this._renderEpisodeCard(episode, index)) : ''}
+                ${this.showControls ? (() => {
+                  const hasMultipleSeasons = new Set(this._allEpisodes.map(e => e.seasonNumber)).size > 1;
+                  return this._allEpisodes.map((episode, index) => this._renderEpisodeCard(episode, index, hasMultipleSeasons));
+                })() : ''}
               </div>
             </div>
           </div>
@@ -522,9 +528,8 @@ export class PlayerControlsElement extends LitElement {
     `;
   }
 
-  private _renderEpisodeCard(episode: FlatEpisode, index: number) {
+  private _renderEpisodeCard(episode: FlatEpisode, index: number, hasMultipleSeasons: boolean) {
     const isCurrent = String(episode.id) === String(this._currentEpisodeId);
-    const hasMultipleSeasons = new Set(this._allEpisodes.map(e => e.seasonNumber)).size > 1;
     const imageUrl = resolveImageUrl(episode.thumbnail, this.clientEndpoint);
 
     return html`
@@ -678,19 +683,55 @@ export class PlayerControlsElement extends LitElement {
     this._onDurationChange = null;
     this._onTimeUpdate = null;
 
-    if (this.rafId) { clearTimeout(this.rafId); this.rafId = 0; }
+    if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = 0; }
+    this._cachedSeekbarEls = null;
     if (this.logicTimer) { clearInterval(this.logicTimer); this.logicTimer = null; }
+  }
+
+  private _cachedSeekbarEls: {
+    timeLabel: HTMLElement | null;
+    fill: HTMLElement | null;
+    buffered: HTMLElement | null;
+    thumb: HTMLElement | null;
+    seekbar: HTMLElement | null;
+  } | null = null;
+
+  private _cacheSeekbarEls() {
+    if (!this._cachedSeekbarEls) {
+      this._cachedSeekbarEls = {
+        timeLabel: this.renderRoot.querySelector('[data-current-time]') as HTMLElement | null,
+        fill: this.renderRoot.querySelector('[data-fill]') as HTMLElement | null,
+        buffered: this.renderRoot.querySelector('[data-buffered]') as HTMLElement | null,
+        thumb: this.renderRoot.querySelector('[data-thumb]') as HTMLElement | null,
+        seekbar: this.renderRoot.querySelector('[data-seekbar-focusable]') as HTMLElement | null,
+      };
+    }
+    return this._cachedSeekbarEls;
   }
 
   private _startSeekbarLoop() {
     if (!this.videoEl) return;
     const video = this.videoEl;
-    const FRAME_MS = 100;
+    const TICK_MS = 100;
     let lastPct = -1;
     let lastDur = 0;
     let lastSec = -1;
+    let lastBufferedPct = -1;
+    let nextTickTime = 0;
 
     const update = () => {
+      if (video.paused) {
+        this.rafId = requestAnimationFrame(update);
+        return;
+      }
+
+      const now = performance.now();
+      if (now < nextTickTime) {
+        this.rafId = requestAnimationFrame(update);
+        return;
+      }
+      nextTickTime = now + TICK_MS;
+
       const dur = video.duration || 0;
       const ct = video.currentTime;
       const pct = dur > 0 ? (ct / dur) * 100 : 0;
@@ -703,8 +744,8 @@ export class PlayerControlsElement extends LitElement {
       const sec = Math.floor(ct);
       if (sec !== lastSec) {
         lastSec = sec;
-        const timeLabel = this.renderRoot.querySelector('[data-current-time]') as HTMLElement;
-        if (timeLabel) timeLabel.textContent = formatTime(ct);
+        const els = this._cacheSeekbarEls();
+        if (els.timeLabel) els.timeLabel.textContent = formatTime(ct);
       }
 
       if (Math.abs(pct - lastPct) > 0.5) {
@@ -713,23 +754,23 @@ export class PlayerControlsElement extends LitElement {
         if (video.buffered.length > 0) bufferedEnd = video.buffered.end(video.buffered.length - 1);
         const bufferedPct = dur > 0 ? (bufferedEnd / dur) * 100 : 0;
 
-        const fill = this.renderRoot.querySelector('[data-fill]') as HTMLElement;
-        const buffered = this.renderRoot.querySelector('[data-buffered]') as HTMLElement;
-        const thumb = this.renderRoot.querySelector('[data-thumb]') as HTMLElement;
-        const seekbar = this.renderRoot.querySelector('[data-seekbar-focusable]') as HTMLElement | null;
+        const els = this._cacheSeekbarEls();
 
-        if (fill) fill.style.width = `${pct}%`;
-        if (buffered) buffered.style.width = `${bufferedPct}%`;
-        if (thumb) thumb.style.left = `${pct}%`;
+        if (els.fill) els.fill.style.width = `${pct}%`;
+        if (Math.abs(bufferedPct - lastBufferedPct) > 0.5 && els.buffered) {
+          lastBufferedPct = bufferedPct;
+          els.buffered.style.width = `${bufferedPct}%`;
+        }
+        if (els.thumb) els.thumb.style.left = `${pct}%`;
 
-        if (seekbar) {
-          seekbar.setAttribute('aria-valuenow', String(Math.round(pct)));
-          seekbar.setAttribute('aria-valuetext', `${formatTime(ct)} de ${formatTime(dur)}`);
+        if (els.seekbar) {
+          els.seekbar.setAttribute('aria-valuenow', String(Math.round(pct)));
+          els.seekbar.setAttribute('aria-valuetext', `${formatTime(ct)} de ${formatTime(dur)}`);
         }
       }
-      this.rafId = window.setTimeout(update, FRAME_MS);
+      this.rafId = requestAnimationFrame(update);
     };
-    this.rafId = window.setTimeout(update, FRAME_MS);
+    this.rafId = requestAnimationFrame(update);
   }
 
   private _startLogicTimer() {
