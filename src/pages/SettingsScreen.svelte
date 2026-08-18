@@ -56,11 +56,6 @@
     }, 50);
   });
 
-  function focusSidebar() {
-    setFocus('sidebar');
-    return false;
-  }
-
   function handleFactoryReset() {
     toastStore.getState().show('Restableciendo la app...', 'info', 3000);
     window.localStorage.clear();
@@ -93,7 +88,7 @@
   class="w-full h-dvh bg-bg flex overflow-hidden"
 >
   <!-- Left panel sidebar -->
-  <nav class="flex-shrink-0 min-w-[clamp(140px,25vw,300px)] py-[clamp(3rem,8vh,4rem)] pl-[clamp(4rem,8vw,6rem)] pr-[clamp(2rem,4vw,3rem)] flex flex-col gap-[clamp(0.25rem,0.4vh,0.35rem)] overflow-y-auto scrollbar-none">
+  <nav class="flex-shrink-0 min-w-[clamp(140px,25vw,300px)] pt-[calc(var(--topnav-h)+1.5rem)] pb-[clamp(3rem,8vh,4rem)] pl-[clamp(4rem,8vw,6rem)] pr-[clamp(2rem,4vw,3rem)] flex flex-col gap-[clamp(0.25rem,0.4vh,0.35rem)] overflow-y-auto scrollbar-none">
     <div class="flex items-center gap-[clamp(0.75rem,1.5vw,1rem)] px-[clamp(0.75rem,1.2vw,1rem)] mb-[clamp(1.5rem,4vh,2rem)]">
       <div class="w-[clamp(2.25rem,3.5vw,3rem)] h-[clamp(2.25rem,3.5vw,3rem)] rounded-full bg-surface flex items-center justify-center text-text-secondary text-[clamp(1.15rem,1.8vw,1.5rem)]">
         ⚙
@@ -120,8 +115,9 @@
           }
         }}
         onArrowPress={(direction) => {
-          if (direction === 'left') {
-            return focusSidebar();
+          if (direction === 'up' && idx === 0) {
+            setFocus('topnav');
+            return false;
           }
           return true;
         }}
@@ -140,7 +136,7 @@
   </nav>
 
   <!-- Right content panel -->
-  <div class="flex-1 overflow-y-auto hide-scrollbar py-[clamp(3rem,8vh,4rem)] px-[clamp(3rem,7.5vw,6rem)]">
+  <div class="flex-1 overflow-y-auto hide-scrollbar pt-[calc(var(--topnav-h)+1.5rem)] pb-[clamp(3rem,8vh,4rem)] px-[clamp(3rem,7.5vw,6rem)]">
     {#if activeSection === 'reproduccion'}
       <div data-settings-section="reproduccion">
         <h3 class="text-[clamp(0.65rem,0.85vw,0.75rem)] font-bold uppercase tracking-wider text-text-secondary mb-[clamp(0.75rem,1.2vh,1rem)]">
@@ -160,7 +156,7 @@
               focusKey="settings-toggle-modern"
               onEnterPress={() => settingsStore.getState().setPrefersModernPlayback(!prefersModernPlayback)}
               onArrowPress={(direction) => {
-                if (direction === 'left') {
+                if (direction === 'up' || direction === 'left') {
                   setFocus('settings-nav-reproduccion');
                   return false;
                 }
@@ -197,7 +193,7 @@
               focusKey="settings-toggle-nav-sound"
               onEnterPress={() => settingsStore.getState().setNavigationSoundEnabled(!navigationSoundEnabled)}
               onArrowPress={(direction) => {
-                if (direction === 'left') {
+                if (direction === 'up' || direction === 'left') {
                   setFocus('settings-nav-audio');
                   return false;
                 }
@@ -252,7 +248,7 @@
           focusKey="settings-reiniciar-btn"
           onEnterPress={() => { window.location.href = '/'; }}
           onArrowPress={(direction) => {
-            if (direction === 'left') {
+            if (direction === 'up' || direction === 'left') {
               setFocus('settings-nav-reiniciar');
               return false;
             }
@@ -294,7 +290,7 @@
             });
           }}
           onArrowPress={(direction) => {
-            if (direction === 'left') {
+            if (direction === 'up' || direction === 'left') {
               setFocus('settings-nav-factory-reset');
               return false;
             }

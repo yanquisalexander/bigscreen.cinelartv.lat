@@ -133,7 +133,7 @@
     <CinelarLogo class="logo" />
   </div>
 {:else}
-  <AppShell hideSidebar={isStandaloneRoute}>
+  <AppShell hideNav={isStandaloneRoute}>
     <Router {routes} onConditionsFailed={conditionsFailed} />
   </AppShell>
   <OverlayPanelHost />

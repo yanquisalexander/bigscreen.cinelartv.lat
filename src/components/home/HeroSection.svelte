@@ -5,6 +5,7 @@
   import { resolveBackdrop, resolveLogo } from '@/utils/helpers';
   import { getRuntimeConfig } from '@/runtime';
   import type { ContentItem } from '@/types/content';
+  import {$body as bodyEl} from "@/lib/dom-selector";
 
   interface Props {
     items: ContentItem[];
@@ -12,7 +13,6 @@
     onInfo: (item: ContentItem) => void;
     clientEndpoint: string;
     firstRowFocusKey?: string;
-    sidebarFocusKey?: string;
     onImmersiveChange?: (immersive: boolean) => void;
   }
 
@@ -21,7 +21,6 @@
     onInfo,
     clientEndpoint,
     firstRowFocusKey,
-    sidebarFocusKey,
     onImmersiveChange,
   }: Props = $props();
 
@@ -75,12 +74,6 @@
     currentIndex = (index + items.length) % items.length;
   }
 
-  function focusSidebarFromHero(direction: string) {
-    if (direction !== 'left' || !sidebarFocusKey) return true;
-    setFocus(sidebarFocusKey);
-    return false;
-  }
-
   function handleTrailerEnded() {
     showTrailer = false;
   }
@@ -124,17 +117,24 @@
     };
   });
 
-  // Video play/pause
+  // Video play/pause + body class
   $effect(() => {
     const video = videoEl;
     if (!video) return;
 
     if (showTrailer) {
+      bodyEl?.classList.add('playing-inmersive-trailer');
       video.currentTime = 0;
       video.play().catch(() => {});
     } else {
+      bodyEl?.classList.remove('playing-inmersive-trailer');
       video.pause();
     }
+
+    return () => {
+      bodyEl?.classList.remove('playing-inmersive-trailer');
+      video.pause();
+    };
   });
 
   $effect(() => {
@@ -186,7 +186,9 @@
             class="w-full h-full object-cover"
             playsinline
             onended={handleTrailerEnded}
-          ></video>
+          >
+          <track kind="captions" />  
+        </video>
         </div>
       {/if}
 
@@ -245,7 +247,6 @@
             onEnterPress={() => onInfo(currentItem)}
             onArrowPress={(direction) => {
               if (direction === 'left') {
-                if (currentIndex === 0) return focusSidebarFromHero(direction);
                 goTo(currentIndex - 1);
                 return false;
               }
@@ -258,6 +259,10 @@
                   setFocus(firstRowFocusKey);
                   return false;
                 }
+              }
+              if (direction === 'up') {
+                setFocus('topnav');
+                return false;
               }
               return true;
             }}

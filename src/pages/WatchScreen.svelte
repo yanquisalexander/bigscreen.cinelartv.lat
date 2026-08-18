@@ -249,7 +249,7 @@
     return () => {
       const key = getCurrentFocusKey();
       if (key && !doesFocusableExist(key)) {
-        setFocus("sidebar");
+        setFocus("topnav");
       }
     };
   });
@@ -847,18 +847,7 @@
   });
 </script>
 
-{#if useNative}
-  <div
-    class="w-full h-full bg-black flex flex-col items-center justify-center gap-5"
-  >
-    <div
-      class="w-10 h-10 rounded-full border-4 border-white/20 border-t-white animate-spin"
-    ></div>
-    <p class="text-white/50 text-base tracking-wide">
-      Abriendo reproductor nativo…
-    </p>
-  </div>
-{:else if streamLimitError}
+{#if streamLimitError}
   <FocusContainer
     focusKey="stream-limit-root"
     focusable={false}

@@ -126,7 +126,7 @@
   preferredChildFocusKey="sk-A"
   trackChildren={true}
   saveLastFocusedChild={true}
-  class="w-full h-dvh overflow-y-auto hide-scrollbar bg-bg px-[clamp(2rem,4vw,4rem)] py-[clamp(1.5rem,3vh,2.5rem)]"
+  class="w-full h-dvh overflow-y-auto hide-scrollbar bg-bg px-[clamp(2rem,4vw,4rem)] pt-[calc(var(--topnav-h)+1.5rem)] pb-[clamp(1.5rem,3vh,2.5rem)]"
 >
   <div class="max-w-2xl mx-auto">
     <div class="flex items-center gap-3 mb-6">
@@ -163,8 +163,8 @@
               focusKey="sk-{char}"
               onEnterPress={() => handleKeyPress(char)}
               onArrowPress={(direction) => {
-                if (direction !== 'left' || charIdx !== 0) return true;
-                setFocus('sidebar');
+                if (direction !== 'up' || charIdx !== 0) return true;
+                setFocus('topnav');
                 return false;
               }}
               focusedClass="!bg-white !text-black scale-110"
@@ -184,8 +184,8 @@
           focusKey="sk-space"
           onEnterPress={handleSpace}
           onArrowPress={(direction) => {
-            if (direction !== 'left') return true;
-            setFocus('sidebar');
+            if (direction !== 'up') return true;
+            setFocus('topnav');
             return false;
           }}
           focusedClass="!bg-white !text-black scale-105"

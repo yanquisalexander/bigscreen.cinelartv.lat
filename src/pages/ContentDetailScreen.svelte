@@ -227,12 +227,6 @@
     push(`/content/${item.id}`);
   }
 
-  function focusSidebarFromLeftEdge(direction: string) {
-    if (direction !== 'left') return true;
-    setFocus('sidebar');
-    return false;
-  }
-
   function focusContentTarget(targetKey?: string) {
     if (!targetKey) return true;
     setFocus(targetKey);
@@ -256,7 +250,7 @@
 
   function handleEpisodeArrowLeft(direction: string) {
     if (direction !== 'left') return true;
-    return focusSidebarFromLeftEdge(direction);
+    return true;
   }
 
   function handleRelatedArrowUp(direction: string) {
@@ -308,8 +302,8 @@
           }
           return true;
         }}
-        onNavigateLeft={focusSidebarFromLeftEdge}
-        onNavigateUp={() => true}
+        onNavigateLeft={() => true}
+        onNavigateUp={() => { setFocus('topnav'); return false; }}
         onPlayFocus={handlePlayFocus}
         {firstEpisodeFocusKey}
         firstSeasonFocusKey={selectedSeasonFocusKey}

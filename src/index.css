@@ -19,6 +19,10 @@
   --animate-fade-in: fade-in 0.5s ease-out forwards;
 }
 
+:root {
+  --topnav-h: clamp(3.5rem, 6vh, 4.5rem);
+}
+
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -408,4 +412,19 @@ body.app-quality-lite {
   transform: scale(1.1);
   will-change: opacity;
   contain: layout paint;
+}
+
+.ambient-canvas {
+  filter: brightness(0.65) saturate(1.0);
+  image-rendering: auto;
+  will-change: opacity;
+  contain: layout paint;
+}
+
+body.playing-inmersive-trailer .topnav-item {
+  opacity: 0 !important;
+}
+
+.topnav-item {
+  transition: opacity var(--animation-duration) ease-in-out;
 }

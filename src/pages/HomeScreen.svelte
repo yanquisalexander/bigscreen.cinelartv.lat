@@ -6,7 +6,6 @@
   import FocusableRow from '@/components/tv/FocusableRow.svelte';
   import HeroSection from '@/components/home/HeroSection.svelte';
   import ExitDialog from '@/components/ui/ExitDialog.svelte';
-  import CinelarLogo from '@/components/ui/CinelarLogo.svelte';
   import {  svelteAuthStore } from '@/stores/authStore';
   import { svelteConfigStore } from '@/stores/configStore';
   import { toastStore } from '@/stores/toastStore';
@@ -129,21 +128,15 @@
   const firstRowFocusKey = $derived(firstRowId != null ? `home-row-0-item-${firstRowId}` : undefined);
   const preferredChildFocusKey = $derived(bannerItems.length > 0 ? 'hero-section' : 'home-row-0');
 
+  function focusTopNav() {
+    setFocus('topnav');
+    return false;
+  }
+
   function focusHeroFromFirstRow(direction: string) {
-    if (direction !== 'up' || bannerItems.length === 0) return true;
+    if (direction !== 'up' || bannerItems.length === 0) return focusTopNav();
     setFocus('hero-view-more');
     return false;
-  }
-
-  function focusSidebarFromRowStart(direction: string) {
-    if (direction !== 'left') return true;
-    setFocus('sidebar');
-    return false;
-  }
-
-  function isSidebarFocused(): boolean {
-    const key = getCurrentFocusKey();
-    return Boolean(key && (key === 'sidebar' || key.startsWith('nav-')));
   }
 
   $effect(() => {
@@ -152,11 +145,16 @@
       const currentKey = getCurrentFocusKey();
       if (currentKey && doesFocusableExist(currentKey)) return;
       e.preventDefault();
-      setFocus(loading || error ? 'sidebar' : 'home-root');
+      setFocus(loading || error ? 'topnav' : 'home-root');
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   });
+
+  function isTopNavFocused(): boolean {
+    const key = getCurrentFocusKey();
+    return Boolean(key && (key === 'topnav' || key.startsWith('nav-')));
+  }
 
   $effect(() => {
     const handleBack = (e: KeyboardEvent) => {
@@ -166,10 +164,10 @@
           showExitDialog = false;
           return;
         }
-        if (isSidebarFocused()) {
+        if (isTopNavFocused()) {
           showExitDialog = true;
         } else {
-          setFocus('sidebar');
+          setFocus('topnav');
         }
       }
     };
@@ -186,11 +184,20 @@
   saveLastFocusedChild={true}
   class="w-full h-dvh hide-scrollbar transition-all duration-700 {heroImmersive ? 'overflow-hidden' : 'overflow-y-auto'}"
 >
-  <CinelarLogo class="fixed top-[clamp(1rem,3vh,1.5rem)] right-[clamp(1.5rem,4vw,2rem)] text-white h-[clamp(1.5rem,2vw,2rem)] z-[999]" />
-
   {#if loading}
     <div class="w-full h-full flex flex-col bg-bg">
-      <div class="w-full h-[clamp(360px,70vh,680px)] bg-surface animate-pulse-slow"></div>
+      <div class="relative w-full h-[clamp(420px,68vh,660px)] bg-black overflow-hidden">
+        <div class="absolute inset-0 bg-surface animate-pulse-slow"></div>
+        <div class="absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/30"></div>
+        <div class="absolute bottom-[clamp(2.5rem,7vh,4.5rem)] left-[clamp(2.5rem,5vw,5rem)] flex flex-col items-start gap-3 z-10">
+          <div class="h-3 w-16 rounded bg-white/10 animate-pulse-slow"></div>
+          <div class="h-[clamp(2rem,3.2vw,2.8rem)] w-[clamp(14rem,28vw,22rem)] rounded-lg bg-white/10 animate-pulse-slow"></div>
+          <div class="h-3 w-[clamp(16rem,24vw,20rem)] rounded bg-white/10 animate-pulse-slow"></div>
+          <div class="h-3 w-[clamp(12rem,18vw,16rem)] rounded bg-white/10 animate-pulse-slow"></div>
+          <div class="mt-2 h-[clamp(2.5rem,4vh,3rem)] w-[clamp(8rem,10vw,10rem)] rounded-xl bg-white/10 animate-pulse-slow"></div>
+        </div>
+      </div>
       <div class="px-[clamp(3rem,7.5vw,6rem)] py-[clamp(1.25rem,4vh,2rem)] space-y-[clamp(1.5rem,4vh,2rem)]">
         {#each [1, 2, 3] as i (i)}
           <div>
@@ -229,7 +236,6 @@
         onInfo={handleInfo}
         {clientEndpoint}
         {firstRowFocusKey}
-        sidebarFocusKey="sidebar"
         onImmersiveChange={(imm) => { heroImmersive = imm; }}
       />
     {/if}
@@ -263,7 +269,6 @@
               progress={progressPercent(item)}
               onArrowPress={(direction) => {
                 if (catIdx === 0 && direction === 'up') return focusHeroFromFirstRow(direction);
-                if (itemIdx === 0 && direction === 'left') return focusSidebarFromRowStart(direction);
                 return true;
               }}
               onEnterPress={() => handleInfo(item)}

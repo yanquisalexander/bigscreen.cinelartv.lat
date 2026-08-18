@@ -66,8 +66,6 @@
         if (searchOpen) {
           searchOpen = false;
           searchQuery = '';
-        } else if (geoblockedSidebarKey) {
-          setFocus(geoblockedSidebarKey);
         } else {
           push('/home');
         }
@@ -125,10 +123,6 @@
     playLiveChannel(info);
   }
 
-  function focusSidebar() {
-    setFocus(geoblockedSidebarKey ?? 'sidebar');
-  }
-
   function handleHeroFocus() {
     setFocus('live-hero-play');
     requestAnimationFrame(() => {
@@ -160,16 +154,7 @@
         <Focusable
           focusKey="livetv-back"
           onEnterPress={() => {
-            if (geoblockedSidebarKey) {
-              setFocus(geoblockedSidebarKey);
-            } else {
-              push('/home');
-            }
-          }}
-          onArrowPress={(direction) => {
-            if (direction !== 'left') return true;
-            focusSidebar();
-            return false;
+            push('/home');
           }}
           focusedClass="!bg-white !text-black"
           class="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium flex items-center justify-center cursor-pointer"
@@ -207,11 +192,6 @@
       <Focusable
         focusKey="livetv-retry"
         onEnterPress={fetchChannels}
-        onArrowPress={(direction) => {
-          if (direction !== 'left') return true;
-          focusSidebar();
-          return false;
-        }}
         focusedClass="!bg-white !text-black"
         class="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium flex items-center gap-2 cursor-pointer"
         playSound={true}
@@ -231,7 +211,7 @@
     </div>
   {:else}
     <!-- Header -->
-    <div class="flex items-center gap-[clamp(0.75rem,1.5vw,1rem)] px-[clamp(3rem,7.5vw,6rem)] pt-[clamp(1.5rem,3vh,3rem)] pb-[clamp(0.75rem,1.5vh,1rem)] shrink-0">
+    <div class="flex items-center gap-[clamp(0.75rem,1.5vw,1rem)] px-[clamp(3rem,7.5vw,6rem)] pt-[calc(var(--topnav-h)+1.5rem)] pb-[clamp(0.75rem,1.5vh,1rem)] shrink-0">
       <div class="w-[clamp(2rem,3.5vw,3rem)] h-[clamp(2rem,3.5vw,3rem)] rounded-full bg-surface flex items-center justify-center shrink-0">
         <Tv class="w-[clamp(1rem,1.5vw,1.25rem)] h-[clamp(1rem,1.5vw,1.25rem)] text-accent-light" />
       </div>
@@ -261,11 +241,11 @@
               setFocus('live-hero-play');
               return false;
             }
-            if (direction === 'left') {
-              focusSidebar();
+            if (direction === 'up') {
+              setFocus('topnav');
               return false;
             }
-            return direction !== 'up';
+            return true;
           }}
           focusedClass="!bg-white !text-black"
           class="w-[clamp(2rem,3.5vh,2.5rem)] h-[clamp(2rem,3.5vh,2.5rem)] rounded-full bg-surface flex items-center justify-center cursor-pointer shrink-0"
@@ -371,8 +351,8 @@
                     focusKey="live-hero-play"
                     onEnterPress={() => handlePlayChannel(featuredChannel)}
                     onArrowPress={(direction) => {
-                      if (direction === 'left') {
-                        focusSidebar();
+                      if (direction === 'up') {
+                        setFocus('topnav');
                         return false;
                       }
                       if (direction === 'down') {
@@ -431,10 +411,6 @@
                 focusKey="live-ch-{ch.id}"
                 onEnterPress={() => handlePlayChannel(ch)}
                 onArrowPress={(direction) => {
-                  if (direction === 'left' && idx === 0) {
-                    focusSidebar();
-                    return false;
-                  }
                   if (direction === 'up') {
                     handleHeroFocus();
                     return false;
@@ -509,10 +485,6 @@
                 focusKey="live-ch-{ch.id}"
                 onEnterPress={() => handlePlayChannel(ch)}
                 onArrowPress={(direction) => {
-                  if (direction === 'left' && idx === 0) {
-                    focusSidebar();
-                    return false;
-                  }
                   if (direction === 'up') {
                     handleHeroFocus();
                     return false;
