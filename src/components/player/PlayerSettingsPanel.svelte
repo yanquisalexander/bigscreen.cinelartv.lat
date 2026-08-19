@@ -25,16 +25,17 @@
     onTracksChanged?: (fn: () => void) => () => void;
   }
 
-  const formatBitrate = (bps: number): string => {
-    if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(1)} Mbps`;
-    if (bps >= 1_000) return `${(bps / 1_000).toFixed(0)} Kbps`;
-    return `${bps} bps`;
-  };
-
   const formatGbPerHour = (bps: number): string => {
     const gb = (bps * 3600) / (8 * 1024 * 1024 * 1024);
     if (gb < 0.01) return '<0.01 GB/h';
     return `${gb.toFixed(2)} GB/h`;
+  };
+
+  const getQualityLabel = (height: number): string => {
+    if (height >= 1080) return 'Excelente';
+    if (height >= 720) return 'Buena';
+    if (height >= 480) return 'Óptima';
+    return 'Básica';
   };
 
   interface Props {
@@ -155,7 +156,7 @@
                   {@const activeTrack = quality.tracks.find(t => t.height === quality.activeHeight)}
                   {#if activeTrack}
                     <span class="text-[0.65rem] tabular-nums text-[#8e8e93]">
-                      {formatBitrate(activeTrack.bandwidth)}
+                      {getQualityLabel(activeTrack.height)}
                     </span>
                   {/if}
                   <Check class="w-4 h-4 text-white" />
@@ -182,7 +183,7 @@
                   </div>
                   <div class="flex flex-col min-w-0 flex-1">
                     <span class="text-[clamp(0.85rem,1.1vw,1rem)] font-medium">
-                      {formatBitrate(t.bandwidth)}
+                      {getQualityLabel(t.height)}
                     </span>
                     <span class="text-[0.65rem] text-[#8e8e93] mt-0.5">
                       ~{formatGbPerHour(t.bandwidth)}
