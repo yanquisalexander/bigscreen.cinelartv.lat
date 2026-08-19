@@ -25,6 +25,18 @@
     onTracksChanged?: (fn: () => void) => () => void;
   }
 
+  const formatBitrate = (bps: number): string => {
+    if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(1)} Mbps`;
+    if (bps >= 1_000) return `${(bps / 1_000).toFixed(0)} Kbps`;
+    return `${bps} bps`;
+  };
+
+  const formatGbPerHour = (bps: number): string => {
+    const gb = (bps * 3600) / (8 * 1024 * 1024 * 1024);
+    if (gb < 0.01) return '<0.01 GB/h';
+    return `${gb.toFixed(2)} GB/h`;
+  };
+
   interface Props {
     engine: EngineLike | null;
     open: boolean;
@@ -132,17 +144,23 @@
             class="flex items-center justify-between p-3 my-1 rounded-xl cursor-pointer transition-colors duration-200"
             playSound={true}
           >
-            {#snippet children()}
-              <div class="flex items-center gap-4 text-white">
-                <div class="text-[#8e8e93]">
-                  <Monitor class="w-5 h-5" />
+              {#snippet children()}
+                <div class="flex items-center gap-4 text-white">
+                  <div class="text-[#8e8e93]">
+                    <Monitor class="w-5 h-5" />
+                  </div>
+                  <span class="text-[clamp(0.85rem,1.1vw,1rem)] font-medium">Auto</span>
                 </div>
-                <span class="text-[clamp(0.85rem,1.1vw,1rem)] font-medium">Auto</span>
-              </div>
-              {#if quality && quality.auto}
-                <Check class="w-4 h-4 text-white" />
-              {/if}
-            {/snippet}
+                {#if quality && quality.auto}
+                  {@const activeTrack = quality.tracks.find(t => t.height === quality.activeHeight)}
+                  {#if activeTrack}
+                    <span class="text-[0.65rem] tabular-nums text-[#8e8e93]">
+                      {formatBitrate(activeTrack.bandwidth)}
+                    </span>
+                  {/if}
+                  <Check class="w-4 h-4 text-white" />
+                {/if}
+              {/snippet}
           </Focusable>
 
           {#each quality.tracks as t (t.height)}
@@ -162,7 +180,14 @@
                   <div class="text-[#8e8e93]">
                     <Monitor class="w-5 h-5" />
                   </div>
-                  <span class="text-[clamp(0.85rem,1.1vw,1rem)] font-medium">{t.height}p</span>
+                  <div class="flex flex-col min-w-0 flex-1">
+                    <span class="text-[clamp(0.85rem,1.1vw,1rem)] font-medium">
+                      {formatBitrate(t.bandwidth)}
+                    </span>
+                    <span class="text-[0.65rem] text-[#8e8e93] mt-0.5">
+                      ~{formatGbPerHour(t.bandwidth)}
+                    </span>
+                  </div>
                 </div>
                 {#if quality && quality.activeHeight === t.height && !quality.auto}
                   <Check class="w-4 h-4 text-white" />
