@@ -32,6 +32,7 @@
   let videoEl = $state<HTMLVideoElement | null>(null);
   let timerId: ReturnType<typeof setTimeout> | null = null;
   let trailerTimerId: ReturnType<typeof setTimeout> | null = null;
+  let vramCleanupId: ReturnType<typeof setTimeout> | null = null;
 
   const currentItem = $derived(items[currentIndex]);
   const hasTrailer = $derived(Boolean(currentItem?.trailer_sources?.length));
@@ -43,7 +44,7 @@
       currentItem.images,
       currentItem.banner_resized ?? currentItem.banner ?? currentItem.cover_resized ?? currentItem.cover,
       clientEndpoint,
-      'xlarge'
+      backdropSize
     );
   });
 
@@ -54,11 +55,7 @@
 
   const { appQuality } = getRuntimeConfig();
   const canAnimate = appQuality !== 'LITE';
-  const heroMaskStyle = $derived(
-    canAnimate && !showTrailer
-      ? 'mask-image: linear-gradient(to bottom, black 90%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 90%, transparent 100%);'
-      : ''
-  );
+  const backdropSize = window.screen.width > 1280 ? 'xlarge' : 'large';
 
   $effect(() => {
     if (currentBannerUrl) {
@@ -81,7 +78,7 @@
   function onUpdateHasFocusedChild(focused: boolean) {
     hasFocusedChild = focused;
     if (focused && heroEl) {
-      heroEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      heroEl.scrollIntoView({ behavior: canAnimate ? 'smooth' : 'auto', block: 'start' });
     }
   }
 
@@ -117,23 +114,35 @@
     };
   });
 
-  // Video play/pause + body class
+  // Video play/pause + body class + VRAM lifecycle
   $effect(() => {
     const video = videoEl;
     if (!video) return;
 
+    // Cancel any pending VRAM cleanup (trailer reactivated before cleanup ran)
+    if (vramCleanupId) { clearTimeout(vramCleanupId); vramCleanupId = null; }
+
     if (showTrailer) {
       bodyEl?.classList.add('playing-inmersive-trailer');
+      if (trailerUrl) video.src = trailerUrl;
       video.currentTime = 0;
       video.play().catch(() => {});
     } else {
       bodyEl?.classList.remove('playing-inmersive-trailer');
       video.pause();
+      // Free VRAM after fade-out transition completes
+      vramCleanupId = setTimeout(() => {
+        if (!showTrailer && videoEl) {
+          videoEl.removeAttribute('src');
+          videoEl.load();
+        }
+      }, 1200);
     }
 
     return () => {
       bodyEl?.classList.remove('playing-inmersive-trailer');
       video.pause();
+      if (vramCleanupId) { clearTimeout(vramCleanupId); vramCleanupId = null; }
     };
   });
 
@@ -153,10 +162,10 @@
     <div
       bind:this={heroEl}
       class="relative w-full overflow-hidden bg-black transition-[height] duration-700 ease-in-out {showTrailer ? 'h-[100dvh]' : 'h-[clamp(420px,68vh,660px)]'}"
-      style={heroMaskStyle}
+      style="contain: strict; will-change: height;"
     >
       <!-- Layer 1: Background crossfade -->
-      <div class="absolute inset-0">
+      <div class="absolute inset-0" style="will-change: opacity;">
         {#if prevBannerUrl}
           <img
             src={prevBannerUrl}
@@ -179,16 +188,18 @@
       {#if hasTrailer}
         <div
           class="absolute inset-0 transition-opacity duration-1000 ease-in-out {showTrailer ? 'opacity-100 z-10' : 'opacity-0 z-0'}"
+          style="will-change: opacity;"
         >
           <video
             bind:this={videoEl}
             src={trailerUrl}
             class="w-full h-full object-cover"
+            preload="auto"
             playsinline
             onended={handleTrailerEnded}
           >
-          <track kind="captions" />  
-        </video>
+            <track kind="captions" />
+          </video>
         </div>
       {/if}
 
@@ -197,100 +208,106 @@
         class="absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent pointer-events-none transition-opacity duration-700 z-20 {showTrailer ? 'opacity-20' : 'opacity-100'}"
       ></div>
       <div
-        class="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/30 pointer-events-none transition-opacity duration-700 z-20 {showTrailer ? 'opacity-30' : 'opacity-100'}"
+        class="absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent pointer-events-none transition-opacity duration-700 z-20 {showTrailer ? 'opacity-30' : 'opacity-100'}"
       ></div>
 
       <!-- Layer 4: Content -->
       <div class="absolute bottom-[clamp(2.5rem,7vh,4.5rem)] left-[clamp(2.5rem,5vw,5rem)] max-w-[clamp(26rem,42vw,36rem)] z-30 flex flex-col items-start text-left">
-        <!-- Metadata -->
-        <div class="flex items-center gap-3 mb-3 text-xs font-semibold text-text-secondary">
-          {#if currentItem.year}
-            <span class="px-2 py-0.5 rounded bg-white/10 text-white backdrop-blur-md">
-              {currentItem.year}
+          <!-- Metadata -->
+          <div class="flex items-center gap-3 mb-3 text-xs font-semibold text-text-secondary">
+            {#if currentItem.year}
+              <span class="px-2 py-0.5 rounded bg-black/40 text-white">
+                {currentItem.year}
+              </span>
+            {/if}
+            {#if currentItem.duration}
+              <span>{currentItem.duration} min</span>
+            {/if}
+            <span class="border border-white/30 px-1.5 py-0.2 rounded text-[10px] text-white">
+              HD
             </span>
-          {/if}
-          {#if currentItem.duration}
-            <span>{currentItem.duration} min</span>
-          {/if}
-          <span class="border border-white/30 px-1.5 py-0.2 rounded text-[10px] text-white">
-            HD
-          </span>
-        </div>
+          </div>
 
-        <!-- Logo or Title -->
-        {#if currentLogoUrl}
-          <img
-            src={currentLogoUrl}
-            alt={currentItem.title}
-            class="h-[clamp(3.5rem,8vh,5.5rem)] max-w-[85%] object-contain object-left mb-3 drop-shadow-2xl"
-          />
-        {:else}
-          <h1 class="text-[clamp(2rem,3.2vw,2.8rem)] font-black text-white leading-tight mb-3 drop-shadow-lg tracking-tight text-left">
-            {currentItem.title}
-          </h1>
-        {/if}
-
-        <!-- Description -->
-        <div
-          class="transition-all duration-700 ease-in-out overflow-hidden w-full {showTrailer ? 'max-h-0 opacity-0 mb-0' : 'max-h-36 opacity-100 mb-6'}"
-        >
-          {#if currentItem.description}
-            <p class="text-[clamp(0.95rem,1.2vw,1.05rem)] text-gray-300 line-clamp-3 leading-relaxed font-normal drop-shadow text-left">
-              {currentItem.description}
-            </p>
+          <!-- Logo or Title -->
+          {#if currentLogoUrl}
+            <img
+              src={currentLogoUrl}
+              alt={currentItem.title}
+              class="h-[clamp(3.5rem,8vh,5.5rem)] max-w-[85%] object-contain object-left mb-3"
+            />
+          {:else}
+            <h1 class="text-[clamp(2rem,3.2vw,2.8rem)] font-black text-white leading-tight mb-3 tracking-tight text-left">
+              {currentItem.title}
+            </h1>
           {/if}
-        </div>
 
-        <!-- Action Button -->
-        <div class="flex items-center gap-4">
-          <Focusable
-            onEnterPress={() => onInfo(currentItem)}
-            onArrowPress={(direction) => {
-              if (direction === 'left') {
-                goTo(currentIndex - 1);
-                return false;
-              }
-              if (direction === 'right') {
-                goTo(currentIndex + 1);
-                return false;
-              }
-              if (direction === 'down') {
-                if (firstRowFocusKey) {
-                  setFocus(firstRowFocusKey);
+          <!-- Description -->
+          <div
+            class="transition-all duration-700 ease-in-out overflow-hidden w-full {showTrailer ? 'max-h-0 opacity-0 mb-0' : 'max-h-36 opacity-100 mb-6'}"
+          >
+            {#if currentItem.description}
+              <p class="text-[clamp(0.95rem,1.2vw,1.05rem)] text-gray-300 line-clamp-3 leading-relaxed font-normal text-left">
+                {currentItem.description}
+              </p>
+            {/if}
+          </div>
+
+          <!-- Action Button -->
+          <div class="flex items-center gap-4">
+            <Focusable
+              onEnterPress={() => onInfo(currentItem)}
+              onArrowPress={(direction) => {
+                if (direction === 'left') {
+                  goTo(currentIndex - 1);
                   return false;
                 }
-              }
-              if (direction === 'up') {
-                setFocus('topnav');
-                return false;
-              }
-              return true;
-            }}
-            autoFocus={true}
-            focusKey="hero-view-more"
-            focusedClass="scale-105 !bg-white !text-black ring-4 ring-white/50"
-            class="px-7 py-3 bg-white text-black text-sm font-bold rounded-xl transition-all duration-200 border border-white/20 cursor-pointer"
-            playSound={true}
-          >
-            {#snippet children()}
-              Ver detalles
-            {/snippet}
-          </Focusable>
+                if (direction === 'right') {
+                  goTo(currentIndex + 1);
+                  return false;
+                }
+                if (direction === 'down') {
+                  if (firstRowFocusKey) {
+                    setFocus(firstRowFocusKey);
+                    return false;
+                  }
+                }
+                if (direction === 'up') {
+                  setFocus('topnav');
+                  return false;
+                }
+                return true;
+              }}
+              autoFocus={true}
+              focusKey="hero-view-more"
+              focusedClass="scale-105 !bg-white !text-black ring-4 ring-white/50"
+              class="px-7 py-3 bg-white text-black text-sm font-bold rounded-xl transition-all duration-200 border border-white/20 cursor-pointer"
+              playSound={true}
+            >
+              {#snippet children()}
+                Ver detalles
+              {/snippet}
+            </Focusable>
+          </div>
         </div>
-      </div>
 
-      <!-- Layer 5: Pagination indicators -->
-      {#if items.length > 1}
-        <div
-          class="absolute bottom-6 right-[clamp(2.5rem,5vw,5rem)] flex items-center gap-2 z-30 transition-opacity duration-500 {showTrailer ? 'opacity-20' : 'opacity-100'}"
-        >
-          {#each items as _, i (i)}
-            <div
-              class="h-1.5 rounded-full transition-all duration-500 {i === currentIndex ? 'w-8 bg-white' : 'w-2 bg-white/30'}"
-            ></div>
-          {/each}
-        </div>
-      {/if}
+        <!-- Layer 5: Pagination indicators -->
+        {#if items.length > 1}
+          <div
+            class="absolute bottom-6 right-[clamp(2.5rem,5vw,5rem)] flex items-center gap-2 z-30 transition-opacity duration-500 {showTrailer ? 'opacity-20' : 'opacity-100'}"
+          >
+            {#each items as _, i (i)}
+              <div
+                class="h-1.5 rounded-full transition-all duration-500 {i === currentIndex ? 'w-8 bg-white' : 'w-2 bg-white/30'}"
+              ></div>
+            {/each}
+          </div>
+        {/if}
+
+      <!-- Gradient overlay -->
+      <div
+        class="absolute inset-0 pointer-events-none z-10 transition-opacity duration-700 {showTrailer ? 'opacity-0' : 'opacity-100'}"
+        style="background: linear-gradient(to bottom, transparent 70%, rgb(var(--color-bg)) 100%);"
+      ></div>
     </div>
   </FocusContainer>
 {/if}
