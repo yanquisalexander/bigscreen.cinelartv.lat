@@ -109,6 +109,7 @@
   let _bufferTotalMs = 0;
   let _lastBufferStart = 0;
   let _playIntentTracked = false;
+  let hideTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const tokens = $derived($svelteAuthStore.tokens);
   const isAdmin = $derived(
@@ -175,7 +176,9 @@
   const allSegments = $derived.by(() => {
     const epSegs = watchData?.episode?.segments ?? [];
     const contentSegs = watchData?.content?.segments ?? [];
-    return [...epSegs, ...contentSegs];
+    if (epSegs.length === 0) return contentSegs;
+    if (contentSegs.length === 0) return epSegs;
+    return epSegs.concat(contentSegs);
   });
 
   function classifyPlayerError(err: any): 'DRM' | 'MANIFEST' | 'MEDIA' | 'NETWORK' | 'PLAYER' | 'UNKNOWN' {
@@ -531,9 +534,11 @@
     return () => clearInterval(timer);
   });
 
-  // On ended
+  // On ended - register once when engine is ready, not on every reactive change
   $effect(() => {
-    engine.setOnEnded(() => {
+    if (!engine.engineReady) return;
+    
+    const handleEnded = () => {
       // Track playback complete
       const video = videoEl;
       if (video && video.duration) {
@@ -549,6 +554,7 @@
         }
         return;
       }
+      
       postrollAds
         .next(7000)
         .then((ad) => {
@@ -573,7 +579,9 @@
             window.history.back();
           }
         });
-    });
+    };
+    
+    engine.setOnEnded(handleEnded);
   });
 
   // Controls properties sync
@@ -814,9 +822,11 @@
 
   // Auto-hide controls
   $effect(() => {
+    if (hideTimeout) clearTimeout(hideTimeout);
+    hideTimeout = null;
     if (engine.isPlaying && controlsEl) {
       controlsEl.showControls = true;
-      setTimeout(() => {
+      hideTimeout = setTimeout(() => {
         const controls = controlsEl;
         const currentFocus = getCurrentFocusKey() ?? "";
         if (
@@ -828,8 +838,13 @@
         ) {
           controls.showControls = false;
         }
+        hideTimeout = null;
       }, 5000);
     }
+    return () => {
+      if (hideTimeout) clearTimeout(hideTimeout);
+      hideTimeout = null;
+    };
   });
 
   // Focus when ready

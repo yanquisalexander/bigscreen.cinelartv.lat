@@ -321,6 +321,7 @@
         {#if items.length > 1}
           <div
             class="absolute bottom-6 right-[clamp(2.5rem,5vw,5rem)] flex items-center gap-2 z-30 transition-opacity duration-500 {showTrailer ? 'opacity-20' : 'opacity-100'}"
+            style="transform: translateY({showTrailer ? expandOffset : 0}px); transition: transform 500ms ease, opacity 500ms ease;"
           >
             {#each items as _, i (i)}
               <div
