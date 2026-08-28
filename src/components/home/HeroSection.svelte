@@ -114,6 +114,8 @@
 
   // Trailer trigger timer
   $effect(() => {
+    // Reiniciar el timer al cambiar de item (incluso si ambos tienen trailer)
+    const _ = trailerUrl;
     if (!hasTrailer || !hasFocusedChild) {
       showTrailer = false;
       return;

@@ -1,11 +1,13 @@
 name: Build TV App (Cobalt)
 
 on:
-  # Temporarily disabled: Cobalt build paused
-  # push:
-  #   branches: [main]
-  # pull_request:
-  #   branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - "cobalt-versions.json"
+      - ".github/workflows/build-tv.yml"
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       cobalt_build_type:
@@ -37,7 +39,7 @@ jobs:
   build:
     name: Build + Package
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
@@ -59,7 +61,7 @@ jobs:
           STARBOARD_API=$(python3 -c "import json; print(json.load(open('cobalt-versions.json'))['cobalt']['starboard_api_version'])")
           echo "cobalt_ref=$COBALT_REF" >> "$GITHUB_OUTPUT"
           echo "starboard_api=$STARBOARD_API" >> "$GITHUB_OUTPUT"
-          echo "Cobalt: $COBALT_REF | Starboard: $STARBOARD_API | Platform: ${{ steps.config.outputs.platform }}"
+          echo "Cobalt: $COBALT_REF | Starboard: $STARBOARD_API"
 
       - name: Install system dependencies
         run: |
@@ -81,24 +83,36 @@ jobs:
         if: startsWith(steps.config.outputs.platform, 'aosp-')
         run: |
           ANDROID_HOME="${{ runner.workspace }}/android-sdk"
-          mkdir -p "$ANDROID_HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
 
-          CMDLINE_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
-          curl -sL "$CMDLINE_URL" -o /tmp/cmdtools.zip
-          unzip -qo /tmp/cmdtools.zip -d "$ANDROID_HOME/cmdline-tools"
-          mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest" 2>/dev/null || true
+          # Skip if already cached
+          if [ -d "$ANDROID_HOME/cmdline-tools/latest/bin" ]; then
+            echo "Android SDK already present, skipping download"
+          else
+            mkdir -p "$ANDROID_HOME"
+            CMDLINE_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+            curl -sL "$CMDLINE_URL" -o /tmp/cmdtools.zip
+            unzip -qo /tmp/cmdtools.zip -d "$ANDROID_HOME/cmdline-tools"
+            mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest" 2>/dev/null || true
+          fi
 
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
           sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125"
 
           NDK_HOME="$ANDROID_HOME/ndk/26.1.10909125"
-          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_HOME=$NDK_HOME" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$NDK_HOME" >> "$GITHUB_ENV"
           echo "NDK_HOME=$NDK_HOME" >> "$GITHUB_ENV"
-          echo "Android NDK ready at $NDK_HOME"
+
+      - name: Cache Android SDK + NDK
+        if: startsWith(steps.config.outputs.platform, 'aosp-')
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.workspace }}/android-sdk
+          key: android-sdk-${{ runner.os }}-ndk26.1
+          restore-keys: |
+            android-sdk-${{ runner.os }}-
 
       - name: Cache depot_tools
         uses: actions/cache@v4
@@ -118,51 +132,54 @@ jobs:
           "$DEPOT_PATH/ensure_bootstrap"
           echo "depot_tools ready"
 
-      - name: Create Cobalt working directory
-        run: |
-          COBALT_WORKDIR="${{ runner.workspace }}/cobalt-build"
-          mkdir -p "$COBALT_WORKDIR"
-          echo "Cobalt workdir: $COBALT_WORKDIR"
-
-      - name: Clone Cobalt repository
-        working-directory: ${{ runner.workspace }}/cobalt-build
-        run: |
-          git clone --single-branch --branch "${{ env.COBALT_VERSION }}" \
-            https://github.com/youtube/cobalt.git src
-          cd src
-          git rev-parse @
-
-      - name: Initialize gclient config
-        working-directory: ${{ runner.workspace }}/cobalt-build
-        run: |
-          printf 'solutions = [{\n  "name": "src",\n  "url": "https://github.com/youtube/cobalt.git",\n  "managed": False,\n}]\ntarget_os = [ "linux", "android" ]\n' > .gclient
-          cat .gclient
-
-      - name: Cache ccache
+      - name: Cache Cobalt dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.ccache
-          key: ccache-${{ runner.os }}-${{ steps.config.outputs.platform }}-${{ github.sha }}
+          path: |
+            ${{ runner.workspace }}/cobalt-build/src
+            !${{ runner.workspace }}/cobalt-build/src/out
+          key: cobalt-deps-${{ runner.os }}-${{ env.COBALT_VERSION }}-${{ steps.config.outputs.platform }}
           restore-keys: |
-            ccache-${{ runner.os }}-${{ steps.config.outputs.platform }}-
+            cobalt-deps-${{ runner.os }}-${{ env.COBALT_VERSION }}-
+            cobalt-deps-${{ runner.os }}-
 
-      - name: Sync Cobalt dependencies (gclient sync)
+      - name: Clone and sync Cobalt
+        working-directory: ${{ runner.workspace }}/cobalt-build
+        run: |
+          # Skip clone if src already exists and has correct branch
+          if [ -d "src/.git" ]; then
+            CURRENT=$(cd src && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+            echo "src exists on branch: $CURRENT"
+            if [ "$CURRENT" = "${{ env.COBALT_VERSION }}" ]; then
+              echo "Correct version already present, skipping clone + sync"
+              cd src
+              echo "Rev: $(git rev-parse @)"
+              exit 0
+            fi
+          fi
+
+          rm -rf src
+          git clone --single-branch --branch "${{ env.COBALT_VERSION }}" \
+            --depth 1 \
+            https://github.com/youtube/cobalt.git src
+
+          cd src
+          echo "solutions = [{
+            \"name\": \"src\",
+            \"url\": \"https://github.com/youtube/cobalt.git\",
+            \"managed\": False,
+          }]
+          target_os = [ \"linux\", \"android\" ]" > ../.gclient
+
+          gclient sync --no-history --shallow -r "$(git rev-parse @)"
+        timeout-minutes: 50
+
+      - name: Install build deps + hooks
         working-directory: ${{ runner.workspace }}/cobalt-build/src
         run: |
-          gclient sync --no-history -r "$(git rev-parse @)"
-        timeout-minutes: 60
-
-      - name: Install build dependencies
-        working-directory: ${{ runner.workspace }}/cobalt-build/src
-        run: |
-          sudo -E build/install-build-deps.sh || echo "install-build-deps warning above (non-fatal)"
-        timeout-minutes: 30
-
-      - name: Run gclient hooks
-        working-directory: ${{ runner.workspace }}/cobalt-build/src
-        run: |
-          gclient runhooks || echo "runhooks warning above (non-fatal)"
-        timeout-minutes: 30
+          sudo -E build/install-build-deps.sh || echo "install-build-deps warning (non-fatal)"
+          gclient runhooks || echo "runhooks warning (non-fatal)"
+        timeout-minutes: 20
 
       - name: Install Linux sysroot
         working-directory: ${{ runner.workspace }}/cobalt-build/src
@@ -174,9 +191,8 @@ jobs:
             *) ARCH="arm" ;;
           esac
           python3 build/linux/sysroot_scripts/install-sysroot.py --arch="$ARCH"
-          echo "Sysroot for $PLATFORM (arch $ARCH) ready"
 
-      - name: Configure Cobalt build (GN)
+      - name: Configure (GN)
         working-directory: ${{ runner.workspace }}/cobalt-build/src
         run: |
           PLATFORM="${{ steps.config.outputs.platform }}"
@@ -185,17 +201,15 @@ jobs:
             -p "$PLATFORM" \
             -c "$BUILD_TYPE" \
             --no-rbe
-          echo "GN configuration done"
 
-      - name: Build Cobalt (Ninja)
+      - name: Build (Ninja)
         working-directory: ${{ runner.workspace }}/cobalt-build/src
         run: |
           PLATFORM="${{ steps.config.outputs.platform }}"
           BUILD_TYPE="${{ steps.config.outputs.build_type }}"
           autoninja -C "out/${PLATFORM}_${BUILD_TYPE}" cobalt_loader
-          echo "Cobalt build done"
 
-      - name: Verify Cobalt build
+      - name: Verify build
         working-directory: ${{ runner.workspace }}/cobalt-build/src
         run: |
           PLATFORM="${{ steps.config.outputs.platform }}"
@@ -203,25 +217,11 @@ jobs:
           BUILD_DIR="out/${PLATFORM}_${BUILD_TYPE}"
           echo "=== Build output ==="
           ls -lh "$BUILD_DIR/"
-          echo ""
           echo "=== APKs ==="
           ls -lh "$BUILD_DIR/apks/" 2>/dev/null || echo "No apks/ dir"
-          echo ""
           for f in "$BUILD_DIR"/apks/*.apk; do
-            if [ -f "$f" ]; then
-              file "$f"
-              echo "  -> $(basename $f) OK"
-            fi
+            [ -f "$f" ] && file "$f" && echo "  -> $(basename $f) OK"
           done
-
-      - name: Smoke test - verify app
-        run: |
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.APP_URL }}" || true)
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "PASSED: ${{ env.APP_URL }} -> HTTP $HTTP_CODE"
-          else
-            echo "WARNING: ${{ env.APP_URL }} -> HTTP $HTTP_CODE"
-          fi
 
       - name: Package artifact
         run: |
@@ -231,10 +231,7 @@ jobs:
           PACKAGE_DIR="build/tv/${PLATFORM}"
           mkdir -p "$PACKAGE_DIR"
 
-          # Copy APKs
           cp -r "$BUILD_DIR/apks/"*.apk "$PACKAGE_DIR/" 2>/dev/null || true
-
-          # Copy shared libs for Evergreen
           cp -r "$BUILD_DIR/"*.so "$PACKAGE_DIR/" 2>/dev/null || true
 
           python3 -c "
@@ -257,10 +254,7 @@ jobs:
           #!/bin/bash
           set -e
           SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-          APK="$SCRIPT_DIR/cobalt.apk"
-          if [ ! -f "$APK" ]; then
-            APK=$(find "$SCRIPT_DIR" -name "*.apk" | head -1)
-          fi
+          APK=$(find "$SCRIPT_DIR" -name "*.apk" | head -1)
           if [ -z "$APK" ]; then
             echo "ERROR: No APK found"
             exit 1
@@ -275,7 +269,6 @@ jobs:
 
           echo "Package:"
           find "$PACKAGE_DIR" -type f
-          du -sh "$PACKAGE_DIR"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

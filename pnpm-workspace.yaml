@@ -1,2 +1,5 @@
+packages:
+  - "platforms/react-native"
+
 allowBuilds:
   core-js: true
