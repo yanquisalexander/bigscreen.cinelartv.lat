@@ -200,22 +200,35 @@
     </div>
   {:else if loading}
     <div class="w-full h-dvh flex flex-col bg-bg">
-      <!-- Category chips skeleton -->
+      <!-- Category chips skeleton (matches actual header) -->
       <div class="flex items-center gap-2 px-6 pt-[calc(var(--topnav-h)+0.5rem)] pb-1 shrink-0">
         {#each [1, 2, 3, 4, 5] as i (i)}
-          <div class="shrink-0 px-3 py-1.5 rounded-full bg-surface text-[clamp(0.7rem,0.9vw,0.8rem)]" style="width: {60 + i * 12}px;"></div>
+          <div class="shrink-0 h-7 rounded-full bg-surface" style="width: {60 + i * 12}px;"></div>
         {/each}
       </div>
-      <!-- EPG rows skeleton -->
-      <div class="flex-1 px-6 pt-2 overflow-hidden">
-        {#each Array(8) as _, i (i)}
+      <!-- EPG grid skeleton (full-bleed, matches EpgGrid structure) -->
+      <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <!-- Time ruler skeleton -->
+        <div class="flex shrink-0 border-b border-white/10" style="height: 70px;">
+          <div class="w-[110px] shrink-0 flex items-center justify-center border-r border-white/10">
+            <span class="text-[10px] font-black uppercase tracking-widest text-white/50">Canales</span>
+          </div>
+          <div class="flex-1 flex items-center gap-4 px-4">
+            <div class="w-12 h-3 rounded bg-white/5"></div>
+            <div class="w-12 h-3 rounded bg-white/5"></div>
+            <div class="w-12 h-3 rounded bg-white/5"></div>
+            <div class="w-12 h-3 rounded bg-white/5"></div>
+          </div>
+        </div>
+        <!-- Channel rows skeleton -->
+        {#each Array(10) as _, i (i)}
           <div class="flex border-b border-white/5" style="height: 70px;">
-            <!-- Channel logo placeholder -->
-            <div class="shrink-0 flex items-center justify-center border-r border-white/10" style="width: 110px;">
-              <div class="w-12 h-12 rounded-xl bg-surface/50"></div>
+            <!-- Channel logo (sticky left column) -->
+            <div class="shrink-0 flex items-center justify-center border-r border-white/10 bg-bg" style="width: 110px;">
+              <div class="w-12 h-12 rounded-xl bg-surface/50 border border-white/5"></div>
             </div>
-            <!-- Program blocks placeholder -->
-            <div class="flex-1 flex items-center gap-2 px-2">
+            <!-- Program blocks -->
+            <div class="flex-1 flex items-center px-2 gap-2">
               <div class="flex-1 h-[calc(100%-12px)] rounded-lg bg-surface"></div>
               <div class="w-1/3 h-[calc(100%-12px)] rounded-lg bg-surface/50"></div>
             </div>
