@@ -252,7 +252,7 @@
       <div
         class="relative z-10 h-[clamp(14rem,24vh,20rem)] -mt-[clamp(6rem,9vh,7rem)] -mb-[clamp(6rem,12vh,10rem)] bg-gradient-to-b from-transparent via-bg via-bg/70 to-bg/10 pointer-events-none transition-opacity duration-700 {heroImmersive ? 'opacity-0' : ''}"
       ></div>
-      <div class="relative z-10 bg-bg pb-[clamp(3rem,8vh,4rem)] transition-opacity duration-700 will-change-opacity {heroImmersive ? 'opacity-0 pointer-events-none' : ''}">
+      <div class="relative z-25 bg-bg pb-[clamp(3rem,8vh,4rem)] transition-opacity duration-700 will-change-opacity {heroImmersive ? 'opacity-0 pointer-events-none' : ''}">
         {#each data?.content ?? [] as category, catIdx (catIdx)}
           {@const preferredChild = category.content?.[0]?.id != null ? `home-row-${catIdx}-item-${category.content[0].id}` : undefined}
 
