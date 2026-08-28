@@ -380,12 +380,9 @@
 
             <!-- Placeholder while loading -->
             {#if state === 'loading' && blocks.length === 0}
-              <div class="absolute inset-0 flex items-center px-2 gap-2">
-                <div class="shrink-0 w-10 h-10 rounded-xl bg-white/5 {canAnimate ? 'animate-pulse' : ''}"></div>
-                <div class="flex-1 flex items-center gap-2 h-full py-2">
-                  <div class="flex-1 h-full rounded-lg bg-white/5 {canAnimate ? 'animate-pulse' : ''}"></div>
-                  <div class="w-1/3 h-full rounded-lg bg-white/[0.03] {canAnimate ? 'animate-pulse' : ''}"></div>
-                </div>
+              <div class="absolute inset-y-1.5 left-2 right-2 flex items-center gap-3 px-4 rounded-lg border border-white/5 bg-[#1d1d1f]">
+                <div class="flex-1 h-3 rounded bg-white/5 {canAnimate ? 'animate-pulse' : ''}"></div>
+                <div class="w-1/4 h-3 rounded bg-white/[0.03] {canAnimate ? 'animate-pulse' : ''}"></div>
               </div>
             {/if}
           </div>
