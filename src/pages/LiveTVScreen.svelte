@@ -200,17 +200,24 @@
     </div>
   {:else if loading}
     <div class="w-full h-dvh flex flex-col bg-bg">
-      <div class="px-[clamp(3rem,7.5vw,6rem)] pt-[clamp(1.5rem,3vh,3rem)] pb-4 shrink-0">
-        <div class="w-full h-[clamp(200px,30vh,320px)] rounded-3xl bg-surface"></div>
+      <!-- Category chips skeleton -->
+      <div class="flex items-center gap-2 px-6 pt-[calc(var(--topnav-h)+0.5rem)] pb-1 shrink-0">
+        {#each [1, 2, 3, 4, 5] as i (i)}
+          <div class="shrink-0 px-3 py-1.5 rounded-full bg-surface text-[clamp(0.7rem,0.9vw,0.8rem)]" style="width: {60 + i * 12}px;"></div>
+        {/each}
       </div>
-      <div class="flex-1 px-[clamp(3rem,7.5vw,6rem)] space-y-6 overflow-hidden">
-        {#each [1, 2] as i (i)}
-          <div>
-            <div class="w-32 h-4 bg-surface rounded mb-3"></div>
-            <div class="flex gap-4">
-              {#each [1, 2, 3, 4] as j (j)}
-                <div class="shrink-0 w-[clamp(160px,14vw,200px)] h-[clamp(200px,22vh,260px)] rounded-2xl bg-surface"></div>
-              {/each}
+      <!-- EPG rows skeleton -->
+      <div class="flex-1 px-6 pt-2 overflow-hidden">
+        {#each Array(8) as _, i (i)}
+          <div class="flex border-b border-white/5" style="height: 70px;">
+            <!-- Channel logo placeholder -->
+            <div class="shrink-0 flex items-center justify-center border-r border-white/10" style="width: 110px;">
+              <div class="w-12 h-12 rounded-xl bg-surface/50"></div>
+            </div>
+            <!-- Program blocks placeholder -->
+            <div class="flex-1 flex items-center gap-2 px-2">
+              <div class="flex-1 h-[calc(100%-12px)] rounded-lg bg-surface"></div>
+              <div class="w-1/3 h-[calc(100%-12px)] rounded-lg bg-surface/50"></div>
             </div>
           </div>
         {/each}
