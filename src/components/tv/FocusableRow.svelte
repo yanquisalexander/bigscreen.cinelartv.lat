@@ -8,6 +8,7 @@
     class?: string;
     focusKey?: string;
     preferredChildFocusKey?: string;
+    onUpdateHasFocusedChild?: (hasFocusedChild: boolean) => void;
     children?: Snippet;
   }
 
@@ -16,16 +17,18 @@
     class: className = '',
     focusKey = generateFocusKey('row'),
     preferredChildFocusKey,
+    onUpdateHasFocusedChild,
     children,
   }: Props = $props();
 
   let scrollEl = $state<HTMLDivElement | null>(null);
   let rafId = 0;
 
-  function onUpdateHasFocusedChild(hasFocusedChild: boolean) {
+  function handleUpdateHasFocusedChild(hasFocusedChild: boolean) {
     if (hasFocusedChild && scrollEl) {
       scrollEl.scrollIntoView({ behavior: 'auto', block: 'nearest' });
     }
+    onUpdateHasFocusedChild?.(hasFocusedChild);
   }
 
   $effect(() => {
@@ -65,7 +68,7 @@
   {preferredChildFocusKey}
   trackChildren={true}
   saveLastFocusedChild={true}
-  {onUpdateHasFocusedChild}
+  onUpdateHasFocusedChild={handleUpdateHasFocusedChild}
   class="mb-[clamp(0.5rem,1.5vh,1rem)] {className}"
 >
   {#if title}

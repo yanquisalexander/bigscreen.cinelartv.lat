@@ -14,6 +14,7 @@
     clientEndpoint: string;
     firstRowFocusKey?: string;
     onImmersiveChange?: (immersive: boolean) => void;
+    onUpdateHasFocusedChild?: (focused: boolean) => void;
   }
 
   let {
@@ -22,6 +23,7 @@
     clientEndpoint,
     firstRowFocusKey,
     onImmersiveChange,
+    onUpdateHasFocusedChild: externalUpdateFocus,
   }: Props = $props();
 
   let currentIndex = $state(0);
@@ -57,6 +59,17 @@
   const canAnimate = appQuality !== 'LITE';
   const backdropSize = window.screen.width > 1280 ? 'xlarge' : 'large';
 
+  let viewportH = $state(typeof window !== 'undefined' ? window.innerHeight : 0);
+  const baseHeight = $derived(Math.max(420, Math.min(68 * (viewportH / 100), 660)));
+  const expandOffset = $derived(Math.max(0, viewportH - baseHeight));
+
+  $effect(() => {
+    const update = () => { viewportH = window.innerHeight; };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  });
+
   $effect(() => {
     if (currentBannerUrl) {
       const timer = setTimeout(() => {
@@ -80,6 +93,7 @@
     if (focused && heroEl) {
       heroEl.scrollIntoView({ behavior: canAnimate ? 'smooth' : 'auto', block: 'start' });
     }
+    externalUpdateFocus?.(focused);
   }
 
   // Auto-advance
@@ -159,60 +173,73 @@
     saveLastFocusedChild={true}
     {onUpdateHasFocusedChild}
   >
+    <!-- Slot: reserva el espacio base en el flujo; SIEMPRE altura fija, nunca cambia -->
     <div
       bind:this={heroEl}
-      class="relative w-full overflow-hidden bg-black transition-[height] duration-700 ease-in-out {showTrailer ? 'h-[100dvh]' : 'h-[clamp(420px,68vh,660px)]'}"
-      style="contain: strict; will-change: height;"
+      class="relative w-full bg-black"
+      style="height: {baseHeight}px;"
     >
-      <!-- Layer 1: Background crossfade -->
-      <div class="absolute inset-0" style="will-change: opacity;">
-        {#if prevBannerUrl}
-          <img
-            src={prevBannerUrl}
-            alt=""
-            class="absolute inset-0 w-full h-full object-cover"
-          />
+      <!-- Backdrop: siempre cubre el viewport a pantalla completa; se revela al desvanecerse el telon -->
+      <div class="absolute inset-x-0 top-0 h-[100dvh] overflow-hidden pointer-events-none">
+        <!-- Layer 1: Background crossfade -->
+        <div class="absolute inset-0" style="will-change: opacity;">
+          {#if prevBannerUrl}
+            <img
+              src={prevBannerUrl}
+              alt=""
+              class="absolute inset-0 w-full h-full object-cover"
+            />
+          {/if}
+
+          {#if currentBannerUrl}
+            <img
+              src={currentBannerUrl}
+              alt={currentItem.title}
+              class="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out {showTrailer ? 'opacity-0' : 'opacity-100'}"
+              loading="eager"
+            />
+          {/if}
+        </div>
+
+        <!-- Layer 2: Trailer video -->
+        {#if hasTrailer}
+          <div
+            class="absolute inset-0 transition-opacity duration-1000 ease-in-out {showTrailer ? 'opacity-100 z-10' : 'opacity-0 z-0'}"
+            style="will-change: opacity;"
+          >
+            <video
+              bind:this={videoEl}
+              src={trailerUrl}
+              class="w-full h-full object-cover"
+              preload="auto"
+              playsinline
+              onended={handleTrailerEnded}
+            >
+              <track kind="captions" />
+            </video>
+          </div>
         {/if}
 
-        {#if currentBannerUrl}
-          <img
-            src={currentBannerUrl}
-            alt={currentItem.title}
-            class="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out {showTrailer ? 'opacity-0' : 'opacity-100'}"
-            loading="eager"
-          />
-        {/if}
+        <!-- Layer 3: Contrast gradients -->
+        <div
+          class="absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent pointer-events-none transition-opacity duration-700 z-20 {showTrailer ? 'opacity-20' : 'opacity-100'}"
+        ></div>
+        <div
+          class="absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent pointer-events-none transition-opacity duration-700 z-20 {showTrailer ? 'opacity-30' : 'opacity-100'}"
+        ></div>
+
+        <!-- Gradient overlay -->
+        <div
+          class="absolute inset-0 pointer-events-none z-10 transition-opacity duration-700 {showTrailer ? 'opacity-0' : 'opacity-100'}"
+          style="background: linear-gradient(to bottom, transparent 70%, rgb(var(--color-bg)) 100%);"
+        ></div>
       </div>
 
-      <!-- Layer 2: Trailer video -->
-      {#if hasTrailer}
-        <div
-          class="absolute inset-0 transition-opacity duration-1000 ease-in-out {showTrailer ? 'opacity-100 z-10' : 'opacity-0 z-0'}"
-          style="will-change: opacity;"
-        >
-          <video
-            bind:this={videoEl}
-            src={trailerUrl}
-            class="w-full h-full object-cover"
-            preload="auto"
-            playsinline
-            onended={handleTrailerEnded}
-          >
-            <track kind="captions" />
-          </video>
-        </div>
-      {/if}
-
-      <!-- Layer 3: Contrast gradients -->
+      <!-- Content: anclado al hero base; baja al fondo con transform (GPU) al expandir -->
       <div
-        class="absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent pointer-events-none transition-opacity duration-700 z-20 {showTrailer ? 'opacity-20' : 'opacity-100'}"
-      ></div>
-      <div
-        class="absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent pointer-events-none transition-opacity duration-700 z-20 {showTrailer ? 'opacity-30' : 'opacity-100'}"
-      ></div>
-
-      <!-- Layer 4: Content -->
-      <div class="absolute bottom-[clamp(2.5rem,7vh,4.5rem)] left-[clamp(2.5rem,5vw,5rem)] max-w-[clamp(26rem,42vw,36rem)] z-30 flex flex-col items-start text-left">
+        class="absolute bottom-[clamp(2.5rem,7vh,4.5rem)] left-[clamp(2.5rem,5vw,5rem)] max-w-[clamp(26rem,42vw,36rem)] z-30 flex flex-col items-start text-left transition-transform duration-700 ease-in-out will-change-transform"
+        style="transform: translateY({showTrailer ? expandOffset : 0}px);"
+      >
           <!-- Metadata -->
           <div class="flex items-center gap-3 mb-3 text-xs font-semibold text-text-secondary">
             {#if currentItem.year}
@@ -302,12 +329,6 @@
             {/each}
           </div>
         {/if}
-
-      <!-- Gradient overlay -->
-      <div
-        class="absolute inset-0 pointer-events-none z-10 transition-opacity duration-700 {showTrailer ? 'opacity-0' : 'opacity-100'}"
-        style="background: linear-gradient(to bottom, transparent 70%, rgb(var(--color-bg)) 100%);"
-      ></div>
     </div>
   </FocusContainer>
 {/if}
