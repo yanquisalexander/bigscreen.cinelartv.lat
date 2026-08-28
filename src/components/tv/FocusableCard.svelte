@@ -17,7 +17,7 @@
     class?: string;
     focusKey?: string;
     autoFocus?: boolean;
-    variant?: 'row' | 'episode';
+    variant?: 'row' | 'episode' | 'grid';
     playSound?: boolean;
   }
 
@@ -42,6 +42,7 @@
 
   let bannerPreloaded = false;
   const isRowVariant = $derived(variant === 'row');
+  const isGridVariant = $derived(variant === 'grid');
 
   function handleCardFocus() {
     if (!bannerPreloaded && bannerImage) {
@@ -61,10 +62,12 @@
   onArrowPress={onArrowPress ? (dir) => onArrowPress(dir) : undefined}
   onFocus={handleCardFocus}
   {playSound}
-  class="relative rounded-xl overflow-hidden border-2 transition-all duration-300 ease-out shrink-0 focus:outline-none snap-start {isRowVariant ? 'w-[clamp(130px,10vw,192px)] h-[clamp(195px,15vw,288px)] border-transparent opacity-80 z-0 scale-100' : 'w-[230px] h-[130px] border-transparent opacity-80 z-0 scale-100'} {className}"
+  class="relative rounded-xl overflow-hidden border-2 transition-all duration-300 ease-out shrink-0 focus:outline-none snap-start {isRowVariant ? 'w-[clamp(130px,10vw,192px)] h-[clamp(195px,15vw,288px)] border-transparent opacity-80 z-0 scale-100' : isGridVariant ? 'w-[clamp(148px,10.5vw,192px)] aspect-[2/3] border-transparent opacity-85 z-0 scale-100' : 'w-[230px] h-[130px] border-transparent opacity-80 z-0 scale-100'} {className}"
   focusedClass={isRowVariant
     ? 'w-[clamp(340px,26vw,500px)] h-[clamp(195px,15vw,288px)] border-white z-20 shadow-xl shadow-black/60 scale-[1.02] opacity-100'
-    : 'w-[280px] h-[158px] border-white z-20 shadow-xl scale-[1.02] opacity-100'}
+    : isGridVariant
+      ? 'w-[clamp(148px,10.5vw,192px)] aspect-[2/3] border-white z-20 shadow-xl shadow-black/60 scale-[1.06] opacity-100'
+      : 'w-[280px] h-[158px] border-white z-20 shadow-xl scale-[1.02] opacity-100'}
 >
   {#snippet children({ focused })}
     <div
