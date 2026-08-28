@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { tick } from 'svelte';
   import { getFocusContext } from '@/lib/spatial/spatialContext';
   import { spatialNav, generateFocusKey, type SpatialNavParams } from '@/lib/spatial/spatialAction';
 
@@ -22,6 +23,7 @@
     focusedClass?: string;
     role?: string;
     id?: string;
+    style?: string;
     children?: Snippet<[{ focused: boolean }]> | Snippet;
   }
 
@@ -44,6 +46,7 @@
     focusedClass = '',
     role = 'button',
     id,
+    style,
     children,
   }: Props = $props();
 
@@ -65,8 +68,9 @@
       onEnterPress?.(details);
     },
     onArrowPress,
-    onFocus: () => {
+    onFocus: async () => {
       isFocused = true;
+      await tick();
       onFocus?.();
     },
     onBlur: () => {
@@ -91,6 +95,7 @@
   use:spatialNav={navParams}
   {tabIndex}
   {role}
+  {style}
   onkeydown={handleKeyDown}
   data-focus-key={focusKey}
   data-focused={isFocused ? 'true' : undefined}

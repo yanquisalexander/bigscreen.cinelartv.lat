@@ -5,7 +5,7 @@
   import FocusableRow from '@/components/tv/FocusableRow.svelte';
   import ChannelCardEpg from '@/components/tv/ChannelCardEpg.svelte';
   import NowAndNextRow from '@/components/tv/NowAndNextRow.svelte';
-  import EpgProgressBar from '@/components/tv/EpgProgressBar.svelte';
+  import EpgGrid from '@/components/tv/EpgGrid.svelte';
   import { svelteAuthStore } from '@/stores/authStore';
   import { svelteLiveTvFavoritesStore, liveTvFavoritesStore } from '@/stores/liveTvFavoritesStore';
   import { getApiConfig } from '@/api/client';
@@ -13,7 +13,7 @@
   import { getLiveTvChannels, type LiveTvChannel } from '@/api/live';
   import { isBackKey } from '@/utils/helpers';
   import { setFocus, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
-  import { Tv, RefreshCw, Search, X, Play, Clock } from '@lucide/svelte';
+  import { Tv, RefreshCw, Search, X } from '@lucide/svelte';
 
   interface Props {
     geoblockedSidebarKey?: string;
@@ -27,18 +27,12 @@
   let searchOpen = $state(false);
   let searchQuery = $state('');
   let scrollContainerEl = $state<HTMLDivElement | null>(null);
-  let activeCategory = $state<string>('Todos');
+  let activeCategory = $state<string>('Guía');
+  let guideFirstFocusKey = $state<string | null>(null);
 
   const nativeSupported = supportsLiveTV();
   const tokens = $derived($svelteAuthStore.tokens);
   const favorites = $derived($svelteLiveTvFavoritesStore.favorites);
-
-  function formatTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString('es', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
 
   function channelCategory(c: LiveTvChannel): string {
     return c.current_program?.category || 'Otros';
@@ -128,7 +122,13 @@
   $effect(() => {
     if (channels.length > 0 && !searchOpen) {
       setTimeout(() => {
-        if (doesFocusableExist('live-cat-Todos')) {
+        if (isGuideView) {
+          if (guideFirstFocusKey && doesFocusableExist(guideFirstFocusKey)) {
+            setFocus(guideFirstFocusKey);
+          } else if (doesFocusableExist('live-cat-Guía')) {
+            setFocus('live-cat-Guía');
+          }
+        } else if (doesFocusableExist('live-cat-Todos')) {
           setFocus('live-cat-Todos');
         }
       }, 50);
@@ -242,82 +242,29 @@
       </p>
     </div>
   {:else}
-    <!-- Header -->
-    <div class="flex items-center gap-[clamp(0.75rem,1.5vw,1rem)] px-[clamp(3rem,7.5vw,6rem)] pt-[calc(var(--topnav-h)+1.5rem)] pb-[clamp(0.5rem,1vh,0.75rem)] shrink-0">
-      <div class="w-[clamp(2rem,3.5vw,3rem)] h-[clamp(2rem,3.5vw,3rem)] rounded-full bg-surface flex items-center justify-center shrink-0">
-        <Tv class="w-[clamp(1rem,1.5vw,1.25rem)] h-[clamp(1rem,1.5vw,1.25rem)] text-accent-light" />
-      </div>
-      <div class="flex-1 min-w-0">
-        <h1 class="text-white text-[clamp(1.25rem,2.5vw,1.75rem)] font-bold">
-          TV en Vivo
-        </h1>
-        <p class="text-text-secondary text-[clamp(0.7rem,0.9vw,0.8rem)]">
-          {filteredChannels.length} {filteredChannels.length === 1 ? 'canal' : 'canales'} disponibles
-        </p>
-      </div>
-
-      {#if !searchOpen}
-        <Focusable
-          focusKey="live-search-toggle"
-          onEnterPress={() => { searchOpen = true; }}
-          onArrowPress={(direction) => {
-            if (direction === 'down') {
-              setFocus('live-cat-Todos');
-              return false;
-            }
-            if (direction === 'up') {
-              setFocus('topnav');
-              return false;
-            }
-            return true;
-          }}
-          focusedClass="!bg-white !text-black"
-          class="w-[clamp(2rem,3.5vh,2.5rem)] h-[clamp(2rem,3.5vh,2.5rem)] rounded-full bg-surface flex items-center justify-center cursor-pointer shrink-0"
-          playSound={true}
-        >
-          {#snippet children()}
-            <Search class="w-4 h-4 text-text-secondary" />
-          {/snippet}
-        </Focusable>
-      {:else}
-        <div class="flex items-center gap-2 bg-surface rounded-full px-4 h-[clamp(2rem,3.5vh,2.5rem)] border border-white/10">
-          <Search class="w-4 h-4 text-text-secondary shrink-0" />
-          <input
-            bind:value={searchQuery}
-            placeholder="Buscar canal..."
-            class="bg-transparent text-white text-[clamp(0.8rem,1.1vw,0.9rem)] outline-none w-[clamp(120px,18vw,220px)]"
-          />
-          <button type="button" onclick={() => { searchOpen = false; searchQuery = ''; }}>
-            <X class="w-4 h-4 text-text-secondary" />
-          </button>
-        </div>
-      {/if}
-    </div>
-
-    <!-- Category filter bar -->
-    <div class="px-[clamp(3rem,7.5vw,6rem)] pb-[clamp(0.5rem,1vh,0.75rem)] shrink-0">
+    <!-- Compact header: single row with categories + search -->
+    <div class="flex items-center gap-4 px-6 pt-[calc(var(--topnav-h)+0.5rem)] pb-1 shrink-0">
       <FocusContainer
         focusKey="live-categories"
         focusable={false}
         trackChildren={true}
         saveLastFocusedChild={true}
-        preferredChildFocusKey="live-cat-Todos"
+        preferredChildFocusKey="live-cat-Guía"
       >
-        <div class="flex gap-2 overflow-x-auto hide-scrollbar py-1">
+        <div class="flex items-center gap-1">
           {#each categories as cat, idx (cat)}
             <Focusable
               focusKey="live-cat-{cat}"
               onEnterPress={() => { activeCategory = cat; }}
               onArrowPress={(direction) => {
                 if (direction === 'up') {
-                  setFocus('live-search-toggle');
+                  setFocus('topnav');
                   return false;
                 }
                 if (direction === 'down') {
                   if (isGuideView) {
-                    const firstGuide = filteredChannels[0];
-                    if (firstGuide && doesFocusableExist('guide-ch-' + firstGuide.id)) {
-                      setFocus('guide-ch-' + firstGuide.id);
+                    if (guideFirstFocusKey && doesFocusableExist(guideFirstFocusKey)) {
+                      setFocus(guideFirstFocusKey);
                     }
                   } else {
                     const firstCard = filteredChannels[0];
@@ -331,14 +278,18 @@
                   setFocus(`live-cat-${categories[idx - 1]}`);
                   return false;
                 }
-                if (direction === 'right' && idx < categories.length - 1) {
-                  setFocus(`live-cat-${categories[idx + 1]}`);
+                if (direction === 'right') {
+                  if (idx < categories.length - 1) {
+                    setFocus(`live-cat-${categories[idx + 1]}`);
+                  } else {
+                    setFocus('live-search-toggle');
+                  }
                   return false;
                 }
                 return true;
               }}
-              focusedClass="!ring-2 !ring-white !ring-offset-2 !ring-offset-bg"
-              class="shrink-0 h-[clamp(1.75rem,3vh,2.25rem)] px-4 rounded-full text-[clamp(0.7rem,0.9vw,0.8rem)] font-medium flex items-center justify-center cursor-pointer transition-all {activeCategory === cat ? 'bg-white text-black' : 'bg-surface text-text-secondary'}"
+              focusedClass="!text-white"
+              class="shrink-0 px-3 py-1.5 rounded-full text-[clamp(0.7rem,0.9vw,0.8rem)] font-medium cursor-pointer transition-colors {activeCategory === cat ? 'bg-white/15 text-white' : 'text-text-secondary hover:text-white/70'}"
               playSound={true}
             >
               {#snippet children()}
@@ -348,6 +299,49 @@
           {/each}
         </div>
       </FocusContainer>
+
+      <div class="flex-1"></div>
+
+      {#if !searchOpen}
+        <Focusable
+          focusKey="live-search-toggle"
+          onEnterPress={() => { searchOpen = true; }}
+          onArrowPress={(direction) => {
+            if (direction === 'down') {
+              setFocus(`live-cat-${activeCategory}`);
+              return false;
+            }
+            if (direction === 'up') {
+              setFocus('topnav');
+              return false;
+            }
+            if (direction === 'left') {
+              setFocus(`live-cat-${categories[categories.length - 1]}`);
+              return false;
+            }
+            return true;
+          }}
+          focusedClass="!text-white"
+          class="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer text-text-secondary hover:text-white transition-colors"
+          playSound={true}
+        >
+          {#snippet children()}
+            <Search class="w-4 h-4" />
+          {/snippet}
+        </Focusable>
+      {:else}
+        <div class="flex items-center gap-2 bg-white/10 rounded-full px-3 h-8 border border-white/10">
+          <Search class="w-4 h-4 text-text-secondary shrink-0" />
+          <input
+            bind:value={searchQuery}
+            placeholder="Buscar canal..."
+            class="bg-transparent text-white text-[clamp(0.8rem,1.1vw,0.9rem)] outline-none w-[clamp(120px,18vw,220px)]"
+          />
+          <button type="button" onclick={() => { searchOpen = false; searchQuery = ''; }}>
+            <X class="w-4 h-4 text-text-secondary" />
+          </button>
+        </div>
+      {/if}
     </div>
 
     <!-- Scrollable content -->
@@ -359,93 +353,18 @@
         </p>
       </div>
     {:else if isGuideView}
-      <!-- EPG Guide list view -->
-      <div
-        bind:this={scrollContainerEl}
-        class="flex-1 overflow-y-auto hide-scrollbar pb-8 px-[clamp(3rem,7.5vw,6rem)]"
-        use:scrollFollow
-      >
-        <FocusContainer
-          focusKey="guide-list"
-          focusable={false}
-          trackChildren={true}
-          saveLastFocusedChild={true}
-          preferredChildFocusKey="guide-ch-{filteredChannels[0].id}"
-        >
-          <div class="space-y-2">
-            {#each filteredChannels as ch, idx (ch.id)}
-              <Focusable
-                focusKey="guide-ch-{ch.id}"
-                onEnterPress={() => handlePlayChannel(ch)}
-                onArrowPress={(direction) => {
-                  if (direction === 'up' && idx === 0) {
-                    setFocus('live-cat-Guía');
-                    return false;
-                  }
-                  return true;
-                }}
-                focusedClass="!bg-white/10 !border-white/30"
-                class="flex items-center gap-4 rounded-xl border border-transparent bg-surface/50 px-4 py-3 cursor-pointer transition-colors"
-                playSound={true}
-              >
-                {#snippet children({ focused })}
-                  <div class="shrink-0">
-                    {#if ch.logo_url}
-                      <img
-                        src={ch.logo_url}
-                        alt={ch.name}
-                        class="w-10 h-10 object-contain"
-                        loading="lazy"
-                      />
-                    {:else}
-                      <div class="w-10 h-10 rounded-lg bg-surface-elevated flex items-center justify-center">
-                        <Tv class="w-5 h-5 text-text-secondary" />
-                      </div>
-                    {/if}
-                  </div>
-
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2">
-                      <p class="text-white text-[clamp(0.85rem,1.1vw,0.95rem)] font-semibold truncate">
-                        {ch.name}
-                      </p>
-                      {#if ch.current_program?.category}
-                        <span class="text-[9px] font-medium uppercase tracking-wider text-accent-light bg-accent/15 rounded-full px-2 py-0.5 shrink-0">
-                          {ch.current_program.category}
-                        </span>
-                      {/if}
-                    </div>
-                    {#if ch.current_program}
-                      <p class="text-text-secondary text-[clamp(0.7rem,0.9vw,0.8rem)] mt-0.5 truncate">
-                        {ch.current_program.title}
-                      </p>
-                    {/if}
-                  </div>
-
-                  <div class="shrink-0 text-right w-[clamp(100px,12vw,160px)]">
-                    {#if ch.current_program}
-                      <div class="flex items-center gap-1.5 justify-end mb-1">
-                        <Clock class="w-3 h-3 text-accent-light shrink-0" />
-                        <p class="text-accent-light text-[clamp(0.6rem,0.75vw,0.7rem)]">
-                          {formatTime(ch.current_program.start_time)} – {formatTime(ch.current_program.end_time)}
-                        </p>
-                      </div>
-                      <EpgProgressBar program={ch.current_program} size="sm" showLabel={false} />
-                    {:else}
-                      <p class="text-text-tertiary text-[clamp(0.6rem,0.7vw,0.65rem)]">Sin programación</p>
-                    {/if}
-                  </div>
-
-                  {#if focused}
-                    <div class="shrink-0 w-8 h-8 rounded-full bg-white/15 flex items-center justify-center">
-                      <Play class="w-4 h-4 text-white ml-0.5" />
-                    </div>
-                  {/if}
-                {/snippet}
-              </Focusable>
-            {/each}
-          </div>
-        </FocusContainer>
+      <!-- Full EPG grid: full-bleed, no card wrapper -->
+      <div class="flex-1 min-h-0">
+        <EpgGrid
+          channels={filteredChannels}
+          accessToken={tokens?.accessToken}
+          onPlay={handlePlayChannel}
+          onReady={(key) => { guideFirstFocusKey = key; }}
+          onArrowUp={() => {
+            setFocus('live-cat-Guía');
+            return false;
+          }}
+        />
       </div>
     {:else}
       <div bind:this={scrollContainerEl} class="flex-1 overflow-y-auto hide-scrollbar pb-8">
