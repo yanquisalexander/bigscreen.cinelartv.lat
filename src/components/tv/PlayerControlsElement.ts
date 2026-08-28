@@ -254,7 +254,6 @@ export class PlayerControlsElement extends LitElement {
   private _onWaiting: (() => void) | null = null;
   private _onPlaying: (() => void) | null = null;
   private _onDurationChange: (() => void) | null = null;
-  private _onTimeUpdate: (() => void) | null = null;
 
   @property({ type: Object, attribute: false }) videoEl!: HTMLVideoElement | null;
   @property({ type: Object, attribute: false }) engineRef!: EngineLike | null;
@@ -326,12 +325,11 @@ export class PlayerControlsElement extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    // Cleanup timers to prevent FPS drops
+    this._stopAllTimers();
     this._teardownVideo();
     this.registrar.unregisterAll();
-    if (this.controlsTimer) clearTimeout(this.controlsTimer);
-    if (this._nextTimer) clearInterval(this._nextTimer);
-    if (this._seekApplyTimer) clearTimeout(this._seekApplyTimer);
-    if (this._seekEndTimer) clearTimeout(this._seekEndTimer);
+    
     const keyHandler = (this as any)._keyHandler;
     if (keyHandler) {
       window.removeEventListener('keydown', keyHandler, true);
@@ -342,6 +340,19 @@ export class PlayerControlsElement extends LitElement {
     this.removeEventListener('focus-gained', this._handleFocusGained);
     this.removeEventListener('focus-lost', this._handleFocusLost);
     this.removeEventListener('arrow-press', this._handleArrowPress);
+  }
+
+  private _stopAllTimers() {
+    if (this.controlsTimer) clearTimeout(this.controlsTimer);
+    if (this._nextTimer) clearInterval(this._nextTimer);
+    if (this._seekApplyTimer) clearTimeout(this._seekApplyTimer);
+    if (this._seekEndTimer) clearTimeout(this._seekEndTimer);
+    if (this._seekRepeatTimer) clearInterval(this._seekRepeatTimer);
+    this.controlsTimer = null;
+    this._nextTimer = null;
+    this._seekApplyTimer = null;
+    this._seekEndTimer = null;
+    this._seekRepeatTimer = null;
   }
 
   updated(changedProperties: PropertyValues) {
@@ -467,10 +478,7 @@ export class PlayerControlsElement extends LitElement {
 
             <div class="episode-rail" data-episode-rail data-expanded=${this.railExpanded} aria-label="Episodios">
               <div class="episode-rail-list" data-episode-list>
-                ${this.showControls ? (() => {
-                  const hasMultipleSeasons = new Set(this._allEpisodes.map(e => e.seasonNumber)).size > 1;
-                  return this._allEpisodes.map((episode, index) => this._renderEpisodeCard(episode, index, hasMultipleSeasons));
-                })() : ''}
+                ${this.showControls ? this._renderEpisodeList() : ''}
               </div>
             </div>
           </div>
@@ -533,13 +541,13 @@ export class PlayerControlsElement extends LitElement {
     const imageUrl = resolveImageUrl(episode.thumbnail, this.clientEndpoint);
 
     return html`
-      <div class="episode-card" 
-           data-focused="false" 
-           data-current=${isCurrent} 
-           role="button" 
+      <div class="episode-card"
+           data-focused="false"
+           data-current=${isCurrent}
+           role="button"
            tabindex="-1"
            aria-label="Episodio ${index + 1}: ${episode.title}"
-           @click=${() => this._selectEpisode(episode.id)}>
+           @click=${this._handleEpisodeCardClick}>
         <span class="episode-thumb">
           ${imageUrl ? html`<img src=${imageUrl} alt="" loading="lazy" />` : ''}
         </span>
@@ -548,6 +556,26 @@ export class PlayerControlsElement extends LitElement {
         </span>
       </div>
     `;
+  }
+
+  private _handleEpisodeCardClick = (e: Event) => {
+    const target = e.composedPath().find((el): el is HTMLElement => el instanceof HTMLElement && el.classList.contains('episode-card'));
+    if (!target) return;
+    const episodeId = this._allEpisodes.find((ep) => {
+      const label = target.getAttribute('aria-label') || '';
+      const match = label.match(/Episodio (\d+):/);
+      if (!match) return false;
+      const num = parseInt(match[1], 10);
+      const idx = this._allEpisodes.findIndex((ep2) => String(ep2.id) === String(ep.id));
+      return idx + 1 === num;
+    })?.id;
+    if (episodeId) this._selectEpisode(episodeId);
+  };
+
+  private _renderEpisodeList() {
+    if (this._allEpisodes.length === 0) return html``;
+    const hasMultipleSeasons = new Set(this._allEpisodes.map(e => e.seasonNumber)).size > 1;
+    return html`${this._allEpisodes.map((episode, index) => this._renderEpisodeCard(episode, index, hasMultipleSeasons))}`;
   }
 
   private _syncFocusables() {
@@ -648,7 +676,6 @@ export class PlayerControlsElement extends LitElement {
     this._onWaiting = () => { this.isBuffering = true; };
     this._onPlaying = () => { this.isBuffering = false; };
     this._onDurationChange = () => { this._duration = video.duration || 0; };
-    this._onTimeUpdate = () => { };
 
     video.addEventListener('play', this._onPlay);
     video.addEventListener('pause', this._onPause);
@@ -657,7 +684,6 @@ export class PlayerControlsElement extends LitElement {
     video.addEventListener('canplay', this._onPlaying);
     video.addEventListener('canplaythrough', this._onPlaying);
     video.addEventListener('durationchange', this._onDurationChange);
-    video.addEventListener('timeupdate', this._onTimeUpdate);
 
     this._startSeekbarLoop();
     this._startLogicTimer();
@@ -674,14 +700,12 @@ export class PlayerControlsElement extends LitElement {
         this.videoEl.removeEventListener('canplaythrough', this._onPlaying);
       }
       if (this._onDurationChange) this.videoEl.removeEventListener('durationchange', this._onDurationChange);
-      if (this._onTimeUpdate) this.videoEl.removeEventListener('timeupdate', this._onTimeUpdate);
     }
     this._onPlay = null;
     this._onPause = null;
     this._onWaiting = null;
     this._onPlaying = null;
     this._onDurationChange = null;
-    this._onTimeUpdate = null;
 
     if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = 0; }
     this._cachedSeekbarEls = null;

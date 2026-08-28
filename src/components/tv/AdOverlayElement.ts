@@ -21,6 +21,8 @@ class AdOverlayElement extends HTMLElement {
   private _quartiles = { q1: false, q2: false, q3: false };
   private _registrar = new FocusableRegistrar();
   private _keyHandler: ((e: KeyboardEvent) => void) | null = null;
+  private _lastUpdateTime = -1;
+  private _rafId: number | null = null;
 
   static get observedAttributes() { return ['skip-offset']; }
 
@@ -59,6 +61,10 @@ class AdOverlayElement extends HTMLElement {
       this._video.load();
       this._video = null;
     }
+    if (this._rafId !== null) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
     this.unregisterFocusables();
     if (this._keyHandler) {
       window.removeEventListener('keydown', this._keyHandler, true);
@@ -92,9 +98,9 @@ class AdOverlayElement extends HTMLElement {
     video.addEventListener('play', () => this.onAdPlay());
     video.addEventListener('waiting', () => this.showSpinner(true));
     video.addEventListener('playing', () => this.showSpinner(false));
-    video.addEventListener('timeupdate', () => this.onTimeUpdate());
     video.addEventListener('ended', () => this.finishAd());
     video.addEventListener('error', () => this.onAdError());
+    video.addEventListener('timeupdate', () => this._scheduleUpdate());
 
     // Listener de click explícito para mayor robustez en TV
     this._skipBtnEl?.addEventListener('click', (e) => {
@@ -113,6 +119,14 @@ class AdOverlayElement extends HTMLElement {
     this.installKeyHandler();
   }
 
+  private _scheduleUpdate() {
+    if (this._rafId !== null) return;
+    this._rafId = requestAnimationFrame(() => {
+      this._rafId = null;
+      this.onTimeUpdate();
+    });
+  }
+
   private onAdPlay() {
     this.showSpinner(false);
     if (this._ad) trackImpression(this._ad);
@@ -123,6 +137,10 @@ class AdOverlayElement extends HTMLElement {
     if (!video) return;
     const ct = video.currentTime;
     const dur = video.duration || 0;
+    const sec = Math.floor(ct);
+
+    if (sec === this._lastUpdateTime) return;
+    this._lastUpdateTime = sec;
 
     // Sincronización del countdown basada en reproducción real
     if (!this._canSkip && ct >= this._skipOffset) {

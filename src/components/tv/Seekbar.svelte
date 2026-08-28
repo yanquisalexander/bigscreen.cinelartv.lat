@@ -20,16 +20,20 @@
     const video = videoEl;
     if (!video) return;
 
-    let timerId: number | null = null;
+    let rafId: number | null = null;
     let lastPct = -1;
-    const FRAME_MS = 100;
+    const THRESHOLD = 0.5;
 
     const update = () => {
+      if (video.paused) {
+        rafId = requestAnimationFrame(update);
+        return;
+      }
       const dur = video.duration || 0;
       const ct = video.currentTime;
       const pct = dur > 0 ? (ct / dur) * 100 : 0;
 
-      if (Math.abs(pct - lastPct) > 0.5) {
+      if (Math.abs(pct - lastPct) > THRESHOLD) {
         lastPct = pct;
         let bufferedEnd = 0;
         if (video.buffered.length > 0) {
@@ -42,12 +46,11 @@
         if (thumbEl) thumbEl.style.left = `${pct}%`;
         if (currentTimeLabelEl) currentTimeLabelEl.textContent = formatTime(ct);
       }
-      timerId = window.setTimeout(update, FRAME_MS);
+      rafId = requestAnimationFrame(update);
     };
-
-    timerId = window.setTimeout(update, FRAME_MS);
+    rafId = requestAnimationFrame(update);
     return () => {
-      if (timerId) clearTimeout(timerId);
+      if (rafId !== null) cancelAnimationFrame(rafId);
     };
   });
 </script>
