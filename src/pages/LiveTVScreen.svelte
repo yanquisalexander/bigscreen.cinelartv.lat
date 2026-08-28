@@ -290,6 +290,7 @@
               }}
               focusedClass="!text-white"
               class="shrink-0 px-3 py-1.5 rounded-full text-[clamp(0.7rem,0.9vw,0.8rem)] font-medium cursor-pointer transition-colors {activeCategory === cat ? 'bg-white/15 text-white' : 'text-text-secondary hover:text-white/70'}"
+              style="transition-duration: var(--animation-duration);"
               playSound={true}
             >
               {#snippet children()}
@@ -323,6 +324,7 @@
           }}
           focusedClass="!text-white"
           class="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer text-text-secondary hover:text-white transition-colors"
+          style="transition-duration: var(--animation-duration);"
           playSound={true}
         >
           {#snippet children()}

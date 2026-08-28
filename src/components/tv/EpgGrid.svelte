@@ -1,6 +1,7 @@
 <script lang="ts">
   import Focusable from '@/components/tv/Focusable.svelte';
   import { getChannelGuide, type LiveTvChannel, type LiveTvProgram } from '@/api/live';
+  import { getRuntimeConfig } from '@/runtime';
   import { Tv, Play } from '@lucide/svelte';
 
   interface Props {
@@ -43,6 +44,9 @@
   let scrollEl = $state<HTMLDivElement | null>(null);
   let headerOffsetX = $state(0);
   let rafId = 0;
+
+  const { appQuality } = getRuntimeConfig();
+  const canAnimate = appQuality !== 'LITE';
 
   function clamp(v: number, min: number, max: number) {
     return Math.max(min, Math.min(max, v));
@@ -201,7 +205,7 @@
         targetX = container.scrollLeft + offsetX - (containerRect.width / 2) + (focusedRect.width / 2);
       }
 
-      container.scrollTo({ top: targetY, left: targetX, behavior: 'smooth' });
+      container.scrollTo({ top: targetY, left: targetX, behavior: canAnimate ? 'smooth' : 'auto' });
       return true;
     };
 
@@ -323,16 +327,17 @@
                   return true;
                 }}
                 onFocus={handleFocusScroll}
-                focusedClass="!z-20 scale-[1.01]"
-                class="absolute inset-y-1.5 left-2 right-2 rounded-lg cursor-pointer transition-transform duration-200"
-                style=""
+                focusedClass={!canAnimate ? '!z-20' : '!z-20 scale-[1.01]'}
+                class="absolute inset-y-1.5 left-2 right-2 rounded-lg cursor-pointer transition-transform"
+                style="transition-duration: var(--animation-duration);"
                 playSound={true}
               >
                 {#snippet children({ focused })}
                   <div
-                    class="w-full h-full rounded-lg border flex items-center px-4 transition-all duration-200 {focused
+                    class="w-full h-full rounded-lg border flex items-center px-4 transition-all {focused
                       ? 'border-white bg-white text-black shadow-lg shadow-black/30'
                       : 'border-white/5 bg-[#1d1d1f]/40 text-white/30 border-dashed'}"
+                    style="transition-duration: var(--animation-duration);"
                   >
                     <p class="truncate font-semibold text-[clamp(0.75rem,0.9vw,0.85rem)] leading-none">
                       Sin programación disponible
@@ -352,16 +357,17 @@
                     return true;
                   }}
                   onFocus={handleFocusScroll}
-                  focusedClass="!z-20 scale-[1.01]"
-                  class="absolute top-1.5 bottom-1.5 px-1 cursor-pointer transition-transform duration-200"
-                  style="left: {block.left}px; width: {block.width}px;"
+                  focusedClass={!canAnimate ? '!z-20' : '!z-20 scale-[1.01]'}
+                  class="absolute top-1.5 bottom-1.5 px-1 cursor-pointer transition-transform"
+                  style="left: {block.left}px; width: {block.width}px; transition-duration: var(--animation-duration);"
                   playSound={true}
                 >
                   {#snippet children({ focused })}
                     <div
-                      class="w-full h-full rounded-lg border flex items-center px-4 transition-all duration-200 {focused
+                      class="w-full h-full rounded-lg border flex items-center px-4 transition-all {focused
                         ? 'border-white bg-white text-black shadow-lg shadow-black/30'
                         : 'border-white/5 bg-[#1d1d1f] text-white/90 hover:bg-[#232326]'}"
+                      style="transition-duration: var(--animation-duration);"
                     >
                       <p class="truncate font-semibold text-[clamp(0.75rem,0.9vw,0.85rem)] leading-none">
                         {block.program.title}
@@ -374,8 +380,12 @@
 
             <!-- Placeholder while loading -->
             {#if state === 'loading' && blocks.length === 0}
-              <div class="absolute inset-0 flex items-center">
-                <div class="ml-4 flex-1 h-2 rounded bg-white/5 animate-pulse mr-6"></div>
+              <div class="absolute inset-0 flex items-center px-2 gap-2">
+                <div class="shrink-0 w-10 h-10 rounded-xl bg-white/5 {canAnimate ? 'animate-pulse' : ''}"></div>
+                <div class="flex-1 flex items-center gap-2 h-full py-2">
+                  <div class="flex-1 h-full rounded-lg bg-white/5 {canAnimate ? 'animate-pulse' : ''}"></div>
+                  <div class="w-1/3 h-full rounded-lg bg-white/[0.03] {canAnimate ? 'animate-pulse' : ''}"></div>
+                </div>
               </div>
             {/if}
           </div>
