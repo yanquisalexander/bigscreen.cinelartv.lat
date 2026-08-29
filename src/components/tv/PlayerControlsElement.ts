@@ -159,15 +159,15 @@ export class PlayerControlsElement extends LitElement {
     
     .seekbar-focus { display: flex; align-items: center; flex: 1; min-width: 0; border: none; outline: none; border-radius: 9999px; transition: box-shadow 200ms ease, transform 200ms ease; }
     .seekbar-focus[data-focused="true"] .seekbar-track-bg { height: clamp(0.375rem, 0.7vw, 0.5rem); }
-    .seekbar-focus[data-focused="true"] .seekbar-thumb { transform: translate(-50%, -50%) scale(1.3); }
+    .seekbar-focus[data-focused="true"] .seekbar-thumb { --thumb-scale: 1.3; }
     .seekbar-track:hover .seekbar-track-bg { height: clamp(0.375rem, 0.7vw, 0.5rem); }
     
     .seekbar-track-bg { position: absolute; inset: 0; margin: auto; width: 100%; height: clamp(0.25rem, 0.5vw, 0.375rem); background: rgba(255,255,255,0.16); border-radius: 9999px; transition: height 200ms ease; }
-    .seekbar-buffered { position: absolute; inset: 0; left: 0; background: rgba(255,255,255,0.12); border-radius: 9999px; }
-    .seekbar-fill { position: absolute; inset: 0; left: 0; background: linear-gradient(to right, #f03 80%, #ff2791 100%); border-radius: 9999px; }
+    .seekbar-buffered { position: absolute; inset: 0; left: 0; background: rgba(255,255,255,0.12); border-radius: 9999px; width: 100%; transform-origin: left; }
+    .seekbar-fill { position: absolute; inset: 0; left: 0; background: linear-gradient(to right, #f03 80%, #ff2791 100%); border-radius: 9999px; width: 100%; transform-origin: left; }
     
-    .seekbar-thumb { position: absolute; top: 50%; left: 0; transform: translate(-50%, -50%); width: clamp(0.75rem, 1.5vw, 1rem); height: clamp(0.75rem, 1.5vw, 1rem); border: 2px solid #ffffff; background: #ffffff; border-radius: 9999px; opacity: 1; transition: transform 200ms ease, box-shadow 200ms ease; }
-    .seekbar-track:hover .seekbar-thumb { transform: translate(-50%, -50%) scale(1.35); }
+    .seekbar-thumb { --thumb-pct: 0%; --thumb-scale: 1; position: absolute; top: 50%; left: 0; transform: translateX(calc(var(--thumb-pct) - 50%)) translateY(-50%) scale(var(--thumb-scale)); width: clamp(0.75rem, 1.5vw, 1rem); height: clamp(0.75rem, 1.5vw, 1rem); border: 2px solid #ffffff; background: #ffffff; border-radius: 9999px; opacity: 1; transition: box-shadow 200ms ease; }
+    .seekbar-track:hover .seekbar-thumb { --thumb-scale: 1.35; }
     
     .seekbar-time-end { color: rgba(255,255,255,0.7); font-size: clamp(0.8rem, 1vw, 0.9rem); font-variant-numeric: tabular-nums; width: clamp(2.5rem, 4vw, 3rem); text-align: right; }
 
@@ -478,6 +478,7 @@ export class PlayerControlsElement extends LitElement {
 
       if (this.showControls) {
         this._restartControlsHideTimer();
+        this._syncSeekbarNow();
 
         if (this._restoreFocusOnShow) {
           this._restoreFocusOnShow = false;
@@ -522,8 +523,8 @@ export class PlayerControlsElement extends LitElement {
                    role="slider" aria-label="Barra de progreso" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                 <div class="seekbar-track" data-seekbar-track>
                   <div class="seekbar-track-bg">
-                    <div class="seekbar-buffered" data-buffered style="width: 0%;"></div>
-                    <div class="seekbar-fill" data-fill style="width: 0%;"></div>
+                    <div class="seekbar-buffered" data-buffered style="transform: scaleX(0);"></div>
+                    <div class="seekbar-fill" data-fill style="transform: scaleX(0);"></div>
                   </div>
                   <div class="seekbar-thumb" data-thumb></div>
                 </div>
@@ -1000,7 +1001,12 @@ export class PlayerControlsElement extends LitElement {
     let nextTickTime = 0;
 
     const update = () => {
-      if (video.paused) {
+      if (!this.showControls) {
+        this.rafId = requestAnimationFrame(update);
+        return;
+      }
+
+      if (video.paused && !this._isSeeking) {
         this.rafId = requestAnimationFrame(update);
         return;
       }
@@ -1036,12 +1042,12 @@ export class PlayerControlsElement extends LitElement {
 
         const els = this._cacheSeekbarEls();
 
-        if (els.fill) els.fill.style.width = `${pct}%`;
+        if (els.fill) els.fill.style.transform = `scaleX(${pct / 100})`;
         if (Math.abs(bufferedPct - lastBufferedPct) > 0.5 && els.buffered) {
           lastBufferedPct = bufferedPct;
-          els.buffered.style.width = `${bufferedPct}%`;
+          els.buffered.style.transform = `scaleX(${bufferedPct / 100})`;
         }
-        if (els.thumb) els.thumb.style.left = `${pct}%`;
+        if (els.thumb) els.thumb.style.setProperty('--thumb-pct', `${pct}%`);
 
         if (els.seekbar) {
           els.seekbar.setAttribute('aria-valuenow', String(Math.round(pct)));
@@ -1051,6 +1057,30 @@ export class PlayerControlsElement extends LitElement {
       this.rafId = requestAnimationFrame(update);
     };
     this.rafId = requestAnimationFrame(update);
+  }
+
+  private _syncSeekbarNow() {
+    if (!this.videoEl) return;
+    const video = this.videoEl;
+    const dur = video.duration || 0;
+    const ct = video.currentTime;
+    const pct = dur > 0 ? (ct / dur) * 100 : 0;
+
+    const els = this._cacheSeekbarEls();
+    if (els.timeLabel) els.timeLabel.textContent = formatTime(ct);
+    if (els.fill) els.fill.style.transform = `scaleX(${pct / 100})`;
+    if (els.thumb) els.thumb.style.setProperty('--thumb-pct', `${pct}%`);
+
+    if (video.buffered.length > 0) {
+      const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+      const bufferedPct = dur > 0 ? (bufferedEnd / dur) * 100 : 0;
+      if (els.buffered) els.buffered.style.transform = `scaleX(${bufferedPct / 100})`;
+    }
+
+    if (els.seekbar) {
+      els.seekbar.setAttribute('aria-valuenow', String(Math.round(pct)));
+      els.seekbar.setAttribute('aria-valuetext', `${formatTime(ct)} de ${formatTime(dur)}`);
+    }
   }
 
   private _startLogicTimer() {
