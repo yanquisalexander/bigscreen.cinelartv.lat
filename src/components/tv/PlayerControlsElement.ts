@@ -163,7 +163,9 @@ export class PlayerControlsElement extends LitElement {
     
     .seekbar-track-bg { position: absolute; inset: 0; margin: auto; width: 100%; height: clamp(0.25rem, 0.5vw, 0.375rem); background: rgba(255,255,255,0.16); border-radius: 9999px; transition: height 200ms ease; }
     .seekbar-buffered { position: absolute; inset: 0; left: 0; background: rgba(255,255,255,0.12); border-radius: 9999px; width: 100%; transform-origin: left; }
-    .seekbar-fill { position: absolute; inset: 0; left: 0; background: linear-gradient(to right, #f03 80%, #ff2791 100%); border-radius: 9999px; width: 100%; transform-origin: left; }
+    .seekbar-fill { position: absolute; inset: 0; left: 0; background: #f1f1f1; border-radius: 9999px; width: 100%; transform-origin: left; transition: background 200ms ease; }
+    .seekbar-focus[data-focused="true"] .seekbar-fill { background: linear-gradient(to right, #f03 80%, #ff2791 100%); }
+    .seekbar-track:hover .seekbar-fill { background: linear-gradient(to right, #f03 80%, #ff2791 100%); }
     
     .seekbar-thumb { --thumb-pct: 0%; --thumb-scale: 1; position: absolute; top: 50%; left: 0; transform: translateX(calc(var(--thumb-pct) - 50%)) translateY(-50%) scale(var(--thumb-scale)); width: clamp(0.75rem, 1.5vw, 1rem); height: clamp(0.75rem, 1.5vw, 1rem); border: 2px solid #ffffff; background: #ffffff; border-radius: 9999px; display: none; transition: box-shadow 200ms ease; }
     .seekbar-focus[data-focused="true"] .seekbar-thumb { display: block; --thumb-scale: 1.3; }
