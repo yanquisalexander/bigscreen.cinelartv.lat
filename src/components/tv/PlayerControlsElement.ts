@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { SpatialNavigation, getCurrentFocusKey, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
 import { FocusableRegistrar } from './spatialFocus';
-import { formatTime, resolveImageUrl } from '@/utils/helpers';
+import { formatTime, resolveEpisodeThumbnail } from '@/utils/helpers';
 import type { Segment } from '@/types/content';
 import type { FlatEpisode } from './RailEpisodeItem';
 import { ctvIconSheet } from '@/lib/ctvIcons';
@@ -157,11 +157,12 @@ export class PlayerControlsElement extends LitElement {
     .episode-rail { display: flex; flex-direction: column; max-height: 0; min-height: 0; overflow: hidden; opacity: 0; transform: translateY(0.5rem); transition: opacity 180ms ease, transform 180ms ease; pointer-events: none; }
     .episode-rail[data-expanded="true"] { max-height: clamp(14rem, 28vh, 19rem); opacity: 1; transform: translateY(0); pointer-events: auto; }
     
-    .episode-rail-list { display: flex; align-items: flex-start; gap: clamp(0.75rem, 1.5vw, 1.25rem); overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; padding: clamp(0.35rem, 0.8vh, 0.55rem) 0.25rem; }
-    .episode-rail-list::-webkit-scrollbar { display: none; }
+    .episode-rail-viewport { position: relative; width: 100%; height: clamp(10rem, 20vh, 14rem); overflow: hidden; padding: clamp(0.35rem, 0.8vh, 0.55rem) 0; }
+    .episode-rail-track { position: absolute; height: 100%; width: 100%; transition: transform 200ms cubic-bezier(0.26, 0.86, 0.44, 0.985); }
     
-    .episode-card { flex: 0 0 clamp(156px, 18vw, 230px); display: block; box-sizing: border-box; margin: 0; padding: 0; outline: 0; color: #fff; text-align: left; cursor: pointer; scroll-snap-align: center; transform: translateZ(0); transition: transform 200ms ease-out, opacity 200ms ease-out; }
-    .episode-card[data-focused="true"] { transform: scale(1.05); }
+    .episode-card { position: absolute; left: 0; top: 0; display: block; box-sizing: border-box; margin: 0; padding: 0; outline: 0; color: #fff; text-align: left; cursor: pointer; transform: translateX(var(--ep-x, 0px)); transition: opacity 200ms ease; opacity: 1; }
+    .episode-card[data-focused="true"] { z-index: 2; }
+    .episode-card[data-partial="true"] { opacity: 0.3; }
     
     .episode-thumb { display: block; position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 2px solid transparent; border-radius: 0.75rem; background: #262626; }
     .episode-card[data-focused="true"] .episode-thumb { border-color: #fff; }
@@ -249,6 +250,16 @@ export class PlayerControlsElement extends LitElement {
   @state() private _allEpisodes!: FlatEpisode[];
   @state() private _renderedEpisodeKeys!: string[];
 
+  private _virtualScrollLeft = 0;
+  private _virtualViewportWidth = 0;
+  private _virtualItemWidth = 0;
+  private _virtualGap = 0;
+  private _virtualOverscan = 2;
+  private _virtualViewportEl: HTMLElement | null = null;
+  private _virtualTrackEl: HTMLElement | null = null;
+  private _virtualResizeObserver: ResizeObserver | null = null;
+  private _virtualMetricsComputed = false;
+
   private _onPlay: (() => void) | null = null;
   private _onPause: (() => void) | null = null;
   private _onWaiting: (() => void) | null = null;
@@ -329,13 +340,19 @@ export class PlayerControlsElement extends LitElement {
     this._stopAllTimers();
     this._teardownVideo();
     this.registrar.unregisterAll();
-    
+
     const keyHandler = (this as any)._keyHandler;
     if (keyHandler) {
       window.removeEventListener('keydown', keyHandler, true);
       (this as any)._keyHandler = null;
     }
     this._teardownSeekbarHoldHandler();
+
+    if (this._virtualResizeObserver) {
+      this._virtualResizeObserver.disconnect();
+      this._virtualResizeObserver = null;
+    }
+
     this.removeEventListener('enter-press', this._handleEnterPress);
     this.removeEventListener('focus-gained', this._handleFocusGained);
     this.removeEventListener('focus-lost', this._handleFocusLost);
@@ -367,6 +384,10 @@ export class PlayerControlsElement extends LitElement {
       this._allEpisodes = this.episodes.episodes;
       this._currentEpisodeId = this.episodes.currentId;
       this.contentId = this.episodes.contentId;
+
+      if (this._allEpisodes.length > 0 && !this._virtualMetricsComputed) {
+        requestAnimationFrame(() => this._computeVirtualMetrics());
+      }
     }
 
     if (changedProperties.has('settingsOpen')) {
@@ -411,6 +432,11 @@ export class PlayerControlsElement extends LitElement {
 
     if (changedProperties.has('railExpanded')) {
       this._restartControlsHideTimer();
+      if (this.railExpanded && !this._virtualMetricsComputed) {
+        // Safety net in case the rail was expanded before metrics were
+        // ready (e.g. episodes arrived on the same tick).
+        requestAnimationFrame(() => this._computeVirtualMetrics());
+      }
     }
   }
 
@@ -477,9 +503,7 @@ export class PlayerControlsElement extends LitElement {
             </div>
 
             <div class="episode-rail" data-episode-rail data-expanded=${this.railExpanded} aria-label="Episodios">
-              <div class="episode-rail-list" data-episode-list>
-                ${this.showControls ? this._renderEpisodeList() : ''}
-              </div>
+              ${this.showControls ? this._renderEpisodeList() : ''}
             </div>
           </div>
         </div>
@@ -499,7 +523,7 @@ export class PlayerControlsElement extends LitElement {
       ${this.nextEpisode && this._nextShowing ? html`
         <div class="next-card" data-next-card>
           ${this.nextEpisode.thumbnail ? html`
-            <img src=${resolveImageUrl(this.nextEpisode.thumbnail, this.clientEndpoint) || ''} />
+            <img src=${resolveEpisodeThumbnail(this.nextEpisode.images, this.nextEpisode.thumbnail_resized ?? this.nextEpisode.thumbnail, this.clientEndpoint) || ''} />
           ` : html`
             <div class="placeholder-thumb">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -538,12 +562,24 @@ export class PlayerControlsElement extends LitElement {
 
   private _renderEpisodeCard(episode: FlatEpisode, index: number, hasMultipleSeasons: boolean) {
     const isCurrent = String(episode.id) === String(this._currentEpisodeId);
-    const imageUrl = resolveImageUrl(episode.thumbnail, this.clientEndpoint);
+    const imageUrl = resolveEpisodeThumbnail(episode.images, episode.thumbnail_resized ?? episode.thumbnail, this.clientEndpoint);
+    const itemW = this._virtualItemWidth || 180;
+    const gap = this._virtualGap || 12;
+    const x = index * (itemW + gap);
+    const vpW = this._virtualViewportWidth || (typeof window !== 'undefined' ? window.innerWidth : 1280);
+    const itemStart = x;
+    const itemEnd = x + itemW;
+    const vpStart = this._virtualScrollLeft;
+    const vpEnd = this._virtualScrollLeft + vpW;
+    const isPartial = itemStart < vpStart || itemEnd > vpEnd;
 
     return html`
       <div class="episode-card"
            data-focused="false"
            data-current=${isCurrent}
+           data-partial=${isPartial || undefined}
+           data-episode-index=${index}
+           style="width: ${itemW}px; --ep-x: ${x}px;"
            role="button"
            tabindex="-1"
            aria-label="Episodio ${index + 1}: ${episode.title}"
@@ -561,21 +597,124 @@ export class PlayerControlsElement extends LitElement {
   private _handleEpisodeCardClick = (e: Event) => {
     const target = e.composedPath().find((el): el is HTMLElement => el instanceof HTMLElement && el.classList.contains('episode-card'));
     if (!target) return;
-    const episodeId = this._allEpisodes.find((ep) => {
-      const label = target.getAttribute('aria-label') || '';
-      const match = label.match(/Episodio (\d+):/);
-      if (!match) return false;
-      const num = parseInt(match[1], 10);
-      const idx = this._allEpisodes.findIndex((ep2) => String(ep2.id) === String(ep.id));
-      return idx + 1 === num;
-    })?.id;
-    if (episodeId) this._selectEpisode(episodeId);
+    const index = parseInt(target.getAttribute('data-episode-index') || '-1', 10);
+    if (index >= 0 && index < this._allEpisodes.length) {
+      this._selectEpisode(this._allEpisodes[index].id);
+    }
   };
 
   private _renderEpisodeList() {
     if (this._allEpisodes.length === 0) return html``;
+
     const hasMultipleSeasons = new Set(this._allEpisodes.map(e => e.seasonNumber)).size > 1;
-    return html`${this._allEpisodes.map((episode, index) => this._renderEpisodeCard(episode, index, hasMultipleSeasons))}`;
+    const { start, end } = this._getVisibleRange();
+
+    return html`
+      <div class="episode-rail-viewport" data-virtual-viewport>
+        <div class="episode-rail-track" data-virtual-track
+             style="transform: translateX(${-this._virtualScrollLeft}px) translateZ(0);">
+          ${this._allEpisodes.slice(start, end).map((episode, i) => {
+      return this._renderEpisodeCard(episode, start + i, hasMultipleSeasons);
+    })}
+        </div>
+      </div>
+    `;
+  }
+
+  private _computeVirtualMetrics() {
+    this._virtualViewportEl = this.renderRoot.querySelector('[data-virtual-viewport]') as HTMLElement | null;
+    this._virtualTrackEl = this.renderRoot.querySelector('[data-virtual-track]') as HTMLElement | null;
+
+    if (!this._virtualViewportEl) return;
+
+    const temp = document.createElement('div');
+    temp.className = 'episode-card';
+    temp.style.cssText = 'position:absolute;visibility:hidden;width:clamp(156px,18vw,230px);';
+    this._virtualViewportEl.appendChild(temp);
+    this._virtualItemWidth = temp.offsetWidth;
+    this._virtualGap = parseFloat(getComputedStyle(this._virtualViewportEl).gap) || 12;
+    temp.remove();
+
+    this._virtualViewportWidth = this._virtualViewportEl.clientWidth;
+    this._virtualMetricsComputed = true;
+
+    if (!this._virtualResizeObserver) {
+      this._virtualResizeObserver = new ResizeObserver(() => {
+        if (this._virtualViewportEl) {
+          this._virtualViewportWidth = this._virtualViewportEl.clientWidth;
+        }
+      });
+      this._virtualResizeObserver.observe(this._virtualViewportEl);
+    }
+
+    this._scrollToCurrentEpisode();
+  }
+
+  private _getVisibleRange(): { start: number; end: number } {
+    const itemW = this._virtualItemWidth || 180;
+    const gap = this._virtualGap || 12;
+    const totalItemWidth = itemW + gap;
+    const vpWidth = this._virtualViewportWidth || (typeof window !== 'undefined' ? window.innerWidth : 1280);
+
+    const start = Math.max(0, Math.floor(this._virtualScrollLeft / totalItemWidth) - this._virtualOverscan);
+    const visibleCount = Math.ceil(vpWidth / totalItemWidth);
+    const end = Math.min(this._allEpisodes.length, start + visibleCount + this._virtualOverscan * 2);
+
+    return { start, end };
+  }
+
+  private _setVirtualScrollLeft(px: number) {
+    this._virtualScrollLeft = px;
+    this.requestUpdate();
+  }
+
+  private _scrollToVirtualItem(index: number) {
+    const itemWidth = this._virtualItemWidth || 180;
+    const gap = this._virtualGap || 12;
+    const step = itemWidth + gap;
+    const viewportWidth = this._virtualViewportWidth || this._virtualViewportEl?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 1280);
+    const totalWidth = Math.max(0, this._allEpisodes.length * step - gap);
+    const endPadding = itemWidth * 0.35;
+    const maxScroll = Math.max(0, totalWidth - viewportWidth + endPadding);
+
+    const x = index * step;
+    const target = Math.max(0, Math.min(x - viewportWidth / 2 + itemWidth / 2, maxScroll));
+
+    this._setVirtualScrollLeft(target);
+  }
+
+  /**
+   * Scrolls the rail so `index` is inside the rendered window, waits for
+   * that render to actually land and for spatial nav to pick up the new
+   * focusable, then focuses it.
+   *
+   * This ordering is the fix for "the rail isn't navigable": cards outside
+   * the virtualized window don't exist in the DOM, so calling
+   * SpatialNavigation.setFocus() on them before they're rendered silently
+   * fails. Every place that jumps focus into the rail goes through this.
+   */
+  private async _revealAndFocusEpisode(index: number) {
+    const episode = this._allEpisodes[index];
+    if (!episode) return;
+    const focusKey = `rail-ep-item-${episode.id}`;
+
+    this._scrollToVirtualItem(index);
+    await this.updateComplete;
+    this._syncFocusables();
+    await this._nextFrame();
+
+    try {
+      SpatialNavigation.setFocus(focusKey);
+    } catch (_err) {
+      // noop
+    }
+  }
+
+  private _scrollToCurrentEpisode() {
+    const currentIndex = this._allEpisodes.findIndex(e => String(e.id) === String(this._currentEpisodeId));
+    if (currentIndex >= 0) {
+      this._scrollToVirtualItem(currentIndex);
+    }
   }
 
   private _syncFocusables() {
@@ -594,7 +733,8 @@ export class PlayerControlsElement extends LitElement {
               if (this._allEpisodes.length > 0) {
                 this.railExpanded = true;
                 const activeEp = this._allEpisodes.find((e) => e.id === this._currentEpisodeId) ?? this._allEpisodes[0];
-                if (activeEp) requestAnimationFrame(() => SpatialNavigation.setFocus(`rail-ep-item-${activeEp.id}`));
+                const activeIndex = activeEp ? this._allEpisodes.indexOf(activeEp) : -1;
+                if (activeIndex >= 0) void this._revealAndFocusEpisode(activeIndex);
               } else {
                 this._focusControl('watch-playpause');
               }
@@ -636,8 +776,12 @@ export class PlayerControlsElement extends LitElement {
     for (const focusKey of this._renderedEpisodeKeys) this.registrar.unregister(focusKey);
     this._renderedEpisodeKeys = [];
 
+    episodeCards.forEach((card) => card.setAttribute('data-focused', 'false'));
+
     if (this.showControls && this.railExpanded && this._allEpisodes.length > 0) {
-      episodeCards.forEach((card, index) => {
+      episodeCards.forEach((card) => {
+        const index = parseInt(card.getAttribute('data-episode-index') || '-1', 10);
+        if (index < 0 || index >= this._allEpisodes.length) return;
         const episode = this._allEpisodes[index];
         if (!episode) return;
         const focusKey = `rail-ep-item-${episode.id}`;
@@ -649,14 +793,22 @@ export class PlayerControlsElement extends LitElement {
           onArrowPress: (direction: string) => {
             if (direction === 'up') { this.railExpanded = false; this._focusControl('watch-episodes'); return false; }
             if (direction === 'down') return false;
-            if (direction === 'left' && index === 0) return false;
-            if (direction === 'right' && index === this._allEpisodes.length - 1) return false;
+            if (direction === 'left') {
+              if (index === 0) return false;
+              void this._revealAndFocusEpisode(index - 1);
+              return false;
+            }
+            if (direction === 'right') {
+              if (index === this._allEpisodes.length - 1) return false;
+              void this._revealAndFocusEpisode(index + 1);
+              return false;
+            }
             return true;
           },
           onFocus: () => {
             this.railExpanded = true;
             card.setAttribute('data-focused', 'true');
-            card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            this._scrollToVirtualItem(index);
           },
           onBlur: () => {
             card.setAttribute('data-focused', 'false');
@@ -709,6 +861,9 @@ export class PlayerControlsElement extends LitElement {
 
     if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = 0; }
     this._cachedSeekbarEls = null;
+    this._virtualViewportEl = null;
+    this._virtualTrackEl = null;
+    this._virtualMetricsComputed = false;
     if (this.logicTimer) { clearInterval(this.logicTimer); this.logicTimer = null; }
   }
 
@@ -1212,7 +1367,8 @@ export class PlayerControlsElement extends LitElement {
     custom.preventDefault();
     this.railExpanded = true;
     const railFocusKey = this._resolveRailFocusKey();
-    if (railFocusKey) requestAnimationFrame(() => SpatialNavigation.setFocus(railFocusKey));
+    const railIndex = railFocusKey ? this._allEpisodes.findIndex((e) => `rail-ep-item-${e.id}` === railFocusKey) : -1;
+    if (railIndex >= 0) void this._revealAndFocusEpisode(railIndex);
   };
 
   focusPlayPause() { SpatialNavigation.setFocus('watch-playpause'); }
@@ -1235,7 +1391,8 @@ export class PlayerControlsElement extends LitElement {
     this.railExpanded = !this.railExpanded;
     if (this.railExpanded) {
       const railFocusKey = this._resolveRailFocusKey();
-      if (railFocusKey) requestAnimationFrame(() => SpatialNavigation.setFocus(railFocusKey));
+      const railIndex = railFocusKey ? this._allEpisodes.findIndex((e) => `rail-ep-item-${e.id}` === railFocusKey) : -1;
+      if (railIndex >= 0) void this._revealAndFocusEpisode(railIndex);
     } else {
       SpatialNavigation.setFocus('watch-episodes');
     }
