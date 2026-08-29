@@ -71,12 +71,17 @@ export class CinelarPlayerEngine {
 
       this.player.configure({
         streaming: {
-          bufferingGoal: 60,
-          rebufferingGoal: 5,
+          bufferingGoal: 30,
+          rebufferingGoal: 2,
           stallEnabled: true,
+          retryDelay: 1000,
+          maxDisabledTime: 30,
         },
         abr: {
           enabled: true,
+          switchInterval: 4,
+          bandwidthUpgradeTarget: 0.85,
+          bandwidthDowngradeTarget: 0.7,
         },
       });
 
@@ -312,18 +317,41 @@ export class CinelarPlayerEngine {
 
   public selectQuality(option: number | 'auto') {
     if (!this.player) return;
-    const currentAudioTracks = this.player.getAudioTracks();
-    const activeAudioIndex = currentAudioTracks?.findIndex((t: any) => t.active) ?? -1;
+
     if (option === 'auto') {
       this.player.configure({ abr: { enabled: true } });
       return;
     }
+
+    const video = this.videoElement;
+    if (!video) return;
+
+    // Save active audio before switching
+    const currentAudioTracks = this.player.getAudioTracks();
+    const activeAudioIndex = currentAudioTracks?.findIndex((t: any) => t.active) ?? -1;
+
     this.player.configure({ abr: { enabled: false } });
+
     const candidates = this.player.getVariantTracks().filter((v: any) => v.height === option);
-    if (candidates.length) {
-      candidates.sort((a: any, b: any) => (b.bandwidth || 0) - (a.bandwidth || 0));
-      this.player.selectVariantTrack(candidates[0], true);
+    if (!candidates.length) return;
+
+    candidates.sort((a: any, b: any) => (b.bandwidth || 0) - (a.bandwidth || 0));
+
+    // Check buffered enough for safe switch (avoid glitch on low-end TVs)
+    const buffered = video.buffered;
+    const currentTime = video.currentTime || 0;
+    let hasBuffer = false;
+    for (let i = 0; i < buffered.length; i++) {
+      if (buffered.start(i) <= currentTime && buffered.end(i) - currentTime >= 2) {
+        hasBuffer = true;
+        break;
+      }
     }
+
+    // false = switch at next safe point (no glitch)
+    this.player.selectVariantTrack(candidates[0], !hasBuffer);
+
+    // Restore audio track
     if (activeAudioIndex >= 0) {
       const tracks = this.player.getAudioTracks();
       if (tracks && tracks[activeAudioIndex]) {
