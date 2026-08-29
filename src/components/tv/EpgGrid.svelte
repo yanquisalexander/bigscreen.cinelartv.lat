@@ -447,17 +447,15 @@
                 onEnterPress={() => handleRowEnter(row.channel)}
                 onArrowPress={(direction) => handleRowArrow(direction, rowIdx)}
                 onFocus={handleFocusScroll}
-                focusedClass={!canAnimate ? '!z-20' : '!z-20 scale-[1.01]'}
-                class="absolute inset-y-1.5 left-2 right-2 rounded-lg cursor-pointer transition-transform"
-                style="transition-duration: var(--animation-duration);"
+                focusedClass="!z-20"
+                class="absolute inset-y-1.5 left-2 right-2 rounded-lg cursor-pointer"
                 playSound={true}
               >
                 {#snippet children({ focused })}
                   <div
-                    class="w-full h-full rounded-lg border flex items-center px-4 transition-all {focused
+                    class="w-full h-full rounded-lg border flex items-center px-4 {focused
                       ? 'border-white bg-white text-black shadow-lg shadow-black/30'
                       : 'border-white/5 bg-[#1d1d1f]/40 text-white/30 border-dashed'}"
-                    style="transition-duration: var(--animation-duration);"
                   >
                     <p class="truncate font-semibold text-[clamp(0.75rem,0.9vw,0.85rem)] leading-none">
                       Sin programación disponible
@@ -473,17 +471,16 @@
                   onEnterPress={() => handleRowEnter(row.channel)}
                   onArrowPress={(direction) => handleRowArrow(direction, rowIdx)}
                   onFocus={handleFocusScroll}
-                  focusedClass={!canAnimate ? '!z-20' : '!z-20 scale-[1.01]'}
-                  class="absolute top-1.5 bottom-1.5 px-1 cursor-pointer transition-transform"
-                  style="left: {block.left}px; width: {block.width}px; transition-duration: var(--animation-duration);"
+                  focusedClass="!z-20"
+                  class="absolute top-1.5 bottom-1.5 px-1 cursor-pointer"
+                  style="left: {block.left}px; width: {block.width}px;"
                   playSound={true}
                 >
                   {#snippet children({ focused })}
                     <div
-                      class="w-full h-full rounded-lg border flex items-center px-4 transition-all {focused
+                      class="w-full h-full rounded-lg border flex items-center px-4 {focused
                         ? 'border-white bg-white text-black shadow-lg shadow-black/30'
                         : 'border-white/5 bg-[#1d1d1f] text-white/90 hover:bg-[#232326]'}"
-                      style="transition-duration: var(--animation-duration);"
                     >
                       <p class="truncate font-semibold text-[clamp(0.75rem,0.9vw,0.85rem)] leading-none">
                         {block.program.title}
