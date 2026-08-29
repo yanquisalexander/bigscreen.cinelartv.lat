@@ -43,10 +43,7 @@
   let guideState = $state<Record<string, 'loading' | 'ready' | 'error'>>({});
   let scrollEl = $state<HTMLDivElement | null>(null);
   let headerOffsetX = $state(0);
-  let scrollTop = $state(0);
   let rafId = 0;
-
-  const BUFFER_ROWS = 5;
 
   const { appQuality } = getRuntimeConfig();
   const canAnimate = appQuality !== 'LITE';
@@ -171,21 +168,6 @@
     });
   });
 
-  // --- Virtualization: only render visible rows + buffer ---
-  const visibleRange = $derived.by(() => {
-    const total = channelBlocks.length;
-    if (total === 0) return { start: 0, end: 0 };
-    const start = Math.max(0, Math.floor(scrollTop / ROW_H) - BUFFER_ROWS);
-    const visibleCount = Math.ceil((scrollEl?.clientHeight ?? 600) / ROW_H);
-    const end = Math.min(total, start + visibleCount + BUFFER_ROWS * 2);
-    return { start, end };
-  });
-
-  const visibleChannelBlocks = $derived(channelBlocks.slice(visibleRange.start, visibleRange.end));
-  const totalHeight = $derived(channelBlocks.length * ROW_H);
-  const spacerTop = $derived(visibleRange.start * ROW_H);
-  const spacerBottom = $derived((channelBlocks.length - visibleRange.end) * ROW_H);
-
   const blockKey = (channelId: string, program: LiveTvProgram, left: number) =>
     `epg-${channelId}-${program.id}-${left}`;
 
@@ -223,16 +205,16 @@
     const containerRect = container.getBoundingClientRect();
     const focusedRect = focused.getBoundingClientRect();
 
+    // Vertical: center the focused row
     const offsetY = focusedRect.top - containerRect.top;
     const targetY = container.scrollTop + offsetY - (containerRect.height / 2) + (focusedRect.height / 2);
+    container.scrollTo({ top: targetY, behavior: canAnimate ? 'smooth' : 'auto' });
 
-    let targetX = container.scrollLeft;
-    if (focusedRect.width < containerRect.width) {
-      const offsetX = focusedRect.left - containerRect.left;
-      targetX = container.scrollLeft + offsetX - (containerRect.width / 2) + (focusedRect.width / 2);
+    // Horizontal: only scroll if the element is off-screen (let spatial nav handle the rest)
+    if (focusedRect.right < containerRect.left || focusedRect.left > containerRect.right) {
+      const targetX = container.scrollLeft + focusedRect.left - containerRect.left - (containerRect.width / 2) + (focusedRect.width / 2);
+      container.scrollTo({ left: targetX, behavior: canAnimate ? 'smooth' : 'auto' });
     }
-
-    container.scrollTo({ top: targetY, left: targetX, behavior: canAnimate ? 'smooth' : 'auto' });
   }
 
   function handleFocusScroll() {
@@ -249,7 +231,6 @@
     cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(() => {
       headerOffsetX = scrollEl?.scrollLeft ?? 0;
-      scrollTop = scrollEl?.scrollTop ?? 0;
     });
   }
 
@@ -313,13 +294,8 @@
           <div class="h-full w-[2px] bg-live/80"></div>
         </div>
       {/if}
-      <!-- Spacer top -->
-      {#if spacerTop > 0}
-        <div style="height: {spacerTop}px;"></div>
-      {/if}
-      <!-- Visible channel rows -->
-      {#each visibleChannelBlocks as { channel, blocks, state }, vIdx (channel.id)}
-        {@const rowIdx = visibleRange.start + vIdx}
+      <!-- Channel rows -->
+      {#each channelBlocks as { channel, blocks, state }, rowIdx (channel.id)}
         <div class="flex border-b border-white/5" style="height: {ROW_H}px;">
           <!-- Channel label (sticky left) -->
           <div
@@ -415,10 +391,6 @@
           </div>
         </div>
       {/each}
-      <!-- Spacer bottom -->
-      {#if spacerBottom > 0}
-        <div style="height: {spacerBottom}px;"></div>
-      {/if}
     </div>
   </div>
 </div>
