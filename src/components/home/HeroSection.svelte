@@ -112,6 +112,18 @@
     };
   });
 
+  // Preload trailer during focus delay (before immersive mode)
+  // This gives the browser time to buffer while user sees the banner
+  $effect(() => {
+    const video = videoEl;
+    if (!video || !hasTrailer || !hasFocusedChild || showTrailer || !trailerUrl) return;
+
+    if (video.getAttribute('src') !== trailerUrl) {
+      video.src = trailerUrl;
+      video.load();
+    }
+  });
+
   // Trailer trigger timer
   $effect(() => {
     // Reiniciar el timer al cambiar de item (incluso si ambos tienen trailer)
