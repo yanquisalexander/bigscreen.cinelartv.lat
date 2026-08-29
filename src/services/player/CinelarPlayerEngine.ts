@@ -36,12 +36,32 @@ export class CinelarPlayerEngine {
   private loadToken = 0;
 
   private playRetried = false;
+  private _maxHeight = 1080;
 
   constructor(videoElement: HTMLVideoElement) {
     this.videoElement = videoElement;
     pdbg('engine.constructor', 'video element received');
     instrumentVideo(videoElement);
     this.initShaka();
+  }
+
+  private async _detectMaxHeight(): Promise<number> {
+    try {
+      const mc = (navigator as any).mediaCapabilities;
+      if (mc?.decodingInfo) {
+        const result = await mc.decodingInfo({
+          type: 'media-source',
+          video: { contentType: 'video/mp4; codecs="avc1.640028"', width: 3840, height: 2160, bitrate: 20000000, framerate: 60 },
+        });
+        if (result?.supported) return 2160;
+      }
+    } catch { /* noop */ }
+
+    const h = Math.max(screen.height, screen.width);
+    if (h >= 2160) return 2160;
+    if (h >= 1440) return 1440;
+    if (h >= 1080) return 1080;
+    return 720;
   }
 
   private initShaka() {
@@ -69,19 +89,47 @@ export class CinelarPlayerEngine {
     try {
       this.player = new shaka.Player();
 
+      this._detectMaxHeight().then((maxH) => {
+        this._maxHeight = maxH;
+        pdbg('engine.initShaka', 'maxHeight detected', maxH);
+        this.player!.configure({
+          abr: { restrictions: { maxHeight: maxH } },
+        });
+      });
+
       this.player.configure({
         streaming: {
-          bufferingGoal: 30,
-          rebufferingGoal: 2,
+          bufferingGoal: 15,
+          rebufferingGoal: 1,
+          bufferBehind: 30,
           stallEnabled: true,
-          retryDelay: 1000,
+          segmentPrefetchLimit: 2,
           maxDisabledTime: 30,
+          retryParameters: {
+            maxAttempts: 4,
+            baseDelay: 1000,
+            backoffFactor: 2,
+            fuzzFactor: 0.5,
+            timeout: 0,
+          },
         },
         abr: {
           enabled: true,
-          switchInterval: 4,
+          switchInterval: 8,
           bandwidthUpgradeTarget: 0.85,
-          bandwidthDowngradeTarget: 0.7,
+          bandwidthDowngradeTarget: 0.85,
+          defaultBandwidthEstimate: 1000000,
+        },
+        preferredAudioLanguage: 'es',
+        preferredTextLanguage: 'es',
+        manifest: {
+          retryParameters: {
+            maxAttempts: 4,
+            baseDelay: 1000,
+            backoffFactor: 2,
+            fuzzFactor: 0.5,
+            timeout: 0,
+          },
         },
       });
 
