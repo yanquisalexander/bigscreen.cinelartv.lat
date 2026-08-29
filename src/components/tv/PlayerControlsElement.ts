@@ -34,12 +34,31 @@ export class PlayerControlsElement extends LitElement {
 
     .controls-overlay {
       position: absolute;
-      inset: 0;
-      transition: opacity 300ms ease;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      overflow: visible;
+      transition: transform 350ms cubic-bezier(0.4, 0, 0.2, 1);
       pointer-events: auto;
     }
 
     .controls-overlay.hidden {
+      pointer-events: none;
+    }
+
+    :host([rail-expanded]) .controls-overlay {
+      transform: translateY(clamp(-6rem, -10vh, -8rem));
+    }
+
+    :host(.controls-hidden) .controls-overlay {
+      pointer-events: none;
+    }
+
+    :host([rail-expanded]) .bottom-scrim,
+    :host(.controls-hidden) .bottom-scrim {
       opacity: 0;
       pointer-events: none;
     }
@@ -55,17 +74,19 @@ export class PlayerControlsElement extends LitElement {
       letter-spacing: 0.02em;
       opacity: 1;
       pointer-events: none;
-      transition: opacity 180ms ease;
+      transition: opacity 180ms ease, transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     :host(.controls-hidden) .player-watermark { opacity: 0.25; }
+    :host(.controls-hidden) .top-scrim { opacity: 0; }
+    :host([rail-expanded]) .player-watermark { opacity: 0; transform: translateY(-0.5rem); }
 
     .top-scrim {
       position: absolute;
+      top: 0;
       left: 0;
       right: 0;
-      top: 0;
-      width: 100%;
+      z-index: 2;
       box-sizing: border-box;
       background: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.3), transparent);
       padding: clamp(1.25rem, 3.4vh, 2rem) clamp(2rem, 4vw, 3rem);
@@ -73,6 +94,12 @@ export class PlayerControlsElement extends LitElement {
       align-items: flex-start;
       justify-content: space-between;
       gap: clamp(1rem, 2vw, 1.5rem);
+      pointer-events: none;
+      transition: opacity 300ms ease;
+    }
+
+    :host([rail-expanded]) .top-scrim {
+      opacity: 0;
     }
 
     .top-title { margin-top: clamp(1rem, 3vh, 1.75rem); max-width: 60vw; }
@@ -87,7 +114,6 @@ export class PlayerControlsElement extends LitElement {
       margin-top: clamp(0.25rem, 0.6vh, 0.5rem);
       flex-shrink: 0;
       max-height: clamp(3.5rem, 6vw, 4rem);
-      transition: opacity 250ms ease;
     }
 
     .controls-row-left, .controls-row-right { display: flex; align-items: center; gap: clamp(0.5rem, 1vw, 0.75rem); flex: 1; }
@@ -124,14 +150,11 @@ export class PlayerControlsElement extends LitElement {
     .control-btn.play-pause-btn svg { width: clamp(1.3rem, 2.4vw, 1.5rem); height: clamp(1.3rem, 2.4vw, 1.5rem); fill: currentColor; stroke: none; }
 
     .bottom-scrim {
-      position: absolute;
-      inset-x: 0;
-      bottom: 0;
       width: 100%;
       box-sizing: border-box;
-      background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.4), transparent);
-      padding: clamp(1.5rem, 3.5vh, 2.5rem) clamp(2rem, 4vw, 3rem) clamp(1.5rem, 4vh, 2.5rem);
+      padding: clamp(0.5rem, 1vh, 0.75rem) clamp(2rem, 4vw, 3rem) clamp(0.5rem, 1vh, 0.75rem);
       pointer-events: auto;
+      transition: opacity 300ms ease;
     }
 
     .seekbar-time { color: rgba(255,255,255,0.9); font-size: clamp(0.8rem, 1vw, 0.9rem); font-variant-numeric: tabular-nums; width: clamp(2.5rem, 4vw, 3rem); text-align: right; }
@@ -154,42 +177,79 @@ export class PlayerControlsElement extends LitElement {
 
     .episodes-container { display: flex; flex-direction: column; width: 100%; pointer-events: auto; }
     
-    .episode-rail { display: flex; flex-direction: column; max-height: 0; min-height: 0; overflow: hidden; opacity: 0; transform: translateY(0.5rem); transition: opacity 180ms ease, transform 180ms ease; pointer-events: none; }
-    .episode-rail[data-expanded="true"] { max-height: clamp(14rem, 28vh, 19rem); opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .episode-rail {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: clamp(8rem, 16vh, 11rem);
+      padding: 0 clamp(2rem, 4vw, 3rem);
+      margin-top: clamp(0.5rem, 1.2vh, 0.8rem);
+      pointer-events: auto;
+      opacity: 0.4;
+      transition: opacity 300ms ease;
+    }
+
+    :host([rail-expanded]) .episode-rail {
+      opacity: 1;
+    }
+
+    :host([rail-expanded]) .episode-rail-viewport {
+      overflow: visible;
+    }
+
+    :host(.controls-hidden) .episode-rail {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .episode-rail[hidden] { display: none !important; }
     
-    .episode-rail-viewport { position: relative; width: 100%; height: clamp(10rem, 20vh, 14rem); overflow: hidden; padding: clamp(0.35rem, 0.8vh, 0.55rem) 0; }
-    .episode-rail-track { position: absolute; height: 100%; width: 100%; transition: transform 200ms cubic-bezier(0.26, 0.86, 0.44, 0.985); }
+    .episode-rail-viewport { position: relative; width: 100%; height: 100%; overflow: hidden; padding: clamp(0.35rem, 0.8vh, 0.55rem) 0; }
+    .episode-rail-track { position: absolute; height: 100%; width: 100%; top: 0; left: 0; transform: translateY(clamp(8rem, 16vh, 10.5rem)); transition: transform 300ms cubic-bezier(0.26, 0.86, 0.44, 0.985); }
     
-    .episode-card { position: absolute; left: 0; top: 0; display: block; box-sizing: border-box; margin: 0; padding: 0; outline: 0; color: #fff; text-align: left; cursor: pointer; transform: translateX(var(--ep-x, 0px)); transition: opacity 200ms ease; opacity: 1; }
+    :host([rail-expanded]) .episode-rail-track {
+      transform: translateY(0);
+    }
+    
+    .episode-card { position: absolute; left: 0; top: 0; display: block; box-sizing: border-box; margin: 0; padding: 0; outline: 0; color: #fff; text-align: left; cursor: pointer; transform: translateX(var(--ep-x, 0px)); transition: opacity 200ms ease, border-color 200ms ease; opacity: 1; }
     .episode-card[data-focused="true"] { z-index: 2; }
     .episode-card[data-partial="true"] { opacity: 0.3; }
     
-    .episode-thumb { display: block; position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 2px solid transparent; border-radius: 0.75rem; background: #262626; }
-    .episode-card[data-focused="true"] .episode-thumb { border-color: #fff; }
+    .episode-thumb { display: block; position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 2px solid transparent; border-radius: 0.75rem; background: #262626; transition: border-color 200ms ease, transform 250ms cubic-bezier(0.4, 0, 0.2, 1); }
+    .episode-card[data-focused="true"] .episode-thumb { border-color: #fff; transform: scale(1.03); }
     .episode-card[data-current="true"] .episode-thumb { border-color: rgba(255,255,255,0.55); }
     .episode-card[data-focused="true"][data-current="true"] .episode-thumb { border-color: #fff; }
     .episode-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .episode-thumb::after { content: ''; position: absolute; inset: 45% 0 0; background: linear-gradient(to top, rgba(0,0,0,0.35), transparent); }
+    .episode-thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%); pointer-events: none; }
     
-    .episode-card-title { display: block; box-sizing: border-box; width: 100%; margin: 0.4rem 0 0; color: rgba(255,255,255,0.9); font-size: clamp(0.75rem, 1.1vw, 0.875rem); font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .episode-card-title { display: block; box-sizing: border-box; width: 100%; margin: 0.4rem 0 0; color: rgba(255,255,255,0.9); font-size: clamp(0.75rem, 1.1vw, 0.875rem); font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: white-space 200ms ease; }
+    :host([rail-expanded]) .episode-card-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+    .episode-card-desc { display: none; width: 100%; margin: 0.25rem 0 0; color: rgba(255,255,255,0.45); font-size: clamp(0.65rem, 0.85vw, 0.75rem); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; }
+    :host([rail-expanded]) .episode-card-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .episode-card[data-focused="true"] .episode-card-desc { color: rgba(255,255,255,0.6); }
+
+    .episode-badge { position: absolute; top: clamp(0.35rem, 0.6vh, 0.5rem); left: clamp(0.35rem, 0.6vw, 0.5rem); z-index: 2; background: rgba(0,0,0,0.6); color: #fff; font-size: clamp(0.55rem, 0.7vw, 0.65rem); font-weight: 600; padding: clamp(0.1rem, 0.2vh, 0.15rem) clamp(0.3rem, 0.5vw, 0.4rem); border-radius: clamp(0.2rem, 0.4vw, 0.25rem); pointer-events: none; }
+
+    .episode-playing-label { position: absolute; bottom: clamp(0.35rem, 0.6vh, 0.5rem); left: clamp(0.35rem, 0.6vw, 0.5rem); z-index: 2; color: #fff; font-size: clamp(0.55rem, 0.7vw, 0.65rem); font-weight: 500; pointer-events: none; }
 
     .seekbar-view { display: flex; align-items: center; gap: clamp(0.75rem, 1.5vw, 1rem); height: clamp(2.25rem, 3.5vh, 2.75rem); max-height: clamp(2.25rem, 3.5vh, 2.75rem); flex-shrink: 0; transition: opacity 250ms ease; pointer-events: auto; }
-    .seekbar-view.hidden { opacity: 0; max-height: 0; pointer-events: none; }
-    .controls-row.hidden { opacity: 0; max-height: 0; pointer-events: none; }
+    .seekbar-view.hidden { opacity: 0; pointer-events: none; }
+    .controls-row.hidden { opacity: 0; pointer-events: none; }
 
     .expanded-view { display: flex; flex-direction: column; justify-content: center; flex-shrink: 0; max-height: clamp(80px, 12vh, 100px); padding-bottom: clamp(0.25rem, 0.6vh, 0.5rem); transition: opacity 250ms ease, transform 250ms ease; transform-origin: left center; pointer-events: auto; }
     .expanded-view[data-focused="false"] { opacity: 0.78; transform: scale(0.96); }
     .expanded-view[data-focused="true"] { opacity: 1; transform: scale(1); }
-    .expanded-view.hidden { opacity: 0; max-height: 0; padding-bottom: 0; pointer-events: none; }
+    .expanded-view.hidden { opacity: 0; pointer-events: none; }
     .expanded-view .ep-num { font-size: clamp(0.65rem, 0.8vw, 0.7rem); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); margin-bottom: clamp(0.25rem, 0.5vh, 0.5rem); }
     .expanded-view h3 { color: #ffffff; font-size: clamp(0.9rem, 1vw, 1rem); font-weight: 500; line-height: 1.3; }
     .expanded-view p { color: rgba(255,255,255,0.4); font-size: clamp(0.6875rem, 0.85vw, 0.75rem); line-height: 1.3; margin-top: 0.25rem; }
 
-    .skip-btn { position: absolute; bottom: clamp(7rem, 16vh, 11rem); right: clamp(2rem, 4vw, 3rem); z-index: 25; display: flex; align-items: center; gap: clamp(0.5rem, 1vw, 0.75rem); padding: clamp(0.625rem, 1.2vw, 0.75rem) clamp(1rem, 2vw, 1.5rem); background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); border-radius: clamp(0.75rem, 1.5vw, 1rem); color: #000000; font-size: clamp(0.875rem, 1.1vw, 1rem); font-weight: 600; cursor: pointer; outline: none; pointer-events: auto; }
+    .skip-btn { position: absolute; bottom: clamp(10rem, 20vh, 14rem); right: clamp(2rem, 4vw, 3rem); z-index: 25; display: flex; align-items: center; gap: clamp(0.5rem, 1vw, 0.75rem); padding: clamp(0.625rem, 1.2vw, 0.75rem) clamp(1rem, 2vw, 1.5rem); background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); border-radius: clamp(0.75rem, 1.5vw, 1rem); color: #000000; font-size: clamp(0.875rem, 1.1vw, 1rem); font-weight: 600; cursor: pointer; outline: none; pointer-events: auto; }
     .skip-btn[data-focused="true"] { scale: 1.05; box-shadow: 0 0 0 4px #ffffff; }
     .skip-btn .chevron { width: clamp(1rem, 1.5vw, 1.25rem); height: clamp(1rem, 1.5vw, 1.25rem); }
 
-    .next-card { position: absolute; bottom: clamp(7rem, 16vh, 11rem); right: clamp(2rem, 4vw, 3rem); z-index: 25; display: flex; align-items: center; gap: clamp(0.75rem, 1.5vw, 1rem); background: #1c1c1e; border-radius: clamp(0.75rem, 1.5vw, 1rem); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.06); padding: clamp(0.75rem, 1.5vw, 1rem); min-width: clamp(280px, 40vw, 360px); transition: opacity 350ms ease, transform 350ms ease; pointer-events: auto; }
+    .next-card { position: absolute; bottom: clamp(10rem, 20vh, 14rem); right: clamp(2rem, 4vw, 3rem); z-index: 25; display: flex; align-items: center; gap: clamp(0.75rem, 1.5vw, 1rem); background: #1c1c1e; border-radius: clamp(0.75rem, 1.5vw, 1rem); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.06); padding: clamp(0.75rem, 1.5vw, 1rem); min-width: clamp(280px, 40vw, 360px); transition: opacity 350ms ease, transform 350ms ease; pointer-events: auto; }
     .next-card.hidden { opacity: 0; transform: translateY(12px); pointer-events: none; }
     .next-card img { width: clamp(4rem, 7vw, 5rem); height: clamp(2.75rem, 5vw, 3.5rem); border-radius: clamp(0.5rem, 1vw, 0.75rem); object-fit: cover; flex-shrink: 0; }
     .next-card .placeholder-thumb { width: clamp(4rem, 7vw, 5rem); height: clamp(2.75rem, 5vw, 3.5rem); border-radius: clamp(0.5rem, 1vw, 0.75rem); background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -446,14 +506,14 @@ export class PlayerControlsElement extends LitElement {
     const controlsRowClasses = { 'controls-row': true, hidden: !this.showControls };
 
     return html`
-      <div class=${classMap(controlsOverlayClasses)} data-controls-overlay>
-        <div class="top-scrim">
-          <div class="top-title">
-            <h1 data-title>${this.contentTitle}</h1>
-            <p data-subtitle>${this.contentSubtitle}</p>
-          </div>
+      <div class="top-scrim">
+        <div class="top-title">
+          <h1 data-title>${this.contentTitle}</h1>
+          <p data-subtitle>${this.contentSubtitle}</p>
         </div>
+      </div>
 
+      <div class=${classMap(controlsOverlayClasses)} data-controls-overlay>
         <div class="bottom-scrim">
           <div class="episodes-container" data-episodes-container>
             <div class=${classMap(seekbarViewClasses)} data-seekbar-view>
@@ -501,12 +561,13 @@ export class PlayerControlsElement extends LitElement {
                 </tv-focusable>
               </div>
             </div>
-
-            <div class="episode-rail" data-episode-rail data-expanded=${this.railExpanded} aria-label="Episodios">
-              ${this.showControls ? this._renderEpisodeList() : ''}
-            </div>
           </div>
         </div>
+
+        <div class="episode-rail" data-episode-rail data-expanded=${this.railExpanded} aria-label="Episodios" ?hidden=${this._allEpisodes.length === 0}>
+          ${this._renderEpisodeList()}
+        </div>
+      </div>
       </div>
 
       <div class="player-watermark" aria-hidden="true">CinelarTV</div>
@@ -572,6 +633,7 @@ export class PlayerControlsElement extends LitElement {
     const vpStart = this._virtualScrollLeft;
     const vpEnd = this._virtualScrollLeft + vpW;
     const isPartial = itemStart < vpStart || itemEnd > vpEnd;
+    const epDescription = (episode as any).description || 'Este episodio no tiene descripción disponible.';
 
     return html`
       <div class="episode-card"
@@ -586,10 +648,13 @@ export class PlayerControlsElement extends LitElement {
            @click=${this._handleEpisodeCardClick}>
         <span class="episode-thumb">
           ${imageUrl ? html`<img src=${imageUrl} alt="" loading="lazy" />` : ''}
+          <span class="episode-badge">${hasMultipleSeasons ? `T${episode.seasonNumber} · ` : ''}E${index + 1}</span>
+          ${isCurrent ? html`<span class="episode-playing-label">Reproduciendo</span>` : ''}
         </span>
         <span class="episode-card-title">
-          ${hasMultipleSeasons ? `T${episode.seasonNumber} · ` : ''}E${index + 1} · ${episode.title}
+          ${episode.title}
         </span>
+        <span class="episode-card-desc">${epDescription}</span>
       </div>
     `;
   }

@@ -1008,6 +1008,7 @@
     <video
       bind:this={videoEl}
       class="absolute inset-0 w-full h-full block object-contain object-center"
+      style="transform: translateX(0px) translateY(0px) scaleX(1) scaleY(1);"
       autoplay
       playsinline
     ></video>
