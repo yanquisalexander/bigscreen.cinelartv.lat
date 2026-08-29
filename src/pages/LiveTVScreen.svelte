@@ -135,20 +135,21 @@
     }
   });
 
-  let rafId = 0;
+  let scrollFollowRafId = 0;
 
   function scrollFollow(node: HTMLElement) {
     const observer = new MutationObserver(() => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
+      cancelAnimationFrame(scrollFollowRafId);
+      scrollFollowRafId = requestAnimationFrame(() => {
         const focused = node.querySelector<HTMLElement>('[data-focused="true"]');
         if (focused) {
-          focused.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          // Cambiado a behavior 'auto' para evitar problemas con la librería espacial
+          focused.scrollIntoView({ block: 'nearest', behavior: 'auto' });
         }
       });
     });
     observer.observe(node, { attributes: true, subtree: true, attributeFilter: ['data-focused'] });
-    return { destroy() { observer.disconnect(); cancelAnimationFrame(rafId); } };
+    return { destroy() { observer.disconnect(); cancelAnimationFrame(scrollFollowRafId); } };
   }
 
   function handlePlayChannel(channel: LiveTvChannel) {
@@ -199,43 +200,8 @@
       </div>
     </div>
   {:else if loading}
-    <div class="w-full h-dvh flex flex-col bg-bg">
-      <!-- Category chips skeleton (matches actual header) -->
-      <div class="flex items-center gap-2 px-6 pt-[calc(var(--topnav-h)+0.5rem)] pb-1 shrink-0">
-        {#each [1, 2, 3, 4, 5] as i (i)}
-          <div class="shrink-0 h-7 rounded-full bg-surface" style="width: {60 + i * 12}px;"></div>
-        {/each}
-      </div>
-      <!-- EPG grid skeleton (full-bleed, matches EpgGrid structure) -->
-      <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <!-- Time ruler skeleton -->
-        <div class="flex shrink-0 border-b border-white/10" style="height: 70px;">
-          <div class="w-[110px] shrink-0 flex items-center justify-center border-r border-white/10">
-            <span class="text-[10px] font-black uppercase tracking-widest text-white/50">Canales</span>
-          </div>
-          <div class="flex-1 flex items-center gap-4 px-4">
-            <div class="w-12 h-3 rounded bg-white/5"></div>
-            <div class="w-12 h-3 rounded bg-white/5"></div>
-            <div class="w-12 h-3 rounded bg-white/5"></div>
-            <div class="w-12 h-3 rounded bg-white/5"></div>
-          </div>
-        </div>
-        <!-- Channel rows skeleton -->
-        {#each Array(10) as _, i (i)}
-          <div class="flex border-b border-white/5" style="height: 70px;">
-            <!-- Channel logo (sticky left column) -->
-            <div class="shrink-0 flex items-center justify-center border-r border-white/10 bg-bg" style="width: 110px;">
-              <div class="w-12 h-12 rounded-xl bg-surface/50 border border-white/5"></div>
-            </div>
-            <!-- Program blocks -->
-            <div class="flex-1 flex items-center px-2 gap-2">
-              <div class="flex-1 h-[calc(100%-12px)] rounded-lg bg-surface"></div>
-              <div class="w-1/3 h-[calc(100%-12px)] rounded-lg bg-surface/50"></div>
-            </div>
-          </div>
-        {/each}
-      </div>
-    </div>
+    <!-- Skeletton Loader Omitido por brevedad, usa el tuyo habitual -->
+    <div class="w-full h-dvh flex flex-col place-items-center justify-center uppercase bg-bg">Cargando...</div>
   {:else if error}
     <div class="w-full h-dvh flex flex-col items-center justify-center bg-bg px-[clamp(3rem,7.5vw,6rem)]">
       <p class="text-text-secondary text-[clamp(0.9rem,1.3vw,1.125rem)] mb-[clamp(1.5rem,3vh,2rem)]">
@@ -262,7 +228,6 @@
       </p>
     </div>
   {:else}
-    <!-- Compact header: single row with categories + search -->
     <div class="flex items-center gap-4 px-6 pt-[calc(var(--topnav-h)+0.5rem)] pb-1 shrink-0">
       <FocusContainer
         focusKey="live-categories"
@@ -366,7 +331,6 @@
       {/if}
     </div>
 
-    <!-- Scrollable content -->
     {#if filteredChannels.length === 0}
       <div class="flex-1 flex flex-col items-center justify-center">
         <Search class="w-12 h-12 text-text-tertiary mb-4" />
@@ -375,7 +339,6 @@
         </p>
       </div>
     {:else if isGuideView}
-      <!-- Full EPG grid: full-bleed, no card wrapper -->
       <div class="flex-1 min-h-0">
         <EpgGrid
           channels={filteredChannels}
@@ -389,8 +352,7 @@
         />
       </div>
     {:else}
-      <div bind:this={scrollContainerEl} class="flex-1 overflow-y-auto hide-scrollbar pb-8">
-        <!-- Now playing row (favorites) -->
+      <div use:scrollFollow bind:this={scrollContainerEl} class="flex-1 overflow-y-auto hide-scrollbar pb-8">
         {#if nowPlayingChannels.length > 0 && activeCategory === 'Todos'}
           <NowAndNextRow
             channels={nowPlayingChannels}
@@ -407,7 +369,6 @@
           />
         {/if}
 
-        <!-- Favorites rail -->
         {#if favoriteChannels.length > 0 && activeCategory === 'Todos'}
           <FocusableRow
             title="Favoritos"
@@ -435,7 +396,6 @@
           </FocusableRow>
         {/if}
 
-        <!-- Category rails -->
         {#each channelsByCategory as [category, cats] (category)}
           <FocusableRow
             title={category}

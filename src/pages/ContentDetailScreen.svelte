@@ -220,7 +220,8 @@
   }
 
   function handleToggleList() {
-    // TODO: toggle like
+    toastStore.getState().show('Esta funcionalidad aún no está implementada', 'info', 3000);
+    // TODO: Implement toggle list functionality
   }
 
   function handleSelectRelated(item: { id: string | number }) {

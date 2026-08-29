@@ -275,7 +275,7 @@
         <DetailActionButton
           focusKey="detail-hero-list"
           variant="ghost"
-          label="Mi Lista"
+          label="Mi colección"
           onEnterPress={onToggleList}
           onArrowPress={(dir) => {
             if (dir === 'left') return true;

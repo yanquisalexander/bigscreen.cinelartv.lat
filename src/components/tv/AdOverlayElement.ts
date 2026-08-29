@@ -263,7 +263,7 @@ class AdOverlayElement extends HTMLElement {
         [data-focus-key] { cursor: pointer; outline: none; }
         @keyframes ad-spin { to { transform: rotate(360deg); } }
       </style>
-      <video playsinline autoplay></video>
+      <video playsinline autoplay disableRemotePlayback style="disableremoteplayback:auto;"></video>
       <div data-ad-spinner style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
         <div style="width:40px;height:40px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:ad-spin 0.8s linear infinite;"></div>
       </div>
