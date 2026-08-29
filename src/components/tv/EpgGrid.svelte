@@ -96,29 +96,40 @@
     return ticks;
   });
 
-  // --- EPG data fetching (per channel, cached) ---
-  function loadGuide(channel: LiveTvChannel) {
-    if (guides[channel.id] || guideState[channel.id]) return;
-    guideState = { ...guideState, [channel.id]: 'loading' };
-    getChannelGuide(
-      channel.id,
-      new Date(windowStartMs).toISOString(),
-      new Date(windowEndMs).toISOString(),
-      accessToken,
-    )
-      .then((res) => {
-        guides = { ...guides, [channel.id]: res.programs };
-        guideState = { ...guideState, [channel.id]: 'ready' };
-      })
-      .catch(() => {
-        guideState = { ...guideState, [channel.id]: 'error' };
-      });
+  // --- EPG data fetching (batched to avoid N re-renders on mount) ---
+  let _loaded = new Set<string>();
+  function loadGuides(list: LiveTvChannel[]) {
+    const toLoad = list.filter((ch) => !_loaded.has(ch.id));
+    if (!toLoad.length) return;
+    toLoad.forEach((ch) => _loaded.add(ch.id));
+
+    // Single state update for all loading channels
+    const next = { ...guideState };
+    let changed = false;
+    for (const ch of toLoad) {
+      if (!next[ch.id]) { next[ch.id] = 'loading'; changed = true; }
+    }
+    if (changed) guideState = next;
+
+    for (const ch of toLoad) {
+      getChannelGuide(
+        ch.id,
+        new Date(windowStartMs).toISOString(),
+        new Date(windowEndMs).toISOString(),
+        accessToken,
+      )
+        .then((res) => {
+          guides = { ...guides, [ch.id]: res.programs };
+          guideState = { ...guideState, [ch.id]: 'ready' };
+        })
+        .catch(() => {
+          guideState = { ...guideState, [ch.id]: 'error' };
+        });
+    }
   }
 
   $effect(() => {
-    if (channels.length) {
-      channels.forEach(loadGuide);
-    }
+    if (channels.length) loadGuides(channels);
   });
 
   // Fall back to payload data (current + upcoming) when guide not loaded yet
@@ -200,46 +211,38 @@
     onReady?.(firstFocusKey);
   });
 
-  let _focusObserver: MutationObserver | null = null;
+  let _scrollQueued = false;
 
   function scrollToFocused() {
     const container = scrollEl;
     if (!container) return;
-    if (_focusObserver) { _focusObserver.disconnect(); _focusObserver = null; }
 
-    const tryScroll = () => {
-      const focused = container.querySelector<HTMLElement>('[data-focused="true"]');
-      if (!focused) return false;
+    const focused = container.querySelector<HTMLElement>('[data-focused="true"]');
+    if (!focused) return;
 
-      const containerRect = container.getBoundingClientRect();
-      const focusedRect = focused.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const focusedRect = focused.getBoundingClientRect();
 
-      const offsetY = focusedRect.top - containerRect.top;
-      const targetY = container.scrollTop + offsetY - (containerRect.height / 2) + (focusedRect.height / 2);
+    const offsetY = focusedRect.top - containerRect.top;
+    const targetY = container.scrollTop + offsetY - (containerRect.height / 2) + (focusedRect.height / 2);
 
-      let targetX = container.scrollLeft;
-      if (focusedRect.width < containerRect.width) {
-        const offsetX = focusedRect.left - containerRect.left;
-        targetX = container.scrollLeft + offsetX - (containerRect.width / 2) + (focusedRect.width / 2);
-      }
+    let targetX = container.scrollLeft;
+    if (focusedRect.width < containerRect.width) {
+      const offsetX = focusedRect.left - containerRect.left;
+      targetX = container.scrollLeft + offsetX - (containerRect.width / 2) + (focusedRect.width / 2);
+    }
 
-      container.scrollTo({ top: targetY, left: targetX, behavior: canAnimate ? 'smooth' : 'auto' });
-      return true;
-    };
-
-    if (tryScroll()) return;
-
-    const observer = new MutationObserver(() => {
-      if (tryScroll()) { observer.disconnect(); _focusObserver = null; }
-    });
-    _focusObserver = observer;
-    observer.observe(container, { attributes: true, subtree: true, attributeFilter: ['data-focused'] });
-    setTimeout(() => { observer.disconnect(); _focusObserver = null; }, 1000);
+    container.scrollTo({ top: targetY, left: targetX, behavior: canAnimate ? 'smooth' : 'auto' });
   }
 
   function handleFocusScroll() {
+    if (_scrollQueued) return;
+    _scrollQueued = true;
     cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(scrollToFocused);
+    rafId = requestAnimationFrame(() => {
+      _scrollQueued = false;
+      scrollToFocused();
+    });
   }
 
   function onBodyScroll() {
