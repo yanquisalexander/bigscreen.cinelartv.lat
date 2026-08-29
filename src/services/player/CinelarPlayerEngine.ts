@@ -121,7 +121,6 @@ export class CinelarPlayerEngine {
           defaultBandwidthEstimate: 1000000,
         },
         preferredAudioLanguage: 'es',
-        preferredTextLanguage: 'es',
         manifest: {
           retryParameters: {
             maxAttempts: 4,
