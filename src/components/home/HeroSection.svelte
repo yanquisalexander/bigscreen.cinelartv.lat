@@ -34,7 +34,7 @@
   let videoEl = $state<HTMLVideoElement | null>(null);
   let timerId: ReturnType<typeof setTimeout> | null = null;
   let trailerTimerId: ReturnType<typeof setTimeout> | null = null;
-  let vramCleanupId: ReturnType<typeof setTimeout> | null = null;
+  let canPlayVideo = $state(false);
 
   const currentItem = $derived(items[currentIndex]);
   const hasTrailer = $derived(Boolean(currentItem?.trailer_sources?.length));
@@ -130,36 +130,38 @@
     };
   });
 
-  // Video play/pause + body class + VRAM lifecycle
+  // Video play/pause + body class (SmartTV optimized: keep src cached)
   $effect(() => {
     const video = videoEl;
     if (!video) return;
 
-    // Cancel any pending VRAM cleanup (trailer reactivated before cleanup ran)
-    if (vramCleanupId) { clearTimeout(vramCleanupId); vramCleanupId = null; }
-
     if (showTrailer) {
       bodyEl?.classList.add('playing-inmersive-trailer');
-      if (trailerUrl) video.src = trailerUrl;
+      canPlayVideo = false;
+      // Only set src if URL actually changed to avoid redundant network request
+      if (trailerUrl && video.getAttribute('src') !== trailerUrl) {
+        video.src = trailerUrl;
+        video.load();
+      }
       video.currentTime = 0;
-      video.play().catch(() => {});
+      // play() is called by the canPlay effect below
     } else {
       bodyEl?.classList.remove('playing-inmersive-trailer');
       video.pause();
-      // Free VRAM after fade-out transition completes
-      vramCleanupId = setTimeout(() => {
-        if (!showTrailer && videoEl) {
-          videoEl.removeAttribute('src');
-          videoEl.load();
-        }
-      }, 1200);
+      // SmartTV: keep src in memory for fast replay, only clean on unmount
     }
 
     return () => {
       bodyEl?.classList.remove('playing-inmersive-trailer');
       video.pause();
-      if (vramCleanupId) { clearTimeout(vramCleanupId); vramCleanupId = null; }
     };
+  });
+
+  // Play only when video is ready (critical for SmartTV slow decode)
+  $effect(() => {
+    const video = videoEl;
+    if (!video || !showTrailer || !canPlayVideo) return;
+    video.play().catch(() => {});
   });
 
   $effect(() => {
@@ -211,11 +213,11 @@
           >
             <video
               bind:this={videoEl}
-              src={trailerUrl}
               class="w-full h-full object-cover"
               preload="auto"
               playsinline
               onended={handleTrailerEnded}
+              oncanplay={() => { canPlayVideo = true; }}
             >
               <track kind="captions" />
             </video>
