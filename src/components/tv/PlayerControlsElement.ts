@@ -119,35 +119,31 @@ export class PlayerControlsElement extends LitElement {
     .controls-row-left, .controls-row-right { display: flex; align-items: center; gap: clamp(0.5rem, 1vw, 0.75rem); flex: 1; }
     .controls-row-left { justify-content: flex-start; }
     .controls-row-right { justify-content: flex-end; }
-    .controls-row-center { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .controls-row-center { display: flex; align-items: center; justify-content: center; gap: clamp(0.5rem, 1vw, 0.75rem); flex-shrink: 0; }
 
     .control-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      color: #ffffff;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.1);
+      color: #f1f1f1;
+      background: rgba(255,255,255,0.1);
+      border: none;
       cursor: pointer;
       outline: none;
       pointer-events: auto;
     }
 
     .control-btn[data-focused="true"] {
-      background: #ffffff;
-      color: #000000;
-      scale: 1.08;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+      background: #f1f1f1;
+      color: #0f0f0f;
     }
 
-    .circle-btn { width: clamp(2.75rem, 5vw, 3.25rem); height: clamp(2.75rem, 5vw, 3.25rem); border-radius: 9999px; }
-    .play-pause-btn { width: clamp(3.25rem, 6vw, 3.75rem); height: clamp(3.25rem, 6vw, 3.75rem); }
-    .pill-btn { padding: clamp(0.4rem, 1vh, 0.6rem) clamp(1rem, 2vw, 1.5rem); border-radius: 9999px; font-size: clamp(0.8rem, 1vw, 0.9rem); font-weight: 600; letter-spacing: 0.01em; }
+    .circle-btn { width: 3rem; height: 3rem; border-radius: 1.5rem; }
+    .play-pause-btn { width: 4rem; height: 4rem; border-radius: 2rem; }
+    .pill-btn { padding: 0 1.25rem; height: 3rem; border-radius: 1.5rem; font-size: clamp(0.8rem, 1vw, 0.9rem); font-weight: 600; letter-spacing: 0.01em; }
 
-    .control-btn svg { width: clamp(1.1rem, 2vw, 1.3rem); height: clamp(1.1rem, 2vw, 1.3rem); stroke: currentColor; fill: none; }
     .control-btn .ctv-icon { font-size: clamp(1.1rem, 2vw, 1.3rem); line-height: 1; color: inherit; }
     .control-btn.play-pause-btn .ctv-icon { font-size: clamp(1.3rem, 2.4vw, 1.5rem); }
-    .control-btn.play-pause-btn svg { width: clamp(1.3rem, 2.4vw, 1.5rem); height: clamp(1.3rem, 2.4vw, 1.5rem); fill: currentColor; stroke: none; }
 
     .bottom-scrim {
       width: 100%;
@@ -303,6 +299,8 @@ export class PlayerControlsElement extends LitElement {
   @state() private _seekRepeatTimer!: ReturnType<typeof setInterval> | null;
   @state() private _skipFocusableRegistered!: boolean;
   @state() private _seekbarFocusableRegistered!: boolean;
+  @state() private _seekBackFocusableRegistered!: boolean;
+  @state() private _seekFwdFocusableRegistered!: boolean;
   @state() private _lastEnterKey!: string;
   @state() private _lastEnterTime!: number;
   @state() private _lastFocusedControlKey!: string;
@@ -544,6 +542,10 @@ export class PlayerControlsElement extends LitElement {
               </div>
 
               <div class="controls-row-center">
+                <tv-focusable focus-key="watch-seek-back" parent-focus-key="watch-root" data-focused="false" class="control-btn circle-btn" data-seek-back
+                  focusable=${this.showControls ? 'true' : 'false'}>
+                  <i class="ctv-icon ctv-seek-previus"></i>
+                </tv-focusable>
                 <tv-focusable focus-key="watch-playpause" parent-focus-key="watch-root" data-focused="false" class="control-btn circle-btn play-pause-btn"
                   focusable=${this.showControls ? 'true' : 'false'}>
                   ${this._isPlaying ? html`
@@ -551,6 +553,10 @@ export class PlayerControlsElement extends LitElement {
                   ` : html`
                     <i class="ctv-icon ctv-play"></i>
                   `}
+                </tv-focusable>
+                <tv-focusable focus-key="watch-seek-fwd" parent-focus-key="watch-root" data-focused="false" class="control-btn circle-btn" data-seek-fwd
+                  focusable=${this.showControls ? 'true' : 'false'}>
+                  <i class="ctv-icon ctv-seek-forward"></i>
                 </tv-focusable>
               </div>
 
@@ -828,6 +834,43 @@ export class PlayerControlsElement extends LitElement {
     } else if (this._skipFocusableRegistered) {
       this._skipFocusableRegistered = false;
       this.registrar.unregister('watch-skip');
+    }
+
+    const seekBackBtn = this.renderRoot.querySelector('[data-seek-back]') as HTMLElement | null;
+    const seekFwdBtn = this.renderRoot.querySelector('[data-seek-fwd]') as HTMLElement | null;
+    if (this.showControls && seekBackBtn) {
+      if (!this._seekBackFocusableRegistered) {
+        this._seekBackFocusableRegistered = true;
+        this.registrar.register([{
+          focusKey: 'watch-seek-back',
+          node: seekBackBtn,
+          parentFocusKey: PARENT_FOCUS_KEY,
+          onEnterPress: () => { this._seekBy(-SEEK_STEP_SECONDS); },
+          onArrowPress: () => true,
+          onFocus: () => { this._lastFocusedControlKey = 'watch-seek-back'; seekBackBtn.setAttribute('data-focused', 'true'); },
+          onBlur: () => seekBackBtn.setAttribute('data-focused', 'false'),
+        }]);
+      }
+    } else if (this._seekBackFocusableRegistered) {
+      this._seekBackFocusableRegistered = false;
+      this.registrar.unregister('watch-seek-back');
+    }
+    if (this.showControls && seekFwdBtn) {
+      if (!this._seekFwdFocusableRegistered) {
+        this._seekFwdFocusableRegistered = true;
+        this.registrar.register([{
+          focusKey: 'watch-seek-fwd',
+          node: seekFwdBtn,
+          parentFocusKey: PARENT_FOCUS_KEY,
+          onEnterPress: () => { this._seekBy(SEEK_STEP_SECONDS); },
+          onArrowPress: () => true,
+          onFocus: () => { this._lastFocusedControlKey = 'watch-seek-fwd'; seekFwdBtn.setAttribute('data-focused', 'true'); },
+          onBlur: () => seekFwdBtn.setAttribute('data-focused', 'false'),
+        }]);
+      }
+    } else if (this._seekFwdFocusableRegistered) {
+      this._seekFwdFocusableRegistered = false;
+      this.registrar.unregister('watch-seek-fwd');
     }
 
     const episodeCards = this.renderRoot.querySelectorAll('.episode-card');
@@ -1188,6 +1231,8 @@ export class PlayerControlsElement extends LitElement {
     const candidates = [
       this._lastFocusedControlKey,
       'watch-playpause',
+      'watch-seek-back',
+      'watch-seek-fwd',
       'watch-seekbar',
       'watch-episodes',
       'watch-settings',
@@ -1415,12 +1460,16 @@ export class PlayerControlsElement extends LitElement {
     const key = source?.getAttribute('focus-key');
     this._restartControlsHideTimer();
 
-    if (key === 'watch-settings' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-playpause'); return; }
-    if (key === 'watch-playpause' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-episodes'); return; }
-    if (key === 'watch-playpause' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-settings'); return; }
-    if (key === 'watch-episodes' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-playpause'); return; }
+    if (key === 'watch-settings' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-seek-fwd'); return; }
+    if (key === 'watch-playpause' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-seek-back'); return; }
+    if (key === 'watch-playpause' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-seek-fwd'); return; }
+    if (key === 'watch-seek-back' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-episodes'); return; }
+    if (key === 'watch-seek-back' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-playpause'); return; }
+    if (key === 'watch-seek-fwd' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-playpause'); return; }
+    if (key === 'watch-seek-fwd' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-settings'); return; }
+    if (key === 'watch-episodes' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-seek-back'); return; }
 
-    if (!['watch-episodes', 'watch-playpause', 'watch-settings'].includes(key ?? '') || custom.detail?.direction !== 'down' || this._allEpisodes.length === 0) return;
+    if (!['watch-episodes', 'watch-seek-back', 'watch-playpause', 'watch-seek-fwd', 'watch-settings'].includes(key ?? '') || custom.detail?.direction !== 'down' || this._allEpisodes.length === 0) return;
 
     custom.preventDefault();
     this.railExpanded = true;
