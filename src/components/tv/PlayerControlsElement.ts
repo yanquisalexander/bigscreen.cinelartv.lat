@@ -730,14 +730,7 @@ export class PlayerControlsElement extends LitElement {
           onArrowPress: (direction: string) => {
             if (!this.showControls || this.railExpanded) return true;
             if (direction === 'down') {
-              if (this._allEpisodes.length > 0) {
-                this.railExpanded = true;
-                const activeEp = this._allEpisodes.find((e) => e.id === this._currentEpisodeId) ?? this._allEpisodes[0];
-                const activeIndex = activeEp ? this._allEpisodes.indexOf(activeEp) : -1;
-                if (activeIndex >= 0) void this._revealAndFocusEpisode(activeIndex);
-              } else {
-                this._focusControl('watch-playpause');
-              }
+              this._focusControl('watch-playpause');
               return false;
             }
             if (direction === 'left') { this._seekBy(-SEEK_STEP_SECONDS); return false; }
