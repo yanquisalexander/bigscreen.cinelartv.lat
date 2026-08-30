@@ -7,6 +7,7 @@ import type { FlatEpisode } from './RailEpisodeItem';
 import { ctvIconSheet } from '@/lib/ctvIcons';
 import { pdbg } from '@/services/player/playerDebug';
 import { toastStore } from '@/stores/toastStore';
+import { formatTime } from '@/utils/helpers';
 import './PlayerSeekbarElement';
 import './PlayerEpisodeRailElement';
 import './PlayerSkipButtonElement';
@@ -199,6 +200,39 @@ export class PlayerControlsElement extends LitElement {
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    .seek-preview-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 20;
+      opacity: 0;
+      transition: opacity 150ms ease;
+    }
+
+    .seek-preview-overlay.visible { opacity: 1; }
+
+    .seek-preview-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 1rem;
+      padding: 0.75rem 1.5rem;
+      color: #fff;
+      font-size: clamp(1.4rem, 2.5vw, 2rem);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+    }
+
+    .seek-preview-badge .ctv-icon {
+      font-size: clamp(1.2rem, 2vw, 1.6rem);
+      color: #f03;
+    }
   `;
 
   protected createRenderRoot(): Element | ShadowRoot {
@@ -224,6 +258,9 @@ export class PlayerControlsElement extends LitElement {
   @state() private _lastFocusedControlKey = 'watch-playpause';
   @state() private _currentEpisodeId: string | number | null = null;
   @state() private _allEpisodes: FlatEpisode[] = [];
+  @state() private _seekPreviewVisible = false;
+  @state() private _seekPreviewTime = 0;
+  @state() private _seekPreviewDirection: 'forward' | 'backward' = 'forward';
 
   private _onPlay: (() => void) | null = null;
   private _onPause: (() => void) | null = null;
@@ -276,6 +313,8 @@ export class PlayerControlsElement extends LitElement {
     this.addEventListener('focus-gained', this._handleFocusGained);
     this.addEventListener('focus-lost', this._handleFocusLost);
     this.addEventListener('arrow-press', this._handleArrowPress);
+    this.addEventListener('seek-preview', this._handleSeekPreview as EventListener);
+    this.addEventListener('seek-end', this._handleSeekEnd as EventListener);
   }
 
   disconnectedCallback() {
@@ -293,6 +332,8 @@ export class PlayerControlsElement extends LitElement {
     this.removeEventListener('focus-gained', this._handleFocusGained);
     this.removeEventListener('focus-lost', this._handleFocusLost);
     this.removeEventListener('arrow-press', this._handleArrowPress);
+    this.removeEventListener('seek-preview', this._handleSeekPreview as EventListener);
+    this.removeEventListener('seek-end', this._handleSeekEnd as EventListener);
   }
 
   private _stopAllTimers() {
@@ -458,6 +499,13 @@ export class PlayerControlsElement extends LitElement {
       </div>
 
       <div class="player-watermark" aria-hidden="true">CinelarTV</div>
+
+      <div class="seek-preview-overlay ${this._seekPreviewVisible ? 'visible' : ''}" aria-hidden="true">
+        <div class="seek-preview-badge">
+          <i class="ctv-icon ${this._seekPreviewDirection === 'forward' ? 'ctv-seek-forward' : 'ctv-seek-previus'}"></i>
+          <span>${formatTime(this._seekPreviewTime)}</span>
+        </div>
+      </div>
 
       <tv-player-skip-btn
         .segment=${this.skipSegment}
@@ -801,6 +849,17 @@ export class PlayerControlsElement extends LitElement {
       if (currentFocus === 'watch-episodes' || currentFocus === 'watch-restart' || currentFocus === 'watch-captions' || currentFocus === 'episodes-rail' || currentFocus?.startsWith('rail-ep-item-')) return;
       this.railExpanded = false;
     });
+  };
+
+  private _handleSeekPreview = (e: CustomEvent) => {
+    this._seekPreviewVisible = true;
+    this._seekPreviewTime = e.detail.targetTime;
+    this._seekPreviewDirection = e.detail.direction;
+  };
+
+  private _handleSeekEnd = () => {
+    this._seekPreviewVisible = false;
+    this._seekPreviewTime = 0;
   };
 
   private _handleArrowPress = (e: Event) => {

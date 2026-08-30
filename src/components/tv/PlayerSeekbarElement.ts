@@ -10,6 +10,18 @@ const PARENT_FOCUS_KEY = 'watch-root';
 const SEEK_STEP_SECONDS = 10;
 const SEEK_REPEAT_MS = 180;
 
+function getSeekStep(heldMs: number): number {
+  if (heldMs > 3000) return 60;
+  if (heldMs > 1000) return 30;
+  return SEEK_STEP_SECONDS;
+}
+
+function getSeekInterval(heldMs: number): number {
+  if (heldMs > 3000) return 80;
+  if (heldMs > 1000) return 120;
+  return SEEK_REPEAT_MS;
+}
+
 @customElement('tv-player-seekbar')
 export class PlayerSeekbarElement extends LitElement {
   static styles = css`
@@ -160,12 +172,12 @@ export class PlayerSeekbarElement extends LitElement {
   private _isSeeking = false;
   private _wasPlayingBeforeSeek = false;
   private _seekAccumulator = 0;
-  private _seekApplyTimer: ReturnType<typeof setTimeout> | null = null;
   private _seekEndTimer: ReturnType<typeof setTimeout> | null = null;
   private _seekKeyHeld = false;
   private _seekDirection = 0;
   private _seekHeldAt = 0;
   private _seekRepeatTimer: ReturnType<typeof setInterval> | null = null;
+  private _seekTargetTime = 0;
 
   private _focused = false;
 
@@ -234,7 +246,6 @@ export class PlayerSeekbarElement extends LitElement {
     const TICK_MS = 100;
     let lastPct = -1;
     let lastDur = 0;
-    let lastSec = -1;
     let lastBufferedPct = -1;
     let nextTickTime = 0;
 
@@ -255,7 +266,7 @@ export class PlayerSeekbarElement extends LitElement {
 
     const doSync = () => {
       const dur = video.duration || 0;
-      const ct = video.currentTime;
+      const ct = this._isSeeking ? this._seekTargetTime : video.currentTime;
       const pct = dur > 0 ? (ct / dur) * 100 : 0;
 
       if (dur !== lastDur && isFinite(dur) && dur > 0) {
@@ -263,11 +274,7 @@ export class PlayerSeekbarElement extends LitElement {
         this._duration = dur;
       }
 
-      const sec = Math.floor(ct);
-      if (sec !== lastSec) {
-        lastSec = sec;
-        if (timeLabel) timeLabel.textContent = formatTime(ct);
-      }
+      if (timeLabel) timeLabel.textContent = formatTime(ct);
 
       if (Math.abs(pct - lastPct) > 0.5) {
         lastPct = pct;
@@ -326,7 +333,7 @@ export class PlayerSeekbarElement extends LitElement {
     if (!this.videoEl) return;
     const video = this.videoEl;
     const dur = video.duration || 0;
-    const ct = video.currentTime;
+    const ct = this._isSeeking ? this._seekTargetTime : video.currentTime;
     const pct = dur > 0 ? (ct / dur) * 100 : 0;
 
     const timeLabel = this._el('[data-current-time]');
@@ -401,15 +408,15 @@ export class PlayerSeekbarElement extends LitElement {
       this._isSeeking = true;
       this._wasPlayingBeforeSeek = !this.videoEl.paused;
       if (!this.videoEl.paused) this.videoEl.pause();
-      // Restart loop for seeking updates
       if (!this.rafId) this._startSeekbarLoop();
     }
     this._seekAccumulator += seconds;
+    this._seekTargetTime = Math.max(0, Math.min(this.videoEl.currentTime + this._seekAccumulator, this.videoEl.duration || 0));
+    const dir = this._seekAccumulator > 0 ? 'forward' : 'backward';
+    this._dispatch('seek-preview', { targetTime: this._seekTargetTime, direction: dir, accumulator: this._seekAccumulator });
     this._dispatch('seek-start');
     if (this._seekEndTimer) clearTimeout(this._seekEndTimer);
     this._seekEndTimer = setTimeout(() => this._endSeek(), 300);
-    if (this._seekApplyTimer) return;
-    this._seekApplyTimer = setTimeout(() => { this._seekApplyTimer = null; this._applySeek(); }, 200);
   }
 
   private _applySeek() {
@@ -427,19 +434,19 @@ export class PlayerSeekbarElement extends LitElement {
 
   private _endSeek() {
     if (!this._isSeeking) return;
-    if (this._seekApplyTimer) { clearTimeout(this._seekApplyTimer); this._seekApplyTimer = null; this._applySeek(); }
+    if (this._seekEndTimer) { clearTimeout(this._seekEndTimer); this._seekEndTimer = null; }
+    this._applySeek();
     this._isSeeking = false;
     this._seekAccumulator = 0;
+    this._seekTargetTime = 0;
     if (this._wasPlayingBeforeSeek && this.videoEl && this.videoEl.paused) this.videoEl.play().catch(() => { });
     this._wasPlayingBeforeSeek = false;
     this._dispatch('seek-end');
   }
 
   private _stopAllTimers() {
-    if (this._seekApplyTimer) clearTimeout(this._seekApplyTimer);
     if (this._seekEndTimer) clearTimeout(this._seekEndTimer);
     if (this._seekRepeatTimer) clearInterval(this._seekRepeatTimer);
-    this._seekApplyTimer = null;
     this._seekEndTimer = null;
     this._seekRepeatTimer = null;
   }
@@ -460,12 +467,16 @@ export class PlayerSeekbarElement extends LitElement {
 
   private _startSeekRepeat(dir: number) {
     this._stopSeekRepeat();
-    this._seekRepeatTimer = setInterval(() => {
+    const tick = () => {
       if (!this._seekKeyHeld || !this.videoEl || !this._seekbarHoldCanIntercept()) {
         this._stopSeekRepeat(); this._resetSeekHold(); if (this._isSeeking) this._endSeek(); return;
       }
-      this._seekBy(dir * SEEK_STEP_SECONDS);
-    }, SEEK_REPEAT_MS);
+      const heldMs = performance.now() - this._seekHeldAt;
+      const step = getSeekStep(heldMs);
+      this._seekBy(dir * step);
+      this._seekRepeatTimer = setTimeout(tick, getSeekInterval(heldMs)) as any;
+    };
+    this._seekRepeatTimer = setTimeout(tick, SEEK_REPEAT_MS) as any;
   }
 
   private _stopSeekRepeat() {
