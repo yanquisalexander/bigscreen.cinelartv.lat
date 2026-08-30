@@ -5,6 +5,7 @@ import { SpatialNavigation, getCurrentFocusKey } from '@noriginmedia/norigin-spa
 import type { Segment } from '@/types/content';
 import type { FlatEpisode } from './RailEpisodeItem';
 import { ctvIconSheet } from '@/lib/ctvIcons';
+import { pdbg } from '@/services/player/playerDebug';
 import './PlayerSeekbarElement';
 import './PlayerEpisodeRailElement';
 import './PlayerSkipButtonElement';
@@ -19,6 +20,9 @@ interface EngineLike {
   getAudioTracksInfo(): any;
   selectQuality(option: number | 'auto'): void;
   selectAudioTrack(language: string, role?: string): void;
+  on(event: 'playing' | 'paused' | 'buffering' | 'error' | 'timeupdate' | 'durationchange' | 'ended' | 'trackschanged', callback: (data?: any) => void): () => void;
+  off?(event: 'playing' | 'paused' | 'buffering' | 'error' | 'timeupdate' | 'durationchange' | 'ended' | 'trackschanged', callback: (data?: any) => void): void;
+  seek(time: number): void;
 }
 
 @customElement('tv-player-controls')
@@ -200,6 +204,7 @@ export class PlayerControlsElement extends LitElement {
   private _onWaiting: (() => void) | null = null;
   private _onPlaying: (() => void) | null = null;
   private _onDurationChange: (() => void) | null = null;
+  private _engineUnsubs: Array<() => void> = [];
 
   @property({ type: Object, attribute: false }) videoEl!: HTMLVideoElement | null;
   @property({ type: Object, attribute: false }) engineRef!: EngineLike | null;
@@ -273,9 +278,20 @@ export class PlayerControlsElement extends LitElement {
   updated(changedProperties: PropertyValues) {
     super.updated(changedProperties);
 
-    if (changedProperties.has('videoEl')) {
+    if (changedProperties.has('videoEl') || changedProperties.has('engineRef')) {
+      const hadEngine = changedProperties.get('engineRef') !== undefined && changedProperties.get('engineRef') !== null;
+      const hasEngine = this.engineRef != null;
+
       this._teardownVideo();
       if (this.videoEl) this._initVideoListeners();
+
+      // If engineRef arrived after videoEl was already set, sync duration
+      if (!hadEngine && hasEngine && this.videoEl) {
+        const dur = this.videoEl.duration;
+        if (dur && isFinite(dur) && dur > 0) {
+          this._duration = dur;
+        }
+      }
     }
 
     if (changedProperties.has('episodes')) {
@@ -427,6 +443,43 @@ export class PlayerControlsElement extends LitElement {
   private _initVideoListeners() {
     if (!this.videoEl) return;
     const video = this.videoEl;
+
+    // If we have an engine, use its event system instead of raw video events
+    if (this.engineRef && this.engineRef.on) {
+      this._engineUnsubs.push(
+        this.engineRef.on('playing', () => { this._isPlaying = true; })
+      );
+      this._engineUnsubs.push(
+        this.engineRef.on('paused', () => { this._isPlaying = false; })
+      );
+      this._engineUnsubs.push(
+        this.engineRef.on('buffering', (val: any) => { this.isBuffering = val !== false; })
+      );
+      this._engineUnsubs.push(
+        this.engineRef.on('durationchange', (d: any) => { this._duration = d || 0; })
+      );
+      this._engineUnsubs.push(
+        this.engineRef.on('ended', () => {
+          this.dispatchEvent(new CustomEvent('ended', { bubbles: true, composed: true }));
+        })
+      );
+      // Sync duration from video element on timeupdate (fallback for adaptive streams)
+      this._engineUnsubs.push(
+        this.engineRef.on('timeupdate', () => {
+          if (!this.videoEl) return;
+          const dur = this.videoEl.duration;
+          if (dur && isFinite(dur) && dur > 0 && dur !== this._duration) {
+            this._duration = dur;
+          }
+        })
+      );
+      pdbg('controls._initVideoListeners', 'engine event listeners attached');
+      this._startLogicTimer();
+      return;
+    }
+
+    // Fallback: listen directly on video element
+    pdbg('controls._initVideoListeners', 'engine not available, using direct video listeners');
     this._onPlay = () => { this._isPlaying = true; };
     this._onPause = () => { this._isPlaying = false; };
     this._onWaiting = () => { this.isBuffering = true; };
@@ -445,6 +498,12 @@ export class PlayerControlsElement extends LitElement {
   }
 
   private _teardownVideo() {
+    // Clean up engine event listeners
+    for (const unsub of this._engineUnsubs) {
+      unsub();
+    }
+    this._engineUnsubs = [];
+
     if (this.videoEl) {
       if (this._onPlay) this.videoEl.removeEventListener('play', this._onPlay);
       if (this._onPause) this.videoEl.removeEventListener('pause', this._onPause);

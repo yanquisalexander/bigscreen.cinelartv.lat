@@ -253,20 +253,7 @@ export class PlayerSeekbarElement extends LitElement {
       this._seekbarTrackObserver.observe(track);
     }
 
-    const update = () => {
-      if (!this.showControls || (video.paused && !this._isSeeking)) {
-        // Stop the loop instead of scheduling empty frames — restart on play/seek
-        this.rafId = 0;
-        return;
-      }
-
-      const now = performance.now();
-      if (now < nextTickTime) {
-        this.rafId = requestAnimationFrame(update);
-        return;
-      }
-      nextTickTime = now + TICK_MS;
-
+    const doSync = () => {
       const dur = video.duration || 0;
       const ct = video.currentTime;
       const pct = dur > 0 ? (ct / dur) * 100 : 0;
@@ -302,8 +289,29 @@ export class PlayerSeekbarElement extends LitElement {
           seekbar.setAttribute('aria-valuetext', `${formatTime(ct)} de ${formatTime(dur)}`);
         }
       }
+    };
+
+    const update = () => {
+      const dur = video.duration || 0;
+      const needsDuration = !isFinite(dur) || dur <= 0;
+
+      if (!this.showControls || (video.paused && !this._isSeeking && !needsDuration)) {
+        this.rafId = 0;
+        return;
+      }
+
+      const now = performance.now();
+      if (now < nextTickTime) {
+        this.rafId = requestAnimationFrame(update);
+        return;
+      }
+      nextTickTime = now + TICK_MS;
+
+      doSync();
       this.rafId = requestAnimationFrame(update);
     };
+
+    doSync();
     this.rafId = requestAnimationFrame(update);
   }
 
