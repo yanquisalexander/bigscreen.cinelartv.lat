@@ -6,6 +6,7 @@ import type { Segment } from '@/types/content';
 import type { FlatEpisode } from './RailEpisodeItem';
 import { ctvIconSheet } from '@/lib/ctvIcons';
 import { pdbg } from '@/services/player/playerDebug';
+import { toastStore } from '@/stores/toastStore';
 import './PlayerSeekbarElement';
 import './PlayerEpisodeRailElement';
 import './PlayerSkipButtonElement';
@@ -139,7 +140,32 @@ export class PlayerControlsElement extends LitElement {
 
     .circle-btn { width: 3rem; height: 3rem; border-radius: 1.5rem; }
     .play-pause-btn { width: 4rem; height: 4rem; border-radius: 2rem; }
-    .pill-btn { padding: 0 1.25rem; height: 3rem; border-radius: 1.5rem; font-size: clamp(0.8rem, 1vw, 0.9rem); font-weight: 600; letter-spacing: 0.01em; }
+    .pill-btn { padding: 0 1rem; height: 2.25rem; border-radius: 1.125rem; font-size: clamp(0.7rem, 0.9vw, 0.8rem); font-weight: 600; letter-spacing: 0.01em; gap: 0.35rem; }
+
+    .pill-group {
+      display: inline-flex;
+      align-items: center;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 1.125rem;
+      vertical-align: middle;
+      position: relative;
+      margin-left: 0;
+      pointer-events: auto;
+    }
+
+    .pill-group .control-btn {
+      background-color: transparent;
+      color: #f1f1f1;
+      border-radius: 1.125rem;
+      height: 2.25rem;
+      line-height: 2.25rem;
+      box-shadow: none;
+    }
+
+    .pill-group .control-btn[data-focused="true"] {
+      background-color: #f1f1f1;
+      color: #0f0f0f;
+    }
 
     .control-btn .ctv-icon { font-size: clamp(1.1rem, 2vw, 1.3rem); line-height: 1; color: inherit; }
     .control-btn.play-pause-btn .ctv-icon { font-size: clamp(1.3rem, 2.4vw, 1.5rem); }
@@ -363,16 +389,24 @@ export class PlayerControlsElement extends LitElement {
               @focus-playpause=${() => this._focusControl('watch-playpause')}
               @seek-start=${() => { this.showControls = true; this._restartControlsHideTimer(); }}
               @seek-change=${() => { this.showControls = true; this._restartControlsHideTimer(); }}
-              @seek-end=${() => {}}
+              @seek-end=${() => { }}
             ></tv-player-seekbar>
 
             <div class=${classMap(controlsRowClasses)}>
               <div class="controls-row-left" data-episodes-btn-container>
                 ${this._allEpisodes.length > 0 ? html`
-                  <tv-focusable id="episodes-btn" focus-key="watch-episodes" parent-focus-key="watch-root" data-focused="false" class="control-btn pill-btn"
-                    focusable=${this.showControls ? 'true' : 'false'}>
-                    <span>Episodios</span>
-                  </tv-focusable>
+                  <div class="pill-group" data-pill-group>
+                    <tv-focusable id="episodes-btn" focus-key="watch-episodes" parent-focus-key="watch-root" data-focused="false" class="control-btn pill-btn"
+                      focusable=${this.showControls ? 'true' : 'false'}>
+                      <i class="ctv-icon ctv-episodes-list"></i>
+                      <span>Episodios</span>
+                    </tv-focusable>
+                    <tv-focusable id="restart-btn" focus-key="watch-restart" parent-focus-key="watch-root" data-focused="false" class="control-btn pill-btn"
+                      focusable=${this.showControls ? 'true' : 'false'}>
+                      <i class="ctv-icon ctv-arrow-counter-clockwise"></i>
+                      <span>Comenzar de nuevo</span>
+                    </tv-focusable>
+                  </div>
                 ` : ''}
               </div>
 
@@ -396,10 +430,17 @@ export class PlayerControlsElement extends LitElement {
               </div>
 
               <div class="controls-row-right">
-                <tv-focusable focus-key="watch-settings" parent-focus-key="watch-root" data-focused="false" class="control-btn circle-btn settings-btn"
-                  focusable=${this.showControls ? 'true' : 'false'}>
-                  <i class="ctv-icon ctv-settings"></i>
-                </tv-focusable>
+                <div class="pill-group" data-pill-group>
+                  <tv-focusable id="captions-btn" focus-key="watch-captions" parent-focus-key="watch-root" data-focused="false" class="control-btn pill-btn"
+                    focusable=${this.showControls ? 'true' : 'false'}>
+                    <i class="ctv-icon ctv-closed-caption"></i>
+                    <span>Subtítulos</span>
+                  </tv-focusable>
+                  <tv-focusable focus-key="watch-settings" parent-focus-key="watch-root" data-focused="false" class="control-btn pill-btn"
+                    focusable=${this.showControls ? 'true' : 'false'}>
+                    <i class="ctv-icon ctv-settings"></i>
+                  </tv-focusable>
+                </div>
               </div>
             </div>
           </div>
@@ -577,7 +618,9 @@ export class PlayerControlsElement extends LitElement {
     const hiddenOverlayFocusKeys = new Set([
       'watch-playpause',
       'watch-settings',
+      'watch-captions',
       'watch-episodes',
+      'watch-restart',
       'watch-seekbar',
     ]);
 
@@ -688,6 +731,8 @@ export class PlayerControlsElement extends LitElement {
         'watch-seek-fwd',
         'watch-seekbar',
         'watch-episodes',
+        'watch-restart',
+        'watch-captions',
         'watch-settings',
         'watch-skip',
         'watch-next-play',
@@ -722,7 +767,9 @@ export class PlayerControlsElement extends LitElement {
     switch (key) {
       case 'watch-playpause': this.togglePlayPause(); break;
       case 'watch-episodes': this.toggleEpisodesRail(); break;
+      case 'watch-restart': this.restartVideo(); break;
       case 'watch-settings': this.toggleSettings(); break;
+      case 'watch-captions': this.showCaptionsToast(); break;
       case 'watch-seek-back': {
         const seekbar = this.renderRoot.querySelector('tv-player-seekbar') as any;
         if (seekbar && typeof seekbar.seekBy === 'function') seekbar.seekBy(-SEEK_STEP_SECONDS);
@@ -751,7 +798,7 @@ export class PlayerControlsElement extends LitElement {
     if (!this.railExpanded) return;
     requestAnimationFrame(() => {
       const currentFocus = getCurrentFocusKey();
-      if (currentFocus === 'watch-episodes' || currentFocus === 'episodes-rail' || currentFocus?.startsWith('rail-ep-item-')) return;
+      if (currentFocus === 'watch-episodes' || currentFocus === 'watch-restart' || currentFocus === 'watch-captions' || currentFocus === 'episodes-rail' || currentFocus?.startsWith('rail-ep-item-')) return;
       this.railExpanded = false;
     });
   };
@@ -762,16 +809,20 @@ export class PlayerControlsElement extends LitElement {
     const key = source?.getAttribute('focus-key');
     this._restartControlsHideTimer();
 
-    if (key === 'watch-settings' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-seek-fwd'); return; }
+    if (key === 'watch-settings' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-captions'); return; }
+    if (key === 'watch-captions' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-seek-fwd'); return; }
+    if (key === 'watch-captions' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-settings'); return; }
     if (key === 'watch-playpause' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-seek-back'); return; }
     if (key === 'watch-playpause' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-seek-fwd'); return; }
-    if (key === 'watch-seek-back' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-episodes'); return; }
     if (key === 'watch-seek-back' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-playpause'); return; }
     if (key === 'watch-seek-fwd' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-playpause'); return; }
-    if (key === 'watch-seek-fwd' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-settings'); return; }
-    if (key === 'watch-episodes' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-seek-back'); return; }
+    if (key === 'watch-seek-fwd' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-captions'); return; }
+    if (key === 'watch-episodes' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-restart'); return; }
+    if (key === 'watch-restart' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-seek-back'); return; }
+    if (key === 'watch-restart' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-episodes'); return; }
+    if (key === 'watch-seek-back' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-restart'); return; }
 
-    if (!['watch-episodes', 'watch-seek-back', 'watch-playpause', 'watch-seek-fwd', 'watch-settings'].includes(key ?? '') || custom.detail?.direction !== 'down' || this._allEpisodes.length === 0) return;
+    if (!['watch-episodes', 'watch-restart', 'watch-seek-back', 'watch-playpause', 'watch-seek-fwd', 'watch-captions', 'watch-settings'].includes(key ?? '') || custom.detail?.direction !== 'down' || this._allEpisodes.length === 0) return;
 
     custom.preventDefault();
     this.railExpanded = true;
@@ -787,6 +838,10 @@ export class PlayerControlsElement extends LitElement {
   focusNextPlay() { SpatialNavigation.setFocus('watch-next-play'); }
 
   toggleSettings() { this.settingsOpen = !this.settingsOpen; }
+
+  showCaptionsToast() {
+    toastStore.getState().show('Subtítulos próximamente', 'info', 3000);
+  }
 
   toggleEpisodesRail() {
     this.railExpanded = !this.railExpanded;
@@ -804,6 +859,14 @@ export class PlayerControlsElement extends LitElement {
     if (this.videoEl) {
       if (this._isPlaying) this.videoEl.pause();
       else this.videoEl.play().catch(() => { });
+    }
+  }
+
+  restartVideo() {
+    if (this.videoEl) {
+      this.videoEl.currentTime = 0;
+      this.videoEl.play().catch(() => { });
+      this.dispatchEvent(new CustomEvent('restart-video', { bubbles: true, composed: true }));
     }
   }
 

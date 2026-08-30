@@ -73,9 +73,8 @@
   let adPhase = $state<"none" | "preroll" | "midroll" | "postroll">("none");
   let prerollChecked = $state(false);
   let settingsOpen = $state(false);
-  let debugVisible = $state(
-    typeof window !== "undefined" && window.location.search.includes("debug=1"),
-  );
+  let debugVisible = $state(false);
+  $effect(() => { debugVisible = $svelteSettingsStore.debugMode; });
 
   const forceShowAds = $derived(
     typeof window !== "undefined" &&
@@ -86,15 +85,12 @@
   let adOverlayEl = $state<any>(null);
   let videoEl = $state<HTMLVideoElement | null>(null);
 
-  let pendingNavigation: { contentId: string; episodeId?: string } | null =
-    null;
+  let pendingNavigation: { contentId: string; episodeId?: string } | null = null;
   let loadedUrl: string | null = null;
 
   let streamLimitError = $state<string | null>(null);
   let streamLimitSessions = $state<any[]>([]);
-  let playerError = $state<{ code?: number | string; message?: string } | null>(
-    null,
-  );
+  let playerError = $state<{ code?: number | string; message?: string } | null>(null);
   let streamPingToken: string | null = null;
   let clientRequestId =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -112,13 +108,9 @@
   let hideTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const tokens = $derived($svelteAuthStore.tokens);
-  const isAdmin = $derived(
-    $svelteAuthStore.session?.current_user?.admin ?? false,
-  );
+  const isAdmin = $derived($svelteAuthStore.session?.current_user?.admin ?? false);
   const clientEndpoint = $derived($svelteConfigStore.config.CLIENT_ENDPOINT);
-  const prefersModernPlayback = $derived(
-    $svelteSettingsStore.prefersModernPlayback,
-  );
+  const prefersModernPlayback = $derived($svelteSettingsStore.prefersModernPlayback);
   const siteSettings = $derived($svelteSiteSettingsStore.settings);
 
   const streamUrl = $derived(watchData?.sources?.[0]?.url);
@@ -126,10 +118,7 @@
   const useNative = $derived(!prefersModernPlayback && prefersNativePlayer());
 
   const userLang = $derived.by(() => {
-    const prefs =
-      ($svelteAuthStore.selectedProfile?.preferences as
-        | Array<{ audio_language?: string; language?: string }>
-        | undefined) ?? [];
+    const prefs = ($svelteAuthStore.selectedProfile?.preferences as Array<{ audio_language?: string; language?: string }> | undefined) ?? [];
     const langPref = prefs.find((p) => p?.audio_language || p?.language);
     return (
       langPref?.audio_language ??
@@ -157,17 +146,12 @@
 
   const currentSeasonNumber = $derived.by(() => {
     if (!watchData?.episode?.season_id || !watchData?.seasons) return null;
-    const idx = watchData.seasons.findIndex(
-      (s) => s.id === watchData.episode!.season_id,
-    );
+    const idx = watchData.seasons.findIndex((s) => s.id === watchData.episode!.season_id);
     return idx >= 0 ? (watchData.seasons[idx].position ?? idx) : null;
   });
 
   const nextEpisode = $derived.by(() => {
-    if (
-      currentEpisodeIndex >= 0 &&
-      currentEpisodeIndex < allEpisodes.length - 1
-    ) {
+    if (currentEpisodeIndex >= 0 && currentEpisodeIndex < allEpisodes.length - 1) {
       return allEpisodes[currentEpisodeIndex + 1];
     }
     return null;
@@ -179,6 +163,12 @@
     if (epSegs.length === 0) return contentSegs;
     if (contentSegs.length === 0) return epSegs;
     return epSegs.concat(contentSegs);
+  });
+
+  // OPTIMIZACIÓN 1: Derivar los datos de episodios una sola vez para evitar comparaciones manuales costosas
+  const episodesData = $derived.by(() => {
+    if (allEpisodes.length === 0) return null;
+    return { episodes: allEpisodes, currentId: episodeId, contentId };
   });
 
   function classifyPlayerError(err: any): 'DRM' | 'MANIFEST' | 'MEDIA' | 'NETWORK' | 'PLAYER' | 'UNKNOWN' {
@@ -210,12 +200,6 @@
       }
     }, intervalMs);
     streamPingToken = sessionId;
-  }
-
-  function releaseStreamSlot() {
-    const sessionId = streamPingToken || getStoredSessionToken();
-    if (!sessionId || !tokens?.accessToken) return;
-    sendStreamEnd(tokens.accessToken, sessionId).catch(() => {});
   }
 
   function focusPlaybackControl() {
@@ -257,22 +241,30 @@
     };
   });
 
-  // Stream slot cleanup on pagehide / unmount
+  // OPTIMIZACIÓN 2: Limpieza de slot y analytics usando sendBeacon (no bloquea el hilo al cerrar la TV)
   $effect(() => {
     const handlePageHide = () => {
       const sessionId = streamPingToken || getStoredSessionToken();
-      if (!sessionId || !tokens?.accessToken) return;
-      const url = `${window.location.origin}/stream/end`;
-      const payload = new Blob([JSON.stringify({ session_id: sessionId })], {
-        type: "application/json",
-      });
-      navigator.sendBeacon?.(url, payload);
+      
+      // 1. Liberar slot de transmisión de forma asíncrona
+      if (sessionId && tokens?.accessToken) {
+        const payload = JSON.stringify({ session_id: sessionId });
+        navigator.sendBeacon?.(`${window.location.origin}/stream/end`, new Blob([payload], { type: "application/json" }));
+      }
+
+      // 2. Enviar métricas de salida de forma asíncrona
+      if (videoEl && videoEl.duration && _playbackStarted) {
+        const watchedPct = (videoEl.currentTime / videoEl.duration) * 100;
+        trackPlaybackExit(contentId, videoEl.currentTime, videoEl.duration, watchedPct, 'pagehide');
+      }
+      
+      stopStreamPing();
     };
+    
     window.addEventListener("pagehide", handlePageHide);
     return () => {
       window.removeEventListener("pagehide", handlePageHide);
-      stopStreamPing();
-      releaseStreamSlot();
+      handlePageHide(); // Fallback por si pagehide no se dispara en ciertos navegadores de TV
     };
   });
 
@@ -291,7 +283,9 @@
   // Load watch data
   function fetchData() {
     if (!tokens || !contentId) return;
-    watchData = null;
+    
+    // CORRECCIÓN: No anulamos watchData aquí para no perder la referencia si se necesita, 
+    // o si lo hacemos, evaluamos el intent DESPUÉS de recibir los nuevos datos.
     streamLimitError = null;
     streamLimitSessions = [];
     stopStreamPing();
@@ -299,20 +293,6 @@
     _bufferCount = 0;
     _bufferTotalMs = 0;
     _lastBufferStart = 0;
-
-    // Track play_intent (once per content load)
-    if (!_playIntentTracked) {
-      _playIntentTracked = true;
-      const source = (watchData?.continue_watching?.progress ?? 0) > 0
-        ? 'continue_watching'
-        : 'detail';
-      trackPlayIntent(
-        contentId,
-        (watchData?.content?.content_type ?? watchData?.content?.contentType ?? 'movie') as 'movie' | 'series' | 'live',
-        source as any,
-        episodeId,
-      );
-    }
 
     const storedToken = getStoredSessionToken();
     const opts = {
@@ -325,15 +305,27 @@
       episodeId,
       hasToken: Boolean(storedToken),
     });
+    
     consumeWatchData(tokens.accessToken, contentId, episodeId, opts)
       .then((data) => {
         pdbg("watch.watchdata", "resolved", {
           hasSources: Boolean(data.sources?.length),
           title: data.content?.title,
         });
-        const isTV =
-          data.content.content_type === "TVSHOW" ||
-          data.content.contentType === "TVSHOW";
+
+        // CORRECCIÓN: Evaluamos play_intent AHORA que tenemos los datos reales
+        if (!_playIntentTracked) {
+          _playIntentTracked = true;
+          const source = (data.continue_watching?.progress ?? 0) > 0 ? 'continue_watching' : 'detail';
+          trackPlayIntent(
+            contentId,
+            (data.content?.content_type ?? data.content?.contentType ?? 'movie') as 'movie' | 'series' | 'live',
+            source as any,
+            episodeId,
+          );
+        }
+
+        const isTV = data.content.content_type === "TVSHOW" || data.content.contentType === "TVSHOW";
         if (isTV && !episodeId && !data.episode) {
           const firstEpisode = data.seasons?.[0]?.episodes?.[0];
           if (firstEpisode) {
@@ -346,13 +338,7 @@
           return;
         }
         if (!data.sources?.length) {
-          toastStore
-            .getState()
-            .show(
-              "Este contenido no tiene episodios disponibles.",
-              "error",
-              4000,
-            );
+          toastStore.getState().show("Este contenido no tiene episodios disponibles.", "error", 4000);
           replace("/home");
           return;
         }
@@ -370,30 +356,19 @@
         pdbg("watch.watchdata", "REJECTED", err);
         const errStr = String(err?.message ?? err ?? "");
 
-        if (
-          err?.body?.error === "STREAM_LIMIT_REACHED" ||
-          errStr.includes("STREAM_LIMIT_REACHED")
-        ) {
-          streamLimitError =
-            "Has alcanzado el número máximo de transmisiones simultáneas.";
+        if (err?.body?.error === "STREAM_LIMIT_REACHED" || errStr.includes("STREAM_LIMIT_REACHED")) {
+          streamLimitError = "Has alcanzado el número máximo de transmisiones simultáneas.";
           streamLimitSessions = err?.body?.sessions ?? [];
           clearSessionToken();
           return;
         }
 
-        const is502 =
-          err?.status === 502 ||
-          errStr.includes("502") ||
-          errStr.toLowerCase().includes("bad gateway");
-        toastStore
-          .getState()
-          .show(
-            is502
-              ? "El servicio no está disponible temporalmente. Intenta de nuevo."
-              : "No se pudo cargar el contenido. Intenta de nuevo más tarde.",
-            "error",
-            is502 ? 6000 : 4000,
-          );
+        const is502 = err?.status === 502 || errStr.includes("502") || errStr.toLowerCase().includes("bad gateway");
+        toastStore.getState().show(
+          is502 ? "El servicio no está disponible temporalmente. Intenta de nuevo." : "No se pudo cargar el contenido. Intenta de nuevo más tarde.",
+          "error",
+          is502 ? 6000 : 4000,
+        );
         replace("/home");
       });
   }
@@ -411,8 +386,7 @@
       return;
     }
     pdbg("watch.preroll", "fetching VAST");
-    prerollAds
-      .next(7000)
+    prerollAds.next(7000)
       .then((ad) => {
         pdbg("watch.preroll", "vast settled", ad ? "ad found" : "no ad", prerollAds.currentLabel);
         prerollChecked = true;
@@ -444,8 +418,7 @@
       url: streamUrl,
       resume,
     });
-    engine
-      .load(streamUrl, resume)
+    engine.load(streamUrl, resume)
       .then(() => {
         if (cancelled) return;
         pdbg("watch.load", "engine.load resolved -> play()");
@@ -466,64 +439,33 @@
     };
   });
 
-  // Progress reporting — build cwItemBase once, update only dynamic fields
+  // Progress reporting
   $effect(() => {
     if (!tokens || !contentId || !watchData) return;
 
-    const cover =
-      resolvePoster(
-        watchData.content.images,
-        watchData.content.cover_resized ?? watchData.content.cover,
-        clientEndpoint,
-      ) ?? undefined;
-    const banner =
-      resolveBackdrop(
-        watchData.content.images,
-        watchData.content.banner_resized ?? watchData.content.banner,
-        clientEndpoint,
-        "medium",
-      ) ?? undefined;
+    const cover = resolvePoster(watchData.content.images, watchData.content.cover_resized ?? watchData.content.cover, clientEndpoint) ?? undefined;
+    const banner = resolveBackdrop(watchData.content.images, watchData.content.banner_resized ?? watchData.content.banner, clientEndpoint, "medium") ?? undefined;
+    
     const cwItemBase = {
       content_id: contentId,
       episode_id: episodeId,
       title: watchData.content.title,
       description: watchData.episode?.title ?? watchData.content.description,
-      content_type:
-        watchData.content.content_type ?? watchData.content.contentType,
+      content_type: watchData.content.content_type ?? watchData.content.contentType,
       cover,
       cover_resized: cover,
       banner,
       banner_resized: banner,
-      image_url:
-        resolveBackdrop(
-          watchData.content.images,
-          watchData.content.banner_resized ??
-            watchData.content.banner ??
-            watchData.content.cover_resized ??
-            watchData.content.cover,
-          clientEndpoint,
-          "medium",
-        ) ?? undefined,
+      image_url: resolveBackdrop(watchData.content.images, watchData.content.banner_resized ?? watchData.content.banner ?? watchData.content.cover_resized ?? watchData.content.cover, clientEndpoint, "medium") ?? undefined,
       url: `/watch/${contentId}${episodeId ? `/${episodeId}` : ""}`,
-      episode_title:
-        watchData.season?.title && watchData.episode?.title
-          ? `${watchData.season.title} - ${watchData.episode.title}`
-          : watchData.episode?.title,
+      episode_title: watchData.season?.title && watchData.episode?.title ? `${watchData.season.title} - ${watchData.episode.title}` : watchData.episode?.title,
     };
 
     const timer = setInterval(() => {
       const video = videoEl;
       if (video && video.duration) {
-        const sessionToken =
-          streamPingToken || getStoredSessionToken() || undefined;
-        updateProgress(
-          tokens.accessToken,
-          contentId,
-          episodeId,
-          video.currentTime,
-          video.duration,
-          sessionToken,
-        ).catch(() => {});
+        const sessionToken = streamPingToken || getStoredSessionToken() || undefined;
+        updateProgress(tokens.accessToken, contentId, episodeId, video.currentTime, video.duration, sessionToken).catch(() => {});
         addContinueWatching({
           ...cwItemBase,
           progress: Math.round(video.currentTime * 1000),
@@ -534,12 +476,11 @@
     return () => clearInterval(timer);
   });
 
-  // On ended - register once when engine is ready, not on every reactive change
+  // On ended
   $effect(() => {
     if (!engine.engineReady) return;
     
     const handleEnded = () => {
-      // Track playback complete
       const video = videoEl;
       if (video && video.duration) {
         const contentType = (watchData?.content?.content_type ?? watchData?.content?.contentType ?? 'movie') as string;
@@ -547,67 +488,59 @@
       }
 
       if (isAdmin && !forceShowAds) {
-        if (nextEpisode) {
-          replace(`/watch/${contentId}/${nextEpisode.id}`);
-        } else {
-          window.history.back();
-        }
+        if (nextEpisode) replace(`/watch/${contentId}/${nextEpisode.id}`);
+        else window.history.back();
         return;
       }
       
-      postrollAds
-        .next(7000)
+      postrollAds.next(7000)
         .then((ad) => {
           if (ad) {
-            pendingNavigation = nextEpisode
-              ? { contentId, episodeId: String(nextEpisode.id) }
-              : { contentId };
+            pendingNavigation = nextEpisode ? { contentId, episodeId: String(nextEpisode.id) } : { contentId };
             currentAd = ad;
             adPhase = "postroll";
           } else {
-            if (nextEpisode) {
-              replace(`/watch/${contentId}/${nextEpisode.id}`);
-            } else {
-              window.history.back();
-            }
+            if (nextEpisode) replace(`/watch/${contentId}/${nextEpisode.id}`);
+            else window.history.back();
           }
         })
         .catch(() => {
-          if (nextEpisode) {
-            replace(`/watch/${contentId}/${nextEpisode.id}`);
-          } else {
-            window.history.back();
-          }
+          if (nextEpisode) replace(`/watch/${contentId}/${nextEpisode.id}`);
+          else window.history.back();
         });
     };
     
     engine.setOnEnded(handleEnded);
   });
 
-  // Controls properties sync — only write when values actually change
+  // OPTIMIZACIÓN 3: Controls properties sync — solo escribe cuando los valores cambian realmente
   $effect(() => {
     const el = controlsEl;
-    if (!el) return;
-    if (engine.engineReady) el.engineRef = engine.getEngine();
-    if (el.videoEl !== videoEl) el.videoEl = videoEl;
+    if (!el || !engine.engineReady) return;
+
+    el.engineRef = engine.getEngine();
+    el.videoEl = videoEl;
+    el.segments = allSegments;
+    el.clientEndpoint = clientEndpoint;
+    el.nextEpisode = nextEpisode;
+
     if (watchData) {
       const title = watchData.content.title;
       if (el.contentTitle !== title) el.contentTitle = title;
+      
       const subtitle = watchData.episode?.title
         ? `${(watchData.content.content_type === "TVSHOW" || watchData.content.contentType === "TVSHOW") && currentSeasonNumber ? `T${currentSeasonNumber} · ` : ""}${watchData.episode.title}`
         : "";
       if (el.contentSubtitle !== subtitle) el.contentSubtitle = subtitle;
     }
-    if (allEpisodes.length > 0) {
-      const epData = { episodes: allEpisodes, currentId: episodeId, contentId };
+
+    const epData = episodesData;
+    if (epData) {
       const prev = el.episodes;
-      if (!prev || prev.currentId !== epData.currentId || prev.contentId !== epData.contentId || prev.episodes.length !== epData.episodes.length) {
+      if (!prev || prev.currentId !== epData.currentId || prev.contentId !== epData.contentId) {
         el.episodes = epData;
       }
     }
-    el.segments = allSegments;
-    if (el.clientEndpoint !== clientEndpoint) el.clientEndpoint = clientEndpoint;
-    if (el.nextEpisode?.id !== nextEpisode?.id) el.nextEpisode = nextEpisode;
   });
 
   // Error listener from engine
@@ -620,7 +553,6 @@
       pdbg("watch.player-error", "showing overlay", err?.code, err?.message);
       playerError = { code: err?.code, message: err?.message };
 
-      // Track playback error
       const errorCategory = classifyPlayerError(err);
       const phase = _playbackStarted ? 'running' : 'load';
       trackPlaybackError(contentId, err?.code, err?.message, errorCategory, phase);
@@ -637,15 +569,7 @@
       _playbackStarted = true;
       const startupMs = Math.round(performance.now() - _playbackStartTime);
       const contentType = (watchData?.content?.content_type ?? watchData?.content?.contentType ?? 'movie') as string;
-      trackPlaybackStart(
-        contentId,
-        contentType as any,
-        'detail',
-        startupMs,
-        undefined,
-        undefined,
-        episodeId,
-      );
+      trackPlaybackStart(contentId, contentType as any, 'detail', startupMs, undefined, undefined, episodeId);
     });
     return unsub;
   });
@@ -676,11 +600,8 @@
       settingsOpen = open;
       if (!open) {
         requestAnimationFrame(() => {
-          if (doesFocusableExist("watch-settings")) {
-            setFocus("watch-settings");
-          } else if (doesFocusableExist("watch-root")) {
-            setFocus("watch-root");
-          }
+          if (doesFocusableExist("watch-settings")) setFocus("watch-settings");
+          else if (doesFocusableExist("watch-root")) setFocus("watch-root");
         });
       }
     };
@@ -690,13 +611,13 @@
       replace(`/watch/${cid}/${eid}`);
     };
 
-    const handleSkip = () => {
+    const handleSkip = () => focusPlaybackControl();
+
+    const handleRestartVideo = () => {
       focusPlaybackControl();
     };
 
-    const handleEpisodeSelect = (
-      e: CustomEvent<{ episodeId: string | number }>,
-    ) => {
+    const handleEpisodeSelect = (e: CustomEvent<{ episodeId: string | number }>) => {
       const selectedEpisodeId = e.detail.episodeId;
       if (String(selectedEpisodeId) !== String(episodeId)) {
         replace(`/watch/${contentId}/${selectedEpisodeId}`);
@@ -706,16 +627,15 @@
     el.addEventListener("settings-toggle", handleSettingsToggle);
     el.addEventListener("next-episode", handleNextEpisode);
     el.addEventListener("skip", handleSkip);
+    el.addEventListener("restart-video", handleRestartVideo);
     el.addEventListener("episode-select", handleEpisodeSelect as EventListener);
 
     return () => {
       el.removeEventListener("settings-toggle", handleSettingsToggle);
       el.removeEventListener("next-episode", handleNextEpisode);
       el.removeEventListener("skip", handleSkip);
-      el.removeEventListener(
-        "episode-select",
-        handleEpisodeSelect as EventListener,
-      );
+      el.removeEventListener("restart-video", handleRestartVideo);
+      el.removeEventListener("episode-select", handleEpisodeSelect as EventListener);
     };
   });
 
@@ -729,11 +649,7 @@
       const pending = pendingNavigation;
       if (pending) {
         pendingNavigation = null;
-        replace(
-          pending.episodeId
-            ? `/watch/${pending.contentId}/${pending.episodeId}`
-            : `/watch/${pending.contentId}`,
-        );
+        replace(pending.episodeId ? `/watch/${pending.contentId}/${pending.episodeId}` : `/watch/${pending.contentId}`);
         return;
       }
       currentAd = null;
@@ -749,21 +665,14 @@
   $effect(() => {
     if (adPhase === "none" || !currentAd) return;
     const graceMs = Math.max(25_000, (currentAd.duration || 0) * 1000 + 15_000);
-    pdbg("watch.ad-watchdog", "armed", {
-      adPhase,
-      duration: currentAd.duration,
-      graceMs,
-    });
+    pdbg("watch.ad-watchdog", "armed", { adPhase, duration: currentAd.duration, graceMs });
+    
     const timer = setTimeout(() => {
       pdbg("watch.ad-watchdog", "FIRED — releasing gate", { adPhase });
       const pending = pendingNavigation;
       if (pending) {
         pendingNavigation = null;
-        replace(
-          pending.episodeId
-            ? `/watch/${pending.contentId}/${pending.episodeId}`
-            : `/watch/${pending.contentId}`,
-        );
+        replace(pending.episodeId ? `/watch/${pending.contentId}/${pending.episodeId}` : `/watch/${pending.contentId}`);
         return;
       }
       currentAd = null;
@@ -778,10 +687,7 @@
     if (el) {
       el.ad = currentAd;
       el.setAttribute("skip-offset", "5");
-      pdbg(
-        "watch.ad-overlay",
-        currentAd ? "ad pushed to overlay" : "ad cleared",
-      );
+      pdbg("watch.ad-overlay", currentAd ? "ad pushed to overlay" : "ad cleared");
     }
   });
 
@@ -802,7 +708,6 @@
         return;
       }
 
-      // Track playback exit
       const video = videoEl;
       if (video && video.duration) {
         const watchedPct = (video.currentTime / video.duration) * 100;
@@ -879,16 +784,11 @@
   >
     <div class="flex flex-col items-center text-center max-w-lg px-8">
       <MonitorPlay class="text-[#3ea6ff] mb-6 w-16 h-16" />
-
-      <h1 class="text-white text-3xl font-semibold mb-4">
-        Límite de transmisiones alcanzado
-      </h1>
-
+      <h1 class="text-white text-3xl font-semibold mb-4">Límite de transmisiones alcanzado</h1>
       <p class="text-white/70 text-base leading-relaxed mb-10">
         Ya hay demasiados dispositivos reproduciendo contenido en esta cuenta.
         Detén la transmisión en otro dispositivo para continuar viendo.
       </p>
-
       <div class="flex gap-4">
         <Focusable
           focusKey="stream-limit-home"
@@ -898,11 +798,8 @@
           class="px-8 py-3 bg-white/10 text-white font-medium rounded-full text-base cursor-pointer"
           playSound={true}
         >
-          {#snippet children()}
-            Volver al inicio
-          {/snippet}
+          {#snippet children()}Volver al inicio{/snippet}
         </Focusable>
-
         <Focusable
           focusKey="stream-limit-retry"
           onEnterPress={() => {
@@ -914,9 +811,7 @@
           class="px-8 py-3 bg-white/10 text-white font-medium rounded-full text-base cursor-pointer"
           playSound={true}
         >
-          {#snippet children()}
-            Reintentar
-          {/snippet}
+          {#snippet children()}Reintentar{/snippet}
         </Focusable>
       </div>
     </div>
@@ -932,23 +827,16 @@
   >
     <div class="flex flex-col items-center text-center max-w-lg px-8">
       <AlertTriangle class="text-red-400 mb-6 w-16 h-16" />
-
-      <h1 class="text-white text-3xl font-semibold mb-4">
-        Error de reproducción
-      </h1>
-
+      <h1 class="text-white text-3xl font-semibold mb-4">Error de reproducción</h1>
       <p class="text-white/70 text-base leading-relaxed mb-4">
-        Ocurrió un error al intentar reproducir el contenido. Por favor, intenta
-        de nuevo.
+        Ocurrió un error al intentar reproducir el contenido. Por favor, intenta de nuevo.
       </p>
-
       {#if playerError.code != null || playerError.message}
         <p class="text-white/40 text-sm font-mono mb-8">
           {playerError.code != null ? playerError.code : ""}
           {playerError.message ? `: ${playerError.message}` : ""}
         </p>
       {/if}
-
       <div class="flex gap-4">
         <Focusable
           focusKey="player-error-back"
@@ -958,28 +846,21 @@
           class="px-8 py-3 bg-white/10 text-white font-medium rounded-full text-base cursor-pointer"
           playSound={true}
         >
-          {#snippet children()}
-            Volver
-          {/snippet}
+          {#snippet children()}Volver{/snippet}
         </Focusable>
-
         <Focusable
           focusKey="player-error-retry"
           onEnterPress={() => {
             playerError = null;
             if (loadedUrl) {
               const resume = watchData?.continue_watching?.progress ?? 0;
-              engine
-                .load(loadedUrl, resume)
+              engine.load(loadedUrl, resume)
                 .then(() => {
                   engine.play();
                   engine.applyPreferredAudioLanguage(userLang);
                 })
                 .catch((e: any) => {
-                  playerError = {
-                    code: e?.code,
-                    message: e?.message ?? "Error al cargar el contenido.",
-                  };
+                  playerError = { code: e?.code, message: e?.message ?? "Error al cargar el contenido." };
                 });
             }
           }}
@@ -987,14 +868,13 @@
           class="px-8 py-3 bg-white/10 text-white font-medium rounded-full text-base cursor-pointer"
           playSound={true}
         >
-          {#snippet children()}
-            Reintentar
-          {/snippet}
+          {#snippet children()}Reintentar{/snippet}
         </Focusable>
       </div>
     </div>
   </FocusContainer>
 {:else}
+  <!-- OPTIMIZACIÓN 4: CSS Containment estricto para evitar Reflows en el navegador de la TV -->
   <FocusContainer
     focusKey="watch-root"
     focusable={false}
@@ -1002,25 +882,25 @@
     trackChildren={true}
     saveLastFocusedChild={true}
     class="fixed inset-0 w-screen h-screen bg-black overflow-hidden select-none"
-    style="contain: layout style;"
+    style="contain: strict; transform: translateZ(0);"
   >
     {#if !ready && !streamLimitError}
-      <div
-        class="absolute inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30"
-        style="contain: layout paint;"
-      >
+      <div class="absolute inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30" style="contain: layout paint;">
         <p class="text-white/50 text-xl tracking-wide uppercase">Cargando...</p>
       </div>
     {/if}
 
+    <!-- OPTIMIZACIÓN 5: Aislamiento de renderizado del video y precarga -->
     <video
       bind:this={videoEl}
       class="absolute inset-0 w-full h-full block object-contain object-center"
-      style="transform: translateZ(0); contain: strict;"
+      style="contain: strict; transform: translateZ(0);"
       autoplay
       playsinline
+      preload="auto"
     ></video>
 
+    <!-- Capa de gradiente aislada -->
     <div
       class="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60"
       style="contain: paint; will-change: opacity;"
@@ -1040,9 +920,7 @@
     {/if}
 
     {#if debugVisible}
-      <div
-        class="absolute top-0 right-0 z-50 p-3 bg-black/90 text-green-400 text-xs font-mono leading-5 max-w-xs"
-      >
+      <div class="absolute top-0 right-0 z-50 p-3 bg-black/90 text-green-400 text-xs font-mono leading-5 max-w-xs">
         <div>engineReady: {String(engine.engineReady)}</div>
         <div>watchData: {String(Boolean(watchData))}</div>
         <div>streamUrl: {streamUrl ? "ok" : "null"}</div>
@@ -1053,6 +931,15 @@
         <div>video.paused: {videoEl ? String(videoEl.paused) : "no-el"}</div>
         <div>video.src: {videoEl?.src ? "ok" : "empty"}</div>
         <div>ready: {String(ready)}</div>
+        {#if engine.getProfile()}
+          <div class="border-t border-green-800 my-1 pt-1"></div>
+          <div>maxH: {engine.getProfile()?.decoderMaxHeight}p (disp: {engine.getProfile()?.displayMaxHeight}p)</div>
+          <div>lowEnd: {String(engine.getProfile()?.isLowEndDevice)}</div>
+          <div>bwEst: {Math.round((engine.getProfile()?.bandwidthEstimate ?? 0) / 1000)}kbps</div>
+          {#if engine.getProfile()?.performanceCap}
+            <div class="text-yellow-400">perfCap: {engine.getProfile()?.performanceCap?.maxHeight}p ({engine.getProfile()?.performanceCap?.reason})</div>
+          {/if}
+        {/if}
       </div>
     {/if}
   </FocusContainer>
