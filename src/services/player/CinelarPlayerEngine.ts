@@ -311,9 +311,7 @@ export class CinelarPlayerEngine {
     const video = this.videoElement;
     if (!video) return;
 
-    const resumeSec = (startTime && startTime > 0)
-      ? (startTime > 1000 ? startTime / 1000 : startTime)
-      : undefined;
+    const resumeSec = (startTime && startTime > 0) ? startTime : undefined;
 
     if (this.player && this.isAdaptiveManifest(url)) {
       pdbg('engine.load', 'starting shaka load', { url, resumeSec });
