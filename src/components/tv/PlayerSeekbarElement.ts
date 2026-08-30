@@ -427,8 +427,8 @@ export class PlayerSeekbarElement extends LitElement {
     if (video.seekable.length > 0) {
       target = Math.max(video.seekable.start(0), Math.min(target, video.seekable.end(video.seekable.length - 1)));
     }
-    video.currentTime = target;
     this._seekAccumulator = 0;
+    this._dispatch('seek-apply', { time: target });
     this._dispatch('seek-change');
   }
 

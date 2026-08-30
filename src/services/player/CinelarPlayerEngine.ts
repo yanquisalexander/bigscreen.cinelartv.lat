@@ -311,10 +311,14 @@ export class CinelarPlayerEngine {
     const video = this.videoElement;
     if (!video) return;
 
+    const resumeSec = (startTime && startTime > 0)
+      ? (startTime > 1000 ? startTime / 1000 : startTime)
+      : undefined;
+
     if (this.player && this.isAdaptiveManifest(url)) {
-      pdbg('engine.load', 'starting shaka load', url);
+      pdbg('engine.load', 'starting shaka load', { url, resumeSec });
       try {
-        await this.player.load(url, startTime && startTime > 0 ? startTime : undefined);
+        await this.player.load(url, resumeSec);
         pdbg('engine.load', 'shaka load OK');
         return;
       } catch (e: any) {
@@ -329,9 +333,9 @@ export class CinelarPlayerEngine {
       try { await this.player.detach(); } catch { /* ignore */ }
     }
     pdbg('engine.load', 'native fallback (video.src)', url);
-    if (startTime && startTime > 0) {
+    if (resumeSec && resumeSec > 0) {
       const seekOnce = () => {
-        video.currentTime = startTime!;
+        video.currentTime = resumeSec;
         video.removeEventListener('loadedmetadata', seekOnce);
       };
       video.addEventListener('loadedmetadata', seekOnce);
@@ -370,7 +374,13 @@ export class CinelarPlayerEngine {
   }
 
   public pause() { this.videoElement?.pause(); }
-  public seek(time: number) { if (this.videoElement) this.videoElement.currentTime = time; }
+  public seek(time: number) {
+    if (this.player && this.player.seek) {
+      this.player.seek(time);
+    } else if (this.videoElement) {
+      this.videoElement.currentTime = time;
+    }
+  }
 
   // ─── Gestión de Pistas y Calidad ───
   public getVariantTracksInfo() {

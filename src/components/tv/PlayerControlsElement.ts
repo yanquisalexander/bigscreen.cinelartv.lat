@@ -315,6 +315,7 @@ export class PlayerControlsElement extends LitElement {
     this.addEventListener('arrow-press', this._handleArrowPress);
     this.addEventListener('seek-preview', this._handleSeekPreview as EventListener);
     this.addEventListener('seek-end', this._handleSeekEnd as EventListener);
+    this.addEventListener('seek-apply', this._handleSeekApply as EventListener);
   }
 
   disconnectedCallback() {
@@ -334,6 +335,7 @@ export class PlayerControlsElement extends LitElement {
     this.removeEventListener('arrow-press', this._handleArrowPress);
     this.removeEventListener('seek-preview', this._handleSeekPreview as EventListener);
     this.removeEventListener('seek-end', this._handleSeekEnd as EventListener);
+    this.removeEventListener('seek-apply', this._handleSeekApply as EventListener);
   }
 
   private _stopAllTimers() {
@@ -645,8 +647,11 @@ export class PlayerControlsElement extends LitElement {
   }
 
   private _handleSkip(endTime: number) {
-    if (!this.videoEl) return;
-    this.videoEl.currentTime = endTime;
+    if (this.engineRef && typeof this.engineRef.seek === 'function') {
+      this.engineRef.seek(endTime);
+    } else if (this.videoEl) {
+      this.videoEl.currentTime = endTime;
+    }
     this.skipSegment = null;
     this.dispatchEvent(new CustomEvent('skip', { bubbles: true, composed: true }));
   }
@@ -862,6 +867,16 @@ export class PlayerControlsElement extends LitElement {
     this._seekPreviewTime = 0;
   };
 
+  private _handleSeekApply = (e: CustomEvent) => {
+    const time = e.detail?.time;
+    if (time == null) return;
+    if (this.engineRef && typeof this.engineRef.seek === 'function') {
+      this.engineRef.seek(time);
+    } else if (this.videoEl) {
+      this.videoEl.currentTime = time;
+    }
+  };
+
   private _handleArrowPress = (e: Event) => {
     const custom = e as CustomEvent<{ direction?: string }>;
     const source = custom.composedPath().find((el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('focus-key'));
@@ -922,11 +937,13 @@ export class PlayerControlsElement extends LitElement {
   }
 
   restartVideo() {
-    if (this.videoEl) {
+    if (this.engineRef && typeof this.engineRef.seek === 'function') {
+      this.engineRef.seek(0);
+    } else if (this.videoEl) {
       this.videoEl.currentTime = 0;
-      this.videoEl.play().catch(() => { });
-      this.dispatchEvent(new CustomEvent('restart-video', { bubbles: true, composed: true }));
     }
+    if (this.videoEl) this.videoEl.play().catch(() => { });
+    this.dispatchEvent(new CustomEvent('restart-video', { bubbles: true, composed: true }));
   }
 
   playNextEpisode() {
