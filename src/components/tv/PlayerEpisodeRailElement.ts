@@ -215,7 +215,7 @@ export class PlayerEpisodeRailElement extends LitElement {
 
   private _renderEpisodeCard(episode: FlatEpisode, index: number, hasMultipleSeasons: boolean) {
     const isCurrent = String(episode.id) === String(this.currentEpisodeId);
-    const imageUrl = resolveEpisodeThumbnail(episode.images, episode.thumbnail_resized ?? episode.thumbnail, this.clientEndpoint);
+    const imageUrl = resolveEpisodeThumbnail(episode.images, episode.thumbnail_resized ?? episode.thumbnail, this.clientEndpoint, 'small');
     const itemW = this._virtualItemWidth || 180;
     const gap = this._virtualGap || 12;
     const x = index * (itemW + gap);

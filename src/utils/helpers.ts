@@ -29,8 +29,8 @@ export function resolvePoster(images: ContentImages | undefined, fallback?: stri
   return pickWebpUrl(images?.poster, baseUrl) ?? resolveImageUrl(fallback, baseUrl);
 }
 
-export function resolveEpisodeThumbnail(images: EpisodeImages | undefined, fallback?: string | null, baseUrl?: string): string | null {
-  return pickWebpUrl(images?.episode_thumbnail, baseUrl) ?? resolveImageUrl(fallback, baseUrl);
+export function resolveEpisodeThumbnail(images: EpisodeImages | undefined, fallback?: string | null, baseUrl?: string, preferredSize?: ImageSize): string | null {
+  return pickWebpUrl(images?.episode_thumbnail, baseUrl, preferredSize) ?? resolveImageUrl(fallback, baseUrl);
 }
 
 export function resolveLogo(images: ContentImages | undefined, baseUrl?: string): string | null {
