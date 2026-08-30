@@ -10,7 +10,7 @@ const PARENT_FOCUS_KEY = 'watch-root';
 @customElement('tv-player-skip-btn')
 export class PlayerSkipButtonElement extends LitElement {
   static styles = css`
-    :host { display: block; }
+    :host { display: block; contain: layout style; }
 
     .skip-btn {
       position: absolute;

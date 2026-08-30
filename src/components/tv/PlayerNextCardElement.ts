@@ -10,7 +10,7 @@ const PARENT_FOCUS_KEY = 'watch-root';
 @customElement('tv-player-next-card')
 export class PlayerNextCardElement extends LitElement {
   static styles = css`
-    :host { display: block; }
+    :host { display: block; contain: layout style; }
 
     .next-card {
       position: absolute;

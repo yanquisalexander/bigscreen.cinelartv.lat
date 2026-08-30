@@ -466,7 +466,7 @@
     };
   });
 
-  // Progress reporting
+  // Progress reporting — build cwItemBase once, update only dynamic fields
   $effect(() => {
     if (!tokens || !contentId || !watchData) return;
 
@@ -584,24 +584,30 @@
     engine.setOnEnded(handleEnded);
   });
 
-  // Controls properties sync
+  // Controls properties sync — only write when values actually change
   $effect(() => {
     const el = controlsEl;
     if (!el) return;
     if (engine.engineReady) el.engineRef = engine.getEngine();
-    el.videoEl = videoEl;
+    if (el.videoEl !== videoEl) el.videoEl = videoEl;
     if (watchData) {
-      el.contentTitle = watchData.content.title;
-      el.contentSubtitle = watchData.episode?.title
+      const title = watchData.content.title;
+      if (el.contentTitle !== title) el.contentTitle = title;
+      const subtitle = watchData.episode?.title
         ? `${(watchData.content.content_type === "TVSHOW" || watchData.content.contentType === "TVSHOW") && currentSeasonNumber ? `T${currentSeasonNumber} · ` : ""}${watchData.episode.title}`
         : "";
+      if (el.contentSubtitle !== subtitle) el.contentSubtitle = subtitle;
     }
     if (allEpisodes.length > 0) {
-      el.episodes = { episodes: allEpisodes, currentId: episodeId, contentId };
+      const epData = { episodes: allEpisodes, currentId: episodeId, contentId };
+      const prev = el.episodes;
+      if (!prev || prev.currentId !== epData.currentId || prev.contentId !== epData.contentId || prev.episodes.length !== epData.episodes.length) {
+        el.episodes = epData;
+      }
     }
     el.segments = allSegments;
-    el.clientEndpoint = clientEndpoint;
-    el.nextEpisode = nextEpisode;
+    if (el.clientEndpoint !== clientEndpoint) el.clientEndpoint = clientEndpoint;
+    if (el.nextEpisode?.id !== nextEpisode?.id) el.nextEpisode = nextEpisode;
   });
 
   // Error listener from engine
@@ -854,9 +860,9 @@
     }
   });
 
-  // Sync buffering
+  // Sync buffering — only write when value changes
   $effect(() => {
-    if (controlsEl) {
+    if (controlsEl && controlsEl.isBuffering !== engine.isBuffering) {
       controlsEl.isBuffering = engine.isBuffering;
     }
   });
@@ -996,10 +1002,12 @@
     trackChildren={true}
     saveLastFocusedChild={true}
     class="fixed inset-0 w-screen h-screen bg-black overflow-hidden select-none"
+    style="contain: layout style;"
   >
     {#if !ready && !streamLimitError}
       <div
         class="absolute inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30"
+        style="contain: layout paint;"
       >
         <p class="text-white/50 text-xl tracking-wide uppercase">Cargando...</p>
       </div>
@@ -1008,19 +1016,20 @@
     <video
       bind:this={videoEl}
       class="absolute inset-0 w-full h-full block object-contain object-center"
-      style="transform: translateX(0px) translateY(0px) scaleX(1) scaleY(1);"
+      style="transform: translateZ(0); contain: strict;"
       autoplay
       playsinline
     ></video>
 
     <div
       class="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60"
+      style="contain: paint; will-change: opacity;"
     ></div>
 
     {#if engine.engineReady}
       <tv-player-controls
         bind:this={controlsEl}
-        style="display: {ready ? 'block' : 'none'};"
+        style="display: {ready ? 'block' : 'none'}; contain: layout style;"
       ></tv-player-controls>
     {/if}
 

@@ -19,7 +19,7 @@
     "core-js": "^3.49.0",
     "lit": "^3.3.3",
     "resize-observer-polyfill": "^1.5.1",
-    "shaka-player": "^5.1.13",
+    "shaka-player": "^5.2.8",
     "svelte": "^5.56.9",
     "svelte-check": "^4.7.5",
     "svelte-spa-router": "^5.1.1",

@@ -11,7 +11,7 @@ const PARENT_FOCUS_KEY = 'watch-root';
 @customElement('tv-player-episode-rail')
 export class PlayerEpisodeRailElement extends LitElement {
   static styles = css`
-    :host { display: block; width: 100%; }
+    :host { display: block; width: 100%; contain: layout style; }
 
     .episode-rail {
       display: flex;

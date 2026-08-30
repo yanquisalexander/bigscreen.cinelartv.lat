@@ -190,7 +190,11 @@ export class PlayerSeekbarElement extends LitElement {
     }
     if (changedProperties.has('showControls')) {
       this._syncFocusable();
-      if (this.showControls) this._syncNow();
+      if (this.showControls) {
+        this._syncNow();
+        // Restart loop if it stopped while paused
+        if (!this.rafId && this.videoEl) this._startSeekbarLoop();
+      }
     }
   }
 
@@ -251,7 +255,8 @@ export class PlayerSeekbarElement extends LitElement {
 
     const update = () => {
       if (!this.showControls || (video.paused && !this._isSeeking)) {
-        this.rafId = requestAnimationFrame(update);
+        // Stop the loop instead of scheduling empty frames — restart on play/seek
+        this.rafId = 0;
         return;
       }
 
@@ -391,6 +396,8 @@ export class PlayerSeekbarElement extends LitElement {
       this._isSeeking = true;
       this._wasPlayingBeforeSeek = !this.videoEl.paused;
       if (!this.videoEl.paused) this.videoEl.pause();
+      // Restart loop for seeking updates
+      if (!this.rafId) this._startSeekbarLoop();
     }
     this._seekAccumulator += seconds;
     this._dispatch('seek-start');

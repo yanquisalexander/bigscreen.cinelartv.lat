@@ -36,8 +36,8 @@ importers:
         specifier: ^1.5.1
         version: 1.5.1
       shaka-player:
-        specifier: ^5.1.13
-        version: 5.1.13
+        specifier: ^5.2.8
+        version: 5.2.8
       svelte:
         specifier: ^5.56.9
         version: 5.56.9
@@ -3937,8 +3937,8 @@ packages:
     resolution: {integrity: sha512-TPbeg0b7ylrswdGCji8FRGFAKuqbpQlLbL8SOle3j1iHSs5Ob5mhvMAxWN2UItOjgALAB5Zp3fmMfj8mbWvXKw==}
     engines: {node: '>=10'}
 
-  shaka-player@5.1.13:
-    resolution: {integrity: sha512-bi1lWymlIgSbCuSwLu4v3Y+hNCX7PEk6LLcuo9dZ04gcbJnyR3FdPgHNGxaBJg4mrLKttlxOuXJWllM8DA/meg==}
+  shaka-player@5.2.8:
+    resolution: {integrity: sha512-CLverPUQCw/ouNsVVo6SVPBNt31Tf6H9h3aZqWaILe9y/WE4Ok5scImkHSriOFo5udm/OShPOH3YNH3Sb3quEA==}
     engines: {node: '>=18'}
 
   shallow-clone@3.0.1:
@@ -8891,7 +8891,7 @@ snapshots:
 
   sf-symbols-typescript@2.2.0: {}
 
-  shaka-player@5.1.13: {}
+  shaka-player@5.2.8: {}
 
   shallow-clone@3.0.1:
     dependencies:

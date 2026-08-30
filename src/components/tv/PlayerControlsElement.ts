@@ -30,6 +30,7 @@ export class PlayerControlsElement extends LitElement {
       inset: 0;
       pointer-events: none;
       z-index: 15;
+      contain: layout style;
     }
 
     .controls-overlay {
@@ -184,6 +185,7 @@ export class PlayerControlsElement extends LitElement {
   private _restoreFocusOnShow = false;
   private _restoreFocusRetry = 0;
   private _restoreFocusToken = 0;
+  private _nextCardRef: any = null;
 
   @state() private _isPlaying = false;
   @state() private _duration = 0;
@@ -282,7 +284,7 @@ export class PlayerControlsElement extends LitElement {
       this.contentId = this.episodes.contentId;
     }
 
-    if (changedProperties.has('settingsOpen')) {
+    if (changedProperties.has('settingsOpen') && changedProperties.get('settingsOpen') !== undefined) {
       this.dispatchEvent(new CustomEvent('settings-toggle', {
         bubbles: true,
         composed: true,
@@ -315,6 +317,11 @@ export class PlayerControlsElement extends LitElement {
 
     if (changedProperties.has('railExpanded')) {
       this._restartControlsHideTimer();
+    }
+
+    // Cache next-card ref after render (avoids querySelector in logic timer)
+    if (!this._nextCardRef) {
+      this._nextCardRef = this.renderRoot.querySelector('tv-player-next-card');
     }
   }
 
@@ -475,12 +482,11 @@ export class PlayerControlsElement extends LitElement {
 
       if (this.nextEpisode && dur > 60) {
         const nearEnd = ct > 0 && (dur - ct) <= 30;
+        const card = this._nextCardRef;
         if (nearEnd) {
-          const nextCard = this.renderRoot.querySelector('tv-player-next-card') as any;
-          if (nextCard && typeof nextCard.show === 'function') nextCard.show();
+          if (card && typeof card.show === 'function') card.show();
         } else {
-          const nextCard = this.renderRoot.querySelector('tv-player-next-card') as any;
-          if (nextCard && typeof nextCard.hide === 'function') nextCard.hide();
+          if (card && typeof card.hide === 'function') card.hide();
         }
       }
     }, LOGIC_TICK_MS);
