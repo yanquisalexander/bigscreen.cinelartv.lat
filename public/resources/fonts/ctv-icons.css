@@ -140,3 +140,7 @@
     content: "\f000";
     content: "\f000" / "";
 }
+.ctv-closed-caption:before {
+    content: "\f018";
+    content: "\f018" / "";
+}

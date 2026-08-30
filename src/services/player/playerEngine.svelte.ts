@@ -4,10 +4,12 @@ import { pdbg } from './playerDebug';
 export function createPlayerEngine() {
   let engine = $state<CinelarPlayerEngine | null>(null);
   let videoEl = $state<HTMLVideoElement | null>(null);
+
   let isPlaying = $state(false);
   let isBuffering = $state(false);
   let duration = $state(0);
   let engineReady = $state(false);
+
   let onEndedCallback: (() => void) | null = null;
 
   function attachVideo(el: HTMLVideoElement | null) {
@@ -52,27 +54,36 @@ export function createPlayerEngine() {
     get engineReady() { return engineReady; },
     get engine() { return engine; },
     get videoEl() { return videoEl; },
+
     attachVideo,
     destroy,
+
     load: (url: string, startTime?: number) => {
       pdbg('engine.load', { url, startTime, hasEngine: !!engine });
       return engine?.load(url, startTime) ?? Promise.resolve();
     },
+
     play: () => {
       pdbg('engine.play', { hasEngine: !!engine });
       engine?.play();
     },
+
     pause: () => engine?.pause(),
     seek: (time: number) => engine?.seek(time),
+
     setOnEnded: (fn: () => void) => { onEndedCallback = fn; },
     getEngine: () => engine,
+
+    getProfile: () => engine?.getProfile() ?? null,
     getVariantTracksInfo: () => engine?.getVariantTracksInfo() ?? null,
     getAudioTracksInfo: () => engine?.getAudioTracksInfo() ?? null,
+
     selectQuality: (option: number | 'auto') => engine?.selectQuality(option),
     selectAudioTrack: (language: string, role?: string) => engine?.selectAudioTrack(language, role),
     applyPreferredAudioLanguage: (lang?: string) => engine?.applyPreferredAudioLanguage(lang),
+
     onTracksChanged: (fn: () => void): (() => void) => {
-      return engine?.on('trackschanged', fn) ?? (() => {});
+      return engine?.on('trackschanged', fn) ?? (() => { });
     },
   };
 }

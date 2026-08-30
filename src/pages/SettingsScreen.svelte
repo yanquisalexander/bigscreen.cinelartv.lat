@@ -40,6 +40,7 @@
 
   const prefersModernPlayback = $derived($svelteSettingsStore.prefersModernPlayback);
   const navigationSoundEnabled = $derived($svelteSettingsStore.navigationSoundEnabled);
+  const debugMode = $derived($svelteSettingsStore.debugMode);
 
   function handleBack() {
     push('/home');
@@ -119,6 +120,16 @@
             setFocus('topnav');
             return false;
           }
+          if (direction === 'right') {
+            const firstItem = document.querySelector(
+              `[data-settings-section="${section.key}"] [data-focus-key]`
+            ) as HTMLElement | null;
+            if (firstItem) {
+              const fk = firstItem.getAttribute('data-focus-key');
+              if (fk) setFocus(fk);
+              return false;
+            }
+          }
           return true;
         }}
         focusedClass="!bg-white !text-black"
@@ -156,18 +167,58 @@
               focusKey="settings-toggle-modern"
               onEnterPress={() => settingsStore.getState().setPrefersModernPlayback(!prefersModernPlayback)}
               onArrowPress={(direction) => {
-                if (direction === 'up' || direction === 'left') {
+                if (direction === 'left') {
                   setFocus('settings-nav-reproduccion');
+                  return false;
+                }
+                if (direction === 'down') {
+                  setFocus('settings-toggle-debug');
                   return false;
                 }
                 return true;
               }}
               class="relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full flex-shrink-0 cursor-pointer {prefersModernPlayback ? 'bg-white' : 'bg-white/20'}"
+              focusedClass="!ring-2 !ring-white/80 !ring-offset-2 !ring-offset-surface"
               playSound={true}
             >
               {#snippet children()}
                 <div
                   class="absolute top-1/2 -translate-y-1/2 w-[clamp(1.1rem,1.8vw,1.3rem)] h-[clamp(1.1rem,1.8vw,1.3rem)] rounded-full bg-black transition-all {prefersModernPlayback ? 'left-[clamp(1.4rem,2.3vw,1.7rem)]' : 'left-[clamp(0.2rem,0.35vw,0.3rem)]'}"
+                ></div>
+              {/snippet}
+            </Focusable>
+          </div>
+
+          <div class="flex items-center justify-between py-[clamp(0.5rem,1vh,0.75rem)] border-t border-white/5">
+            <div class="flex flex-col flex-1 min-w-0">
+              <span class="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">
+                Habilitar depuración
+              </span>
+              <span class="text-text-secondary text-[clamp(0.75rem,1vw,0.85rem)] mt-0.5">
+                Muestra información técnica del reproductor durante la reproducción.
+              </span>
+            </div>
+            <Focusable
+              focusKey="settings-toggle-debug"
+              onEnterPress={() => settingsStore.getState().setDebugMode(!debugMode)}
+              onArrowPress={(direction) => {
+                if (direction === 'left') {
+                  setFocus('settings-nav-reproduccion');
+                  return false;
+                }
+                if (direction === 'up') {
+                  setFocus('settings-toggle-modern');
+                  return false;
+                }
+                return true;
+              }}
+              class="relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full flex-shrink-0 cursor-pointer {debugMode ? 'bg-white' : 'bg-white/20'}"
+              focusedClass="!ring-2 !ring-white/80 !ring-offset-2 !ring-offset-surface"
+              playSound={true}
+            >
+              {#snippet children()}
+                <div
+                  class="absolute top-1/2 -translate-y-1/2 w-[clamp(1.1rem,1.8vw,1.3rem)] h-[clamp(1.1rem,1.8vw,1.3rem)] rounded-full bg-black transition-all {debugMode ? 'left-[clamp(1.4rem,2.3vw,1.7rem)]' : 'left-[clamp(0.2rem,0.35vw,0.3rem)]'}"
                 ></div>
               {/snippet}
             </Focusable>
@@ -193,13 +244,14 @@
               focusKey="settings-toggle-nav-sound"
               onEnterPress={() => settingsStore.getState().setNavigationSoundEnabled(!navigationSoundEnabled)}
               onArrowPress={(direction) => {
-                if (direction === 'up' || direction === 'left') {
+                if (direction === 'up' || 'left') {
                   setFocus('settings-nav-audio');
                   return false;
                 }
                 return true;
               }}
               class="relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full flex-shrink-0 cursor-pointer {navigationSoundEnabled ? 'bg-white' : 'bg-white/20'}"
+              focusedClass="!ring-2 !ring-white/80 !ring-offset-2 !ring-offset-surface"
               playSound={true}
             >
               {#snippet children()}

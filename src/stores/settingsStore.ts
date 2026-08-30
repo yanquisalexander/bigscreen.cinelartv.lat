@@ -3,6 +3,7 @@ import { zustandToSvelte } from '@/lib/zustandToSvelte';
 
 const MODERN_PLAYBACK_KEY = 'cinelar_prefers_modern_playback';
 const NAV_SOUND_KEY = 'cinelar_navigation_sound';
+const DEBUG_MODE_KEY = 'cinelar_debug_mode';
 
 function loadPrefersModern(): boolean {
   try {
@@ -37,11 +38,29 @@ function saveNavigationSound(value: boolean) {
   }
 }
 
+function loadDebugMode(): boolean {
+  try {
+    return localStorage.getItem(DEBUG_MODE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveDebugMode(value: boolean) {
+  try {
+    localStorage.setItem(DEBUG_MODE_KEY, value ? '1' : '0');
+  } catch {
+    // ignore storage errors
+  }
+}
+
 interface SettingsState {
   prefersModernPlayback: boolean;
   setPrefersModernPlayback: (value: boolean) => void;
   navigationSoundEnabled: boolean;
   setNavigationSoundEnabled: (value: boolean) => void;
+  debugMode: boolean;
+  setDebugMode: (value: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -54,6 +73,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setNavigationSoundEnabled: (value: boolean) => {
     saveNavigationSound(value);
     set({ navigationSoundEnabled: value });
+  },
+  debugMode: loadDebugMode(),
+  setDebugMode: (value: boolean) => {
+    saveDebugMode(value);
+    set({ debugMode: value });
   },
 }));
 
