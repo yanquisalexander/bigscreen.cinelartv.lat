@@ -292,10 +292,7 @@ export class PlayerSeekbarElement extends LitElement {
     };
 
     const update = () => {
-      const dur = video.duration || 0;
-      const needsDuration = !isFinite(dur) || dur <= 0;
-
-      if (!this.showControls || (video.paused && !this._isSeeking && !needsDuration)) {
+      if (!this.showControls) {
         this.rafId = 0;
         return;
       }
