@@ -20,7 +20,7 @@
   const NAV_ITEMS: { key: string; label: string; path: string }[] = [
     { key: 'home', label: 'Explorar', path: '/home' },
     { key: 'search', label: 'Búsqueda', path: '/search' },
-    { key: 'live', label: 'Live TV', path: '/live' },
+    { key: 'live', label: 'En vivo', path: '/live' },
   ];
 
   function focusKeyForPath(path: string): string {
