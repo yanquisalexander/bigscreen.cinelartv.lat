@@ -163,6 +163,14 @@ export class PlayerControlsElement extends LitElement {
       box-shadow: none;
     }
 
+    .pill-group .control-btn.icon-only {
+      width: 2.25rem;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     .pill-group .control-btn[data-focused="true"] {
       background-color: #f1f1f1;
       color: #0f0f0f;
@@ -479,7 +487,7 @@ export class PlayerControlsElement extends LitElement {
                     <i class="ctv-icon ctv-closed-caption"></i>
                     <span>Subtítulos</span>
                   </tv-focusable>
-                  <tv-focusable focus-key="watch-settings" parent-focus-key="watch-root" data-focused="false" class="control-btn pill-btn"
+                  <tv-focusable focus-key="watch-settings" parent-focus-key="watch-root" data-focused="false" class="control-btn pill-btn icon-only"
                     focusable=${this.showControls ? 'true' : 'false'}>
                     <i class="ctv-icon ctv-settings"></i>
                   </tv-focusable>
