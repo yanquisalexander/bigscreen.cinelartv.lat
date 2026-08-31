@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { SpatialNavigation, getCurrentFocusKey, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
+  import { tick } from 'svelte';
+  import { SpatialNavigation, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation-core';
   import { FocusableRegistrar } from '@/components/tv/spatialFocus';
   import { svelteConfigStore } from '@/stores/configStore';
   import { resolveEpisodeThumbnail } from '@/utils/helpers';
@@ -67,7 +68,6 @@
     temp.remove();
     viewportWidth = viewportEl.clientWidth;
     metricsReady = true;
-    syncFocusables();
   }
 
   function scrollToItem(index: number) {
@@ -79,12 +79,13 @@
     scrollLeft = Math.max(0, Math.min(x - viewportWidth / 2 + itemWidth / 2, maxScroll));
   }
 
-  function syncFocusables() {
+  async function syncFocusables() {
+    await tick();
+    await new Promise<void>((r) => requestAnimationFrame(() => r()));
     if (!trackEl) return;
     const cards = trackEl.querySelectorAll('.dcard');
     for (const key of renderedKeys) registrar.unregister(key);
     renderedKeys = [];
-
     if (episodes.length === 0) return;
 
     cards.forEach((card) => {
@@ -145,7 +146,6 @@
     if (episodes.length > 0 && viewportEl && !metricsReady) {
       requestAnimationFrame(() => computeMetrics());
     }
-    return () => destroyFocusables();
   });
 
   $effect(() => {
@@ -159,6 +159,7 @@
   });
 
   $effect(() => {
+    const _deps = visibleEpisodes;
     if (metricsReady) syncFocusables();
   });
 
@@ -173,6 +174,10 @@
   function cardX(index: number) {
     return index * (itemWidth + gap);
   }
+
+  function epNum(ep: Episode, idx: number) {
+    return (ep.position != null ? ep.position + 1 : idx + 1);
+  }
 </script>
 
 <div class="detail-episode-rail" class:hidden={episodes.length === 0}>
@@ -186,7 +191,6 @@
         {@const realIndex = visibleRange.start + i}
         {@const thumbUrl = resolveThumb(episode)}
         {@const progress = episode.continue_watching ? Math.round((episode.continue_watching.progress / episode.continue_watching.duration) * 100) : undefined}
-        {@const episodeNum = episode.position ?? realIndex + 1}
 
         <div
           class="dcard"
@@ -200,15 +204,13 @@
             {#if thumbUrl}
               <img src={thumbUrl} alt="" loading="lazy" />
             {/if}
-            <span class="dbadge">T{seasonIndex + 1} · E{episodeNum}</span>
+            <span class="dbadge">T{seasonIndex + 1} · E{epNum(episode, realIndex)}</span>
             {#if episode.premium}
               <span class="dlock"><Lock size={11} /></span>
             {/if}
           </span>
           <span class="dtitle">{episode.title}</span>
-          {#if episode.description}
-            <span class="ddesc">{episode.description}</span>
-          {/if}
+          <span class="ddesc">{episode.description || 'Este episodio no tiene descripción disponible.'}</span>
           {#if progress != null && progress > 0}
             <div class="dprogress">
               <div class="dprogress-bar" style="width: {Math.min(progress, 100)}%;"></div>
@@ -331,6 +333,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    transition: white-space 200ms ease;
   }
 
   .dcard[data-focused="true"] .dtitle {
@@ -355,9 +358,8 @@
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+    color: rgba(255,255,255,0.6);
   }
-
-  .dcard[data-focused="true"] .ddesc { color: rgba(255,255,255,0.6); }
 
   .dprogress {
     position: absolute;
@@ -371,6 +373,5 @@
   .dprogress-bar {
     height: 100%;
     background: var(--color-accent, #e11d48);
-    border-radius: 0;
   }
 </style>
