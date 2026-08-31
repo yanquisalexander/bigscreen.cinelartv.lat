@@ -70,7 +70,8 @@
   }
 
   function _scrollToCurrentEpisode() {
-    const idx = episodes.findIndex(e => String(e.id));
+    // Find episode that's currently playing or first episode
+    const idx = episodes.findIndex(e => e.id === (episodes as any).currentEpisodeId) ?? 0;
     if (idx >= 0) scrollToVirtualItem(idx);
   }
 
@@ -143,6 +144,7 @@
     renderedKeys = [];
   }
 
+  // Single effect: compute metrics then sync focusables
   $effect(() => {
     if (episodes.length > 0 && viewportEl && !metricsComputed) {
       requestAnimationFrame(() => {
@@ -173,9 +175,12 @@
     };
   });
 
+  // Sync focusables when visible range changes (after DOM updates)
   $effect(() => {
     void _visibleRange;
-    if (metricsComputed) syncFocusables();
+    if (metricsComputed) {
+      syncFocusables();
+    }
   });
 
   function resolveThumb(ep: Episode) {
