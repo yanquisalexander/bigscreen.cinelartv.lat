@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { SpatialNavigation, getCurrentFocusKey, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
+  import { SpatialNavigation, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation-core';
   import { FocusableRegistrar } from '@/components/tv/spatialFocus';
   import { svelteConfigStore } from '@/stores/configStore';
   import { resolveEpisodeThumbnail } from '@/utils/helpers';
@@ -43,10 +43,10 @@
   let itemWidth = $state(0);
   let gap = $state(0);
   let metricsComputed = $state(false);
+  let _tick = $state(0);
 
   const OVERSCAN = 2;
   const registrar = new FocusableRegistrar();
-  let _resizeObserver: ResizeObserver | null = null;
 
   const _visibleRange = $derived.by(() => {
     if (!metricsComputed || episodes.length === 0) return { start: 0, end: Math.min(episodes.length, 10) };
@@ -70,8 +70,15 @@
   }
 
   function _scrollToCurrentEpisode() {
-    // Find episode that's currently playing or first episode
-    const idx = episodes.findIndex(e => e.id === (episodes as any).currentEpisodeId) ?? 0;
+    // Find currently playing episode or first episode
+    let idx = 0;
+    if (episodes.length > 0) {
+      const currentId = (episodes as any).currentEpisodeId;
+      if (currentId) {
+        idx = episodes.findIndex(e => e.id === currentId);
+      }
+      if (idx === -1) idx = 0;
+    }
     if (idx >= 0) scrollToVirtualItem(idx);
   }
 
@@ -126,6 +133,10 @@
         },
         onBlur: () => {
           card.setAttribute('data-focused', 'false');
+          requestAnimationFrame(() => {
+            const cur = getCurrentFocusKey() ?? '';
+            if (!cur.startsWith('detail-ep-')) return;
+          });
         },
       }]);
       renderedKeys.push(fKey);
@@ -144,7 +155,6 @@
     renderedKeys = [];
   }
 
-  // Single effect: compute metrics then sync focusables
   $effect(() => {
     if (episodes.length > 0 && viewportEl && !metricsComputed) {
       requestAnimationFrame(() => {
@@ -159,28 +169,26 @@
         viewportWidth = viewportEl.clientWidth;
         metricsComputed = true;
 
-        if (!_resizeObserver) {
-          _resizeObserver = new ResizeObserver(() => {
-            if (viewportEl) viewportWidth = viewportEl.clientWidth;
-          });
-          _resizeObserver.observe(viewportEl);
-        }
+        const ro = new ResizeObserver(() => {
+          if (viewportEl) {
+            viewportWidth = viewportEl.clientWidth;
+            _tick++;
+          }
+        });
+        ro.observe(viewportEl);
+        return () => ro.disconnect();
 
         _scrollToCurrentEpisode();
       });
     }
     return () => {
       destroyFocusables();
-      if (_resizeObserver) { _resizeObserver.disconnect(); _resizeObserver = null; }
     };
   });
 
-  // Sync focusables when visible range changes (after DOM updates)
   $effect(() => {
-    void _visibleRange;
-    if (metricsComputed) {
-      syncFocusables();
-    }
+    void _tick;
+    if (metricsComputed) syncFocusables();
   });
 
   function resolveThumb(ep: Episode) {
