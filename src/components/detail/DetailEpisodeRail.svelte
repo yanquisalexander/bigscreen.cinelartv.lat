@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
-  import { SpatialNavigation, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation-core';
+  import { SpatialNavigation, getCurrentFocusKey, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
   import { FocusableRegistrar } from '@/components/tv/spatialFocus';
   import { svelteConfigStore } from '@/stores/configStore';
   import { resolveEpisodeThumbnail } from '@/utils/helpers';
@@ -35,53 +34,102 @@
 
   let viewportEl = $state<HTMLDivElement | null>(null);
   let trackEl = $state<HTMLDivElement | null>(null);
-  let scrollLeft = $state(0);
-  let viewportWidth = $state(0);
-  let itemWidth = $state(0);
-  let gap = $state(0);
-  let metricsReady = $state(false);
   let renderedKeys: string[] = [];
   let lastFocusedKey = '';
 
-  const OVERSCAN = 2;
+  let _scrollLeft = 0;
+  let _viewportWidth = 0;
+  let _itemWidth = 0;
+  let _gap = 0;
+  let _overscan = 2;
+  let _metricsComputed = false;
+  let _resizeObserver: ResizeObserver | null = null;
+
   const registrar = new FocusableRegistrar();
 
-  const visibleRange = $derived.by(() => {
-    if (!metricsReady || episodes.length === 0) return { start: 0, end: Math.min(episodes.length, 10) };
-    const step = itemWidth + gap;
-    const start = Math.max(0, Math.floor(scrollLeft / step) - OVERSCAN);
-    const visibleCount = Math.ceil(viewportWidth / step);
-    const end = Math.min(episodes.length, start + visibleCount + OVERSCAN * 2);
+  let _rerender = $state(0);
+
+  const hasMultipleSeasons = $derived(new Set(episodes.map(e => (e as any).seasonNumber ?? 1)).size > 1);
+
+  function _getVisibleRange(): { start: number; end: number } {
+    const itemW = _itemWidth || 180;
+    const gap = _gap || 12;
+    const totalItemWidth = itemW + gap;
+    const vpWidth = _viewportWidth || (typeof window !== 'undefined' ? window.innerWidth : 1280);
+    const start = Math.max(0, Math.floor(_scrollLeft / totalItemWidth) - _overscan);
+    const visibleCount = Math.ceil(vpWidth / totalItemWidth);
+    const end = Math.min(episodes.length, start + visibleCount + _overscan * 2);
     return { start, end };
+  }
+
+  const _visibleRange = $derived.by(() => {
+    void _rerender;
+    return _getVisibleRange();
   });
 
-  const visibleEpisodes = $derived(episodes.slice(visibleRange.start, visibleRange.end));
+  const _visibleEpisodes = $derived(episodes.slice(_visibleRange.start, _visibleRange.end));
 
-  function computeMetrics() {
+  function _computeMetrics() {
     if (!viewportEl) return;
     const temp = document.createElement('div');
     temp.className = 'dcard';
     temp.style.cssText = 'position:absolute;visibility:hidden;width:clamp(156px,18vw,230px);';
     viewportEl.appendChild(temp);
-    itemWidth = temp.offsetWidth;
-    gap = parseFloat(getComputedStyle(viewportEl).gap) || 12;
+    _itemWidth = temp.offsetWidth;
+    _gap = parseFloat(getComputedStyle(viewportEl).gap) || 12;
     temp.remove();
-    viewportWidth = viewportEl.clientWidth;
-    metricsReady = true;
+    _viewportWidth = viewportEl.clientWidth;
+    _metricsComputed = true;
+
+    if (!_resizeObserver) {
+      _resizeObserver = new ResizeObserver(() => {
+        if (viewportEl) {
+          _viewportWidth = viewportEl.clientWidth;
+          _rerender++;
+        }
+      });
+      _resizeObserver.observe(viewportEl);
+    }
+
+    _scrollToCurrentEpisode();
+    _syncFocusables();
   }
 
-  function scrollToItem(index: number) {
-    const step = itemWidth + gap;
+  function _setScrollLeft(px: number) {
+    _scrollLeft = px;
+    _rerender++;
+  }
+
+  function scrollToVirtualItem(index: number) {
+    const itemW = _itemWidth || 180;
+    const gap = _gap || 12;
+    const step = itemW + gap;
+    const vpW = _viewportWidth || viewportEl?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 1280);
     const totalWidth = Math.max(0, episodes.length * step - gap);
-    const endPadding = itemWidth * 0.35;
-    const maxScroll = Math.max(0, totalWidth - viewportWidth + endPadding);
+    const endPadding = itemW * 0.35;
+    const maxScroll = Math.max(0, totalWidth - vpW + endPadding);
     const x = index * step;
-    scrollLeft = Math.max(0, Math.min(x - viewportWidth / 2 + itemWidth / 2, maxScroll));
+    const target = Math.max(0, Math.min(x - vpW / 2 + itemW / 2, maxScroll));
+    _setScrollLeft(target);
   }
 
-  async function syncFocusables() {
+  function _scrollToCurrentEpisode() {
+    const idx = episodes.findIndex(e => String(e.id) === String((episodes as any).currentEpisodeId));
+    if (idx >= 0) scrollToVirtualItem(idx);
+  }
+
+  async function revealAndFocusEpisode(index: number) {
+    const episode = episodes[index];
+    if (!episode) return;
+    const fKey = `detail-ep-${episode.id}`;
+    scrollToVirtualItem(index);
     await tick();
-    await new Promise<void>((r) => requestAnimationFrame(() => r()));
+    _syncFocusables();
+    await new Promise<void>(r => requestAnimationFrame(() => r()));
+    try { SpatialNavigation.setFocus(fKey); } catch (_e) { /* noop */ }
+  }
+
+  function _syncFocusables() {
     if (!trackEl) return;
     const cards = trackEl.querySelectorAll('.dcard');
     for (const key of renderedKeys) registrar.unregister(key);
@@ -89,7 +137,7 @@
     if (episodes.length === 0) return;
 
     cards.forEach((card) => {
-      const index = parseInt(card.getAttribute('data-ep-index') || '-1', 10);
+      const index = parseInt(card.getAttribute('data-episode-index') || '-1', 10);
       if (index < 0 || index >= episodes.length) return;
       const episode = episodes[index];
       if (!episode) return;
@@ -101,70 +149,54 @@
         onEnterPress: () => onPlayEpisode(episode.id),
         onArrowPress: (direction: string) => {
           if (direction === 'up' && onArrowUp) return onArrowUp(direction);
+          if (direction === 'down') return false;
           if (direction === 'left') {
             if (index === 0 && onArrowLeft) return onArrowLeft(direction);
-            if (index > 0) {
-              scrollToItem(index - 1);
-              requestAnimationFrame(() => {
-                try { SpatialNavigation.setFocus(`detail-ep-${episodes[index - 1].id}`); } catch (_e) { /* noop */ }
-              });
-              return false;
-            }
+            if (index > 0) { void revealAndFocusEpisode(index - 1); return false; }
           }
           if (direction === 'right') {
-            if (index < episodes.length - 1) {
-              scrollToItem(index + 1);
-              requestAnimationFrame(() => {
-                try { SpatialNavigation.setFocus(`detail-ep-${episodes[index + 1].id}`); } catch (_e) { /* noop */ }
-              });
-              return false;
-            }
+            if (index < episodes.length - 1) { void revealAndFocusEpisode(index + 1); return false; }
           }
-          if (direction === 'down') return false;
           return true;
         },
         onFocus: () => {
           lastFocusedKey = fKey;
-          scrollToItem(index);
           card.setAttribute('data-focused', 'true');
+          scrollToVirtualItem(index);
           onFocusEpisode?.(episode.id);
         },
         onBlur: () => {
           card.setAttribute('data-focused', 'false');
+          requestAnimationFrame(() => {
+            const cur = getCurrentFocusKey() ?? '';
+            if (!cur.startsWith('detail-ep-')) return;
+          });
         },
       }]);
       renderedKeys.push(fKey);
     });
   }
 
-  function destroyFocusables() {
+  function _destroyFocusables() {
     for (const key of renderedKeys) registrar.unregister(key);
     renderedKeys = [];
   }
 
+  import { tick } from 'svelte';
+
   $effect(() => {
-    if (episodes.length > 0 && viewportEl && !metricsReady) {
-      requestAnimationFrame(() => computeMetrics());
+    if (episodes.length > 0 && viewportEl && !_metricsComputed) {
+      requestAnimationFrame(() => _computeMetrics());
     }
+    return () => {
+      _destroyFocusables();
+      if (_resizeObserver) { _resizeObserver.disconnect(); _resizeObserver = null; }
+    };
   });
 
   $effect(() => {
-    const el = viewportEl;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      viewportWidth = el.clientWidth;
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  });
-
-  $effect(() => {
-    const _deps = visibleEpisodes;
-    if (metricsReady) syncFocusables();
-  });
-
-  $effect(() => {
-    return () => destroyFocusables();
+    void _rerender;
+    if (_metricsComputed) _syncFocusables();
   });
 
   function resolveThumb(ep: Episode) {
@@ -172,7 +204,7 @@
   }
 
   function cardX(index: number) {
-    return index * (itemWidth + gap);
+    return index * (_itemWidth + _gap);
   }
 
   function epNum(ep: Episode, idx: number) {
@@ -185,18 +217,20 @@
     <div
       class="dtrack"
       bind:this={trackEl}
-      style="transform: translateX({-scrollLeft}px) translateZ(0);"
+      style="transform: translateX({-_scrollLeft}px) translateZ(0);"
     >
-      {#each visibleEpisodes as episode, i (episode.id)}
-        {@const realIndex = visibleRange.start + i}
+      {#each _visibleEpisodes as episode, i (episode.id)}
+        {@const realIndex = _visibleRange.start + i}
         {@const thumbUrl = resolveThumb(episode)}
         {@const progress = episode.continue_watching ? Math.round((episode.continue_watching.progress / episode.continue_watching.duration) * 100) : undefined}
+        {@const isPartial = cardX(realIndex) < _scrollLeft || cardX(realIndex) + (_itemWidth || 180) > _scrollLeft + (_viewportWidth || 1280)}
 
         <div
           class="dcard"
           data-focused="false"
-          data-ep-index={realIndex}
-          style="width: {itemWidth || 180}px; --ep-x: {cardX(realIndex)}px;"
+          data-partial={isPartial || undefined}
+          data-episode-index={realIndex}
+          style="width: {_itemWidth || 180}px; --ep-x: {cardX(realIndex)}px;"
           role="button"
           tabindex="-1"
         >
@@ -204,7 +238,7 @@
             {#if thumbUrl}
               <img src={thumbUrl} alt="" loading="lazy" />
             {/if}
-            <span class="dbadge">T{seasonIndex + 1} · E{epNum(episode, realIndex)}</span>
+            <span class="dbadge">{hasMultipleSeasons ? `T${(episode as any).seasonNumber ?? 1} · ` : ''}E{epNum(episode, realIndex)}</span>
             {#if episode.premium}
               <span class="dlock"><Lock size={11} /></span>
             {/if}
@@ -265,6 +299,7 @@
   }
 
   .dcard[data-focused="true"] { z-index: 2; }
+  .dcard[data-partial="true"] { opacity: 0.3; }
 
   .dthumb {
     display: block;
