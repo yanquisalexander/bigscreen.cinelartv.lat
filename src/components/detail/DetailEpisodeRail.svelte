@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { SpatialNavigation, getCurrentFocusKey, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
   import { FocusableRegistrar } from '@/components/tv/spatialFocus';
   import { svelteConfigStore } from '@/stores/configStore';
@@ -37,100 +38,56 @@
   let renderedKeys: string[] = [];
   let lastFocusedKey = '';
 
-  let _scrollLeft = 0;
-  let _viewportWidth = 0;
-  let _itemWidth = 0;
-  let _gap = 0;
-  let _overscan = 2;
-  let _metricsComputed = false;
+  let scrollLeft = $state(0);
+  let viewportWidth = $state(0);
+  let itemWidth = $state(0);
+  let gap = $state(0);
+  let metricsComputed = $state(false);
+
+  const OVERSCAN = 2;
+  const registrar = new FocusableRegistrar();
   let _resizeObserver: ResizeObserver | null = null;
 
-  const registrar = new FocusableRegistrar();
-
-  let _rerender = $state(0);
-
-  const hasMultipleSeasons = $derived(new Set(episodes.map(e => (e as any).seasonNumber ?? 1)).size > 1);
-
-  function _getVisibleRange(): { start: number; end: number } {
-    const itemW = _itemWidth || 180;
-    const gap = _gap || 12;
-    const totalItemWidth = itemW + gap;
-    const vpWidth = _viewportWidth || (typeof window !== 'undefined' ? window.innerWidth : 1280);
-    const start = Math.max(0, Math.floor(_scrollLeft / totalItemWidth) - _overscan);
-    const visibleCount = Math.ceil(vpWidth / totalItemWidth);
-    const end = Math.min(episodes.length, start + visibleCount + _overscan * 2);
-    return { start, end };
-  }
-
   const _visibleRange = $derived.by(() => {
-    void _rerender;
-    return _getVisibleRange();
+    if (!metricsComputed || episodes.length === 0) return { start: 0, end: Math.min(episodes.length, 10) };
+    const step = itemWidth + gap;
+    const start = Math.max(0, Math.floor(scrollLeft / step) - OVERSCAN);
+    const visibleCount = Math.ceil(viewportWidth / step);
+    const end = Math.min(episodes.length, start + visibleCount + OVERSCAN * 2);
+    return { start, end };
   });
 
   const _visibleEpisodes = $derived(episodes.slice(_visibleRange.start, _visibleRange.end));
-
-  function _computeMetrics() {
-    if (!viewportEl) return;
-    const temp = document.createElement('div');
-    temp.className = 'dcard';
-    temp.style.cssText = 'position:absolute;visibility:hidden;width:clamp(156px,18vw,230px);';
-    viewportEl.appendChild(temp);
-    _itemWidth = temp.offsetWidth;
-    _gap = parseFloat(getComputedStyle(viewportEl).gap) || 12;
-    temp.remove();
-    _viewportWidth = viewportEl.clientWidth;
-    _metricsComputed = true;
-
-    if (!_resizeObserver) {
-      _resizeObserver = new ResizeObserver(() => {
-        if (viewportEl) {
-          _viewportWidth = viewportEl.clientWidth;
-          _rerender++;
-        }
-      });
-      _resizeObserver.observe(viewportEl);
-    }
-
-    _scrollToCurrentEpisode();
-    _syncFocusables();
-  }
-
-  function _setScrollLeft(px: number) {
-    _scrollLeft = px;
-    _rerender++;
-  }
+  const _hasMultipleSeasons = $derived(new Set(episodes.map(e => (e as any).seasonNumber ?? 1)).size > 1);
 
   function scrollToVirtualItem(index: number) {
-    const itemW = _itemWidth || 180;
-    const gap = _gap || 12;
-    const step = itemW + gap;
-    const vpW = _viewportWidth || viewportEl?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 1280);
+    const step = itemWidth + gap;
     const totalWidth = Math.max(0, episodes.length * step - gap);
-    const endPadding = itemW * 0.35;
-    const maxScroll = Math.max(0, totalWidth - vpW + endPadding);
+    const endPadding = itemWidth * 0.35;
+    const maxScroll = Math.max(0, totalWidth - viewportWidth + endPadding);
     const x = index * step;
-    const target = Math.max(0, Math.min(x - vpW / 2 + itemW / 2, maxScroll));
-    _setScrollLeft(target);
+    scrollLeft = Math.max(0, Math.min(x - viewportWidth / 2 + itemWidth / 2, maxScroll));
   }
 
   function _scrollToCurrentEpisode() {
-    const idx = episodes.findIndex(e => String(e.id) === String((episodes as any).currentEpisodeId));
+    const idx = episodes.findIndex(e => String(e.id));
     if (idx >= 0) scrollToVirtualItem(idx);
   }
 
-  async function revealAndFocusEpisode(index: number) {
-    const episode = episodes[index];
-    if (!episode) return;
-    const fKey = `detail-ep-${episode.id}`;
-    scrollToVirtualItem(index);
-    await tick();
-    _syncFocusables();
-    await new Promise<void>(r => requestAnimationFrame(() => r()));
-    try { SpatialNavigation.setFocus(fKey); } catch (_e) { /* noop */ }
+  function cardX(index: number) {
+    return index * (itemWidth + gap);
   }
 
-  function _syncFocusables() {
+  function isPartial(index: number) {
+    const x = cardX(index);
+    return x < scrollLeft || x + itemWidth > scrollLeft + viewportWidth;
+  }
+
+  async function syncFocusables() {
+    await tick();
+    await new Promise<void>(r => requestAnimationFrame(() => r()));
     if (!trackEl) return;
+
     const cards = trackEl.querySelectorAll('.dcard');
     for (const key of renderedKeys) registrar.unregister(key);
     renderedKeys = [];
@@ -142,6 +99,7 @@
       const episode = episodes[index];
       if (!episode) return;
       const fKey = `detail-ep-${episode.id}`;
+
       registrar.register([{
         focusKey: fKey,
         node: card as HTMLElement,
@@ -167,44 +125,61 @@
         },
         onBlur: () => {
           card.setAttribute('data-focused', 'false');
-          requestAnimationFrame(() => {
-            const cur = getCurrentFocusKey() ?? '';
-            if (!cur.startsWith('detail-ep-')) return;
-          });
         },
       }]);
       renderedKeys.push(fKey);
     });
   }
 
-  function _destroyFocusables() {
+  async function revealAndFocusEpisode(index: number) {
+    scrollToVirtualItem(index);
+    await syncFocusables();
+    const fKey = `detail-ep-${episodes[index]?.id}`;
+    if (fKey) try { SpatialNavigation.setFocus(fKey); } catch (_e) { /* noop */ }
+  }
+
+  function destroyFocusables() {
     for (const key of renderedKeys) registrar.unregister(key);
     renderedKeys = [];
   }
 
-  import { tick } from 'svelte';
-
   $effect(() => {
-    if (episodes.length > 0 && viewportEl && !_metricsComputed) {
-      requestAnimationFrame(() => _computeMetrics());
+    if (episodes.length > 0 && viewportEl && !metricsComputed) {
+      requestAnimationFrame(() => {
+        if (!viewportEl) return;
+        const temp = document.createElement('div');
+        temp.className = 'dcard';
+        temp.style.cssText = 'position:absolute;visibility:hidden;width:clamp(156px,18vw,230px);';
+        viewportEl.appendChild(temp);
+        itemWidth = temp.offsetWidth;
+        gap = parseFloat(getComputedStyle(viewportEl).gap) || 12;
+        temp.remove();
+        viewportWidth = viewportEl.clientWidth;
+        metricsComputed = true;
+
+        if (!_resizeObserver) {
+          _resizeObserver = new ResizeObserver(() => {
+            if (viewportEl) viewportWidth = viewportEl.clientWidth;
+          });
+          _resizeObserver.observe(viewportEl);
+        }
+
+        _scrollToCurrentEpisode();
+      });
     }
     return () => {
-      _destroyFocusables();
+      destroyFocusables();
       if (_resizeObserver) { _resizeObserver.disconnect(); _resizeObserver = null; }
     };
   });
 
   $effect(() => {
-    void _rerender;
-    if (_metricsComputed) _syncFocusables();
+    void _visibleRange;
+    if (metricsComputed) syncFocusables();
   });
 
   function resolveThumb(ep: Episode) {
     return resolveEpisodeThumbnail(ep.images, ep.thumbnail_resized ?? ep.thumbnail, clientEndpoint);
-  }
-
-  function cardX(index: number) {
-    return index * (_itemWidth + _gap);
   }
 
   function epNum(ep: Episode, idx: number) {
@@ -217,20 +192,19 @@
     <div
       class="dtrack"
       bind:this={trackEl}
-      style="transform: translateX({-_scrollLeft}px) translateZ(0);"
+      style="transform: translateX({-scrollLeft}px) translateZ(0);"
     >
       {#each _visibleEpisodes as episode, i (episode.id)}
         {@const realIndex = _visibleRange.start + i}
         {@const thumbUrl = resolveThumb(episode)}
         {@const progress = episode.continue_watching ? Math.round((episode.continue_watching.progress / episode.continue_watching.duration) * 100) : undefined}
-        {@const isPartial = cardX(realIndex) < _scrollLeft || cardX(realIndex) + (_itemWidth || 180) > _scrollLeft + (_viewportWidth || 1280)}
 
         <div
           class="dcard"
           data-focused="false"
-          data-partial={isPartial || undefined}
+          data-partial={isPartial(realIndex) || undefined}
           data-episode-index={realIndex}
-          style="width: {_itemWidth || 180}px; --ep-x: {cardX(realIndex)}px;"
+          style="width: {itemWidth || 180}px; --ep-x: {cardX(realIndex)}px;"
           role="button"
           tabindex="-1"
         >
@@ -238,7 +212,7 @@
             {#if thumbUrl}
               <img src={thumbUrl} alt="" loading="lazy" />
             {/if}
-            <span class="dbadge">{hasMultipleSeasons ? `T${(episode as any).seasonNumber ?? 1} · ` : ''}E{epNum(episode, realIndex)}</span>
+            <span class="dbadge">{_hasMultipleSeasons ? `T${(episode as any).seasonNumber ?? 1} · ` : ''}E{epNum(episode, realIndex)}</span>
             {#if episode.premium}
               <span class="dlock"><Lock size={11} /></span>
             {/if}
