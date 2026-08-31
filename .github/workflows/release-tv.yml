@@ -34,7 +34,6 @@ on:
 env:
   APP_URL: https://bigscreen.cinelartv.lat
   DEPOT_TOOLS_UPDATE: 0
-  CCACHE_DIR: ${{ runner.temp }}/ccache
 
 jobs:
   release:
@@ -43,6 +42,8 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: write
+    env:
+      CCACHE_DIR: ${{ runner.temp }}/ccache
 
     steps:
       - name: Checkout
