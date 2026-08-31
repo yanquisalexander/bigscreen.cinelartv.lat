@@ -58,6 +58,10 @@ export class PlayerControlsElement extends LitElement {
       transform: translateY(clamp(-6rem, -10vh, -8rem));
     }
 
+    :host([no-episodes]) .controls-overlay {
+      transform: translateY(clamp(-4rem, -7vh, -5.5rem));
+    }
+
     :host(.controls-hidden) .controls-overlay { pointer-events: none; }
 
     :host([rail-expanded]) .bottom-scrim,
@@ -402,6 +406,7 @@ export class PlayerControlsElement extends LitElement {
       this._allEpisodes = this.episodes.episodes;
       this._currentEpisodeId = this.episodes.currentId;
       this.contentId = this.episodes.contentId;
+      this.toggleAttribute('no-episodes', this._allEpisodes.length === 0);
     }
 
     if (changedProperties.has('settingsOpen') && changedProperties.get('settingsOpen') !== undefined) {
@@ -481,20 +486,20 @@ export class PlayerControlsElement extends LitElement {
 
             <div class=${classMap(controlsRowClasses)}>
               <div class="controls-row-left" data-episodes-btn-container>
-                ${this._allEpisodes.length > 0 ? html`
-                  <div class="pill-group" data-pill-group>
+                <div class="pill-group" data-pill-group>
+                  ${this._allEpisodes.length > 0 ? html`
                     <tv-focusable id="episodes-btn" focus-key="watch-episodes" parent-focus-key="watch-root" data-focused="false" class="control-btn pill-btn"
                       focusable=${this.showControls ? 'true' : 'false'}>
                       <i class="ctv-icon ctv-episodes-list"></i>
                       <span>Episodios</span>
                     </tv-focusable>
-                    <tv-focusable id="restart-btn" focus-key="watch-restart" parent-focus-key="watch-root" data-focused="false" class="control-btn pill-btn"
-                      focusable=${this.showControls ? 'true' : 'false'}>
-                      <i class="ctv-icon ctv-arrow-counter-clockwise"></i>
-                      <span>Comenzar de nuevo</span>
-                    </tv-focusable>
-                  </div>
-                ` : ''}
+                  ` : ''}
+                  <tv-focusable id="restart-btn" focus-key="watch-restart" parent-focus-key="watch-root" data-focused="false" class="control-btn pill-btn"
+                    focusable=${this.showControls ? 'true' : 'false'}>
+                    <i class="ctv-icon ctv-arrow-counter-clockwise"></i>
+                    <span>Comenzar de nuevo</span>
+                  </tv-focusable>
+                </div>
               </div>
 
               <div class="controls-row-center">

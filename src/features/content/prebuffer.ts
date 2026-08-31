@@ -8,6 +8,7 @@
  */
 
 const PREBUFFER_TTL_MS = 60_000; // discard if unused after 60s
+const DATA_ATTR = 'data-prebuffer';
 
 let activeElement: HTMLVideoElement | null = null;
 let activeKey: string | null = null;
@@ -21,10 +22,27 @@ function cleanup() {
   if (activeElement) {
     activeElement.removeAttribute('src');
     activeElement.load(); // aborts any in-flight network requests
+    activeElement.remove();
     activeElement = null;
   }
   activeKey = null;
 }
+
+/**
+ * Removes any orphaned prebuffer elements left behind by HMR or bugs.
+ */
+export function cleanupOrphanedPrebuffers(): void {
+  document.querySelectorAll<HTMLVideoElement>(`video[${DATA_ATTR}]`).forEach((el) => {
+    if (el !== activeElement) {
+      el.removeAttribute('src');
+      el.load();
+      el.remove();
+    }
+  });
+}
+
+// Clean up orphans from previous HMR reloads
+cleanupOrphanedPrebuffers();
 
 function scheduleDiscard() {
   if (discardTimer) clearTimeout(discardTimer);
@@ -53,6 +71,7 @@ export function prebufferStream(
   cleanup();
 
   const video = document.createElement('video');
+  video.setAttribute(DATA_ATTR, '');
   video.preload = 'auto';
   video.muted = true;
   video.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;top:-9999px';
