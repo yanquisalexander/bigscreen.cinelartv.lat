@@ -36,7 +36,6 @@ on:
 env:
   APP_URL: https://bigscreen.cinelartv.lat
   DEPOT_TOOLS_UPDATE: 0
-  CCACHE_DIR: ${{ runner.temp }}/ccache
 
 jobs:
   build:
@@ -149,7 +148,7 @@ jobs:
       - name: Cache compiler output
         uses: actions/cache@v4
         with:
-          path: ${{ env.CCACHE_DIR }}
+          path: ${{ runner.temp }}/ccache
           key: ccache-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}-${{ steps.config.outputs.platform }}
           restore-keys: |
             ccache-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}-${{ steps.config.outputs.platform }}
