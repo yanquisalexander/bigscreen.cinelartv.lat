@@ -18,7 +18,7 @@
 | Variable | Default | Descripción |
 |---|---|---|
 | `APP_URL` | `https://bigscreen.cinelartv.lat` | URL que Cobalt carga |
-| `COBALT_VERSION` | `27.lts.1` | Versión de Cobalt |
+| `cobalt-versions.json` | `27.lts.2` | Fuente única de la versión de Cobalt |
 
 ## Platforms
 

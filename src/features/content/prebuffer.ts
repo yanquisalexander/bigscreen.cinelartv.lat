@@ -14,6 +14,11 @@ let activeElement: HTMLVideoElement | null = null;
 let activeKey: string | null = null;
 let discardTimer: ReturnType<typeof setTimeout> | null = null;
 
+function isAdaptiveManifest(url: string): boolean {
+  const pathname = url.split('?')[0].toLowerCase();
+  return pathname.endsWith('.m3u8') || pathname.endsWith('.mpd');
+}
+
 function cleanup() {
   if (discardTimer) {
     clearTimeout(discardTimer);
@@ -60,6 +65,14 @@ export function prebufferStream(
   contentId: string | number,
   episodeId?: string | number,
 ): void {
+  // Shaka owns MediaSource buffering for adaptive manifests. A second video
+  // competes for network, memory and decoder resources on constrained TVs, but
+  // cannot transfer its MSE buffer to the real player.
+  if (isAdaptiveManifest(streamUrl)) {
+    cleanup();
+    return;
+  }
+
   const key = episodeId ? `${contentId}:${episodeId}` : `${contentId}:`;
   if (activeKey === key && activeElement) {
     // Already pre-buffering this exact stream — just extend TTL

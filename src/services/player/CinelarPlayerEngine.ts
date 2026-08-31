@@ -37,6 +37,8 @@ export class CinelarPlayerEngine {
   private eventListeners: Map<PlayerEvent, EventCallback[]> = new Map();
   private _videoListeners: Array<[string, EventListener]> = [];
   private _bufferingState = false;
+  private initialization: Promise<void> = Promise.resolve();
+  private attachPromise: Promise<void> = Promise.resolve();
 
   private loadQueue: Promise<void> = Promise.resolve();
   private loadToken = 0;
@@ -44,6 +46,8 @@ export class CinelarPlayerEngine {
 
   private profile: TvPlayerProfile | null = null;
   private stallTimestamps: number[] = [];
+  private lastPlaybackQuality: { total: number; dropped: number } | null = null;
+  private lastStallRecoveryAt = 0;
   private bwSaveIntervalId: ReturnType<typeof setInterval> | null = null;
   private perfCheckIntervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -143,20 +147,74 @@ export class CinelarPlayerEngine {
     } catch { /* noop */ }
   }
 
+  private reduceQualityForInstability(reason: string) {
+    const now = performance.now();
+    // Avoid repeatedly changing tracks while the decoder/network is recovering.
+    if (now - this.lastStallRecoveryAt < 15_000) return;
+
+    const effective = this.getEffectiveMaxHeight();
+    if (effective <= 720) return;
+
+    this.lastStallRecoveryAt = now;
+    this.applyPerformanceCap(effective > 1080 ? 1080 : 720, reason);
+  }
+
+  private getBufferAhead(): number {
+    const video = this.videoElement;
+    if (!video) return 0;
+
+    for (let i = 0; i < video.buffered.length; i++) {
+      if (video.buffered.start(i) <= video.currentTime && video.buffered.end(i) >= video.currentTime) {
+        return Math.max(0, video.buffered.end(i) - video.currentTime);
+      }
+    }
+    return 0;
+  }
+
+  private noteStall() {
+    const now = performance.now();
+    this.stallTimestamps.push(now);
+    this.stallTimestamps = this.stallTimestamps.filter((timestamp) => now - timestamp <= 60_000);
+    pdbg('engine.health', 'stall', { recentStalls: this.stallTimestamps.length, bufferAhead: this.getBufferAhead() });
+
+    // Repeated rebuffering is a stronger signal than a single transient network event.
+    if (this.stallTimestamps.length >= 3) {
+      this.reduceQualityForInstability('repeated_stalls');
+    }
+  }
+
   private checkDroppedFramesAndEvaluate() {
     const video = this.videoElement;
     if (!video || typeof video.getVideoPlaybackQuality !== 'function' || video.paused) return;
 
     try {
       const q = video.getVideoPlaybackQuality();
-      if (q && q.totalVideoFrames > 300) {
-        const dropRatio = q.droppedVideoFrames / q.totalVideoFrames;
-        const effective = this.getEffectiveMaxHeight();
+      if (q) {
+        const previous = this.lastPlaybackQuality;
+        this.lastPlaybackQuality = {
+          total: q.totalVideoFrames,
+          dropped: q.droppedVideoFrames,
+        };
+        if (!previous) return;
 
-        // 1. Aplicar cap si hay muchos drops (>15%)
-        if (dropRatio > 0.15 && effective > 720) {
-          const nextCap = effective > 1080 ? 1080 : 720;
-          this.applyPerformanceCap(nextCap, `high_frame_drops_${Math.round(dropRatio * 100)}%`);
+        // Use the last sample, not the session-wide ratio. A short startup hiccup
+        // must not permanently make the player lower quality minutes later.
+        const renderedSinceLastCheck = q.totalVideoFrames - previous.total;
+        const droppedSinceLastCheck = q.droppedVideoFrames - previous.dropped;
+        if (renderedSinceLastCheck <= 0 || droppedSinceLastCheck < 0) return;
+
+        const dropRatio = droppedSinceLastCheck / renderedSinceLastCheck;
+        const effective = this.getEffectiveMaxHeight();
+        pdbg('engine.health', 'frame sample', {
+          renderedSinceLastCheck,
+          droppedSinceLastCheck,
+          dropRatio: Number(dropRatio.toFixed(3)),
+          bufferAhead: Number(this.getBufferAhead().toFixed(1)),
+        });
+
+        // Lower the decoder load before frame loss becomes visible as A/V drift.
+        if (renderedSinceLastCheck >= 90 && dropRatio > 0.08 && effective > 720) {
+          this.reduceQualityForInstability(`frame_drops_${Math.round(dropRatio * 100)}%`);
         }
         // 2. Mecanismo de Recuperación (YouTube "Sticky" con prueba)
         else if (dropRatio < 0.02 && this.profile?.performanceCap) {
@@ -203,7 +261,8 @@ export class CinelarPlayerEngine {
       shaka.polyfill.installAll();
       this.player = new shaka.Player();
 
-      this.detectTvProfile().then((prof) => {
+      this.initialization = this.detectTvProfile().then((prof) => {
+        if (!this.player) return;
         this.profile = prof;
         const maxH = this.getEffectiveMaxHeight();
         const isLowEnd = prof.isLowEndDevice;
@@ -212,9 +271,9 @@ export class CinelarPlayerEngine {
 
         this.player.configure({
           streaming: {
-            bufferingGoal: isLowEnd ? 15 : 30,      // Menos búfer inicial en low-end para evitar OOM
-            rebufferingGoal: 2,                     // Agresivo para reanudar rápido
-            bufferBehind: isLowEnd ? 15 : 30,       // CRÍTICO: Libera memoria de segmentos ya vistos
+            bufferingGoal: isLowEnd ? 25 : 40,
+            rebufferingGoal: 4,
+            bufferBehind: isLowEnd ? 20 : 30,
             safeSeekOffset: 5,                      // Evita seeks a zonas no bufferizadas
             stallEnabled: true,
             stallThreshold: 1,
@@ -224,9 +283,9 @@ export class CinelarPlayerEngine {
           },
           abr: {
             enabled: true,
-            switchInterval: 15,
-            bandwidthUpgradeTarget: 0.85,
-            bandwidthDowngradeTarget: 0.85,
+            switchInterval: 8,
+            bandwidthUpgradeTarget: 0.75,
+            bandwidthDowngradeTarget: 0.9,
             defaultBandwidthEstimate: prof.bandwidthEstimate,
             restrictions: { maxHeight: maxH },
             minTimeToSwitch: 2, // Evita cambios de calidad si el búfer es bajo
@@ -234,6 +293,7 @@ export class CinelarPlayerEngine {
           preferredAudioLanguage: 'es',
           manifest: {
             retryParameters: { maxAttempts: 4, baseDelay: 1000, backoffFactor: 2, fuzzFactor: 0.5, timeout: 0 },
+            dash: { autoCorrectDrift: true },
           },
         });
 
@@ -243,9 +303,11 @@ export class CinelarPlayerEngine {
         });
 
         this.player.addEventListener('trackschanged', () => this.emit('trackschanged'));
+      }).catch((error: any) => {
+        pdbg('engine.initShaka', 'profile setup FAILED', error?.message);
       });
 
-      this.player.attach(this.videoElement).catch((e: any) => {
+      this.attachPromise = this.player.attach(this.videoElement).catch((e: any) => {
         pdbg('engine.attach', 'attach() FAILED', e);
         try { this.player?.detach(); } catch { /* ignore */ }
         this.player = null;
@@ -262,7 +324,8 @@ export class CinelarPlayerEngine {
       this._videoListeners = [
         ['play', () => this.emit('playing')],
         ['pause', () => { this.updateBandwidthMemory(); this.emit('paused'); }],
-        ['waiting', () => { emitBuffering(true); this.stallTimestamps.push(performance.now()); this.stallTimestamps = this.stallTimestamps.filter((t) => performance.now() - t <= 60000); }],
+        ['waiting', () => { emitBuffering(true); this.noteStall(); }],
+        ['stalled', () => { emitBuffering(true); this.noteStall(); }],
         ['playing', () => emitBuffering(false)],
         ['canplay', () => emitBuffering(false)],
         ['canplaythrough', () => emitBuffering(false)],
@@ -311,6 +374,11 @@ export class CinelarPlayerEngine {
     const video = this.videoElement;
     if (!video) return;
 
+    // A load can be triggered immediately after mount. Wait until Shaka is attached
+    // and the TV-specific safety limits are in place before selecting a stream.
+    await this.initialization;
+    await this.attachPromise;
+
     const resumeSec = (startTime && startTime > 0) ? startTime : undefined;
 
     if (this.player && this.isAdaptiveManifest(url)) {
@@ -322,7 +390,7 @@ export class CinelarPlayerEngine {
       } catch (e: any) {
         pdbg('engine.load', 'shaka load FAILED', e);
         this.emit('error', e);
-        return;
+        throw e;
       }
     }
 
@@ -496,6 +564,7 @@ export class CinelarPlayerEngine {
     pdbg('engine.destroy');
     this.loadToken++; // invalidar cargas en cola
     this._bufferingState = false;
+    this.lastPlaybackQuality = null;
 
     if (this.bwSaveIntervalId) { clearInterval(this.bwSaveIntervalId); this.bwSaveIntervalId = null; }
     if (this.perfCheckIntervalId) { clearInterval(this.perfCheckIntervalId); this.perfCheckIntervalId = null; }

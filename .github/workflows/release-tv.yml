@@ -34,7 +34,7 @@ on:
 env:
   APP_URL: https://bigscreen.cinelartv.lat
   DEPOT_TOOLS_UPDATE: 0
-  COBALT_VERSION: "27.lts.1"
+  CCACHE_DIR: ${{ runner.temp }}/ccache
 
 jobs:
   release:
@@ -93,6 +93,15 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Restore Android SDK + NDK
+        if: startsWith(steps.config.outputs.platform, 'aosp-')
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.workspace }}/android-sdk
+          key: android-sdk-${{ runner.os }}-ndk26.1
+          restore-keys: |
+            android-sdk-${{ runner.os }}-
+
       - name: Setup Android SDK + NDK
         if: startsWith(steps.config.outputs.platform, 'aosp-')
         run: |
@@ -118,20 +127,11 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_HOME" >> "$GITHUB_ENV"
           echo "NDK_HOME=$NDK_HOME" >> "$GITHUB_ENV"
 
-      - name: Cache Android SDK + NDK
-        if: startsWith(steps.config.outputs.platform, 'aosp-')
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.workspace }}/android-sdk
-          key: android-sdk-${{ runner.os }}-ndk26.1
-          restore-keys: |
-            android-sdk-${{ runner.os }}-
-
       - name: Cache depot_tools
         uses: actions/cache@v4
         with:
           path: ${{ runner.workspace }}/depot_tools
-          key: depot-tools-${{ runner.os }}-${{ env.COBALT_VERSION }}
+          key: depot-tools-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}
           restore-keys: |
             depot-tools-${{ runner.os }}-
 
@@ -150,25 +150,34 @@ jobs:
           path: |
             ${{ runner.workspace }}/cobalt-build/src
             !${{ runner.workspace }}/cobalt-build/src/out
-          key: cobalt-deps-${{ runner.os }}-${{ env.COBALT_VERSION }}-${{ steps.config.outputs.platform }}
+          key: cobalt-deps-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}-${{ steps.config.outputs.platform }}
           restore-keys: |
-            cobalt-deps-${{ runner.os }}-${{ env.COBALT_VERSION }}-
+            cobalt-deps-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}-
             cobalt-deps-${{ runner.os }}-
+
+      - name: Cache compiler output
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}-${{ steps.config.outputs.platform }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}-${{ steps.config.outputs.platform }}
 
       - name: Clone and sync Cobalt
         working-directory: ${{ runner.workspace }}/cobalt-build
         run: |
+          COBALT_REF="${{ steps.versions.outputs.cobalt_ref }}"
           if [ -d "src/.git" ]; then
-            CURRENT=$(cd src && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
-            if [ "$CURRENT" = "${{ env.COBALT_VERSION }}" ]; then
-              echo "Correct version already present, skipping clone + sync"
-              cd src && echo "Rev: $(git rev-parse @)"
+            CURRENT=$(cd src && git rev-parse HEAD 2>/dev/null || true)
+            EXPECTED=$(cd src && git rev-parse "$COBALT_REF^{commit}" 2>/dev/null || true)
+            if [ -n "$CURRENT" ] && [ "$CURRENT" = "$EXPECTED" ]; then
+              echo "Cobalt source cache hit: $COBALT_REF ($CURRENT)"
               exit 0
             fi
           fi
 
           rm -rf src
-          git clone --single-branch --branch "${{ env.COBALT_VERSION }}" \
+          git clone --single-branch --branch "$COBALT_REF" \
             --depth 1 \
             https://github.com/youtube/cobalt.git src
 
@@ -211,12 +220,21 @@ jobs:
             -c "$BUILD_TYPE" \
             --no-rbe
 
+          ccache --set-config=max_size=5G
+          ccache --zero-stats
+          echo 'cc_wrapper = "ccache"' >> "out/${PLATFORM}_${BUILD_TYPE}/args.gn"
+          gn gen "out/${PLATFORM}_${BUILD_TYPE}"
+
       - name: Build (Ninja)
         working-directory: ${{ runner.workspace }}/cobalt-build/src
         run: |
           PLATFORM="${{ steps.config.outputs.platform }}"
           BUILD_TYPE="${{ steps.config.outputs.build_type }}"
           autoninja -C "out/${PLATFORM}_${BUILD_TYPE}" cobalt_loader
+
+      - name: Show compiler-cache result
+        if: always()
+        run: ccache --show-stats || true
 
       - name: Verify build
         working-directory: ${{ runner.workspace }}/cobalt-build/src
@@ -248,7 +266,7 @@ jobs:
               'app_version': '$VERSION',
               'platform': '$PLATFORM',
               'build_type': '$BUILD_TYPE',
-              'cobalt_version': '${{ env.COBALT_VERSION }}',
+              'cobalt_version': '${{ steps.versions.outputs.cobalt_ref }}',
               'starboard_api': ${{ steps.versions.outputs.starboard_api }},
               'app_url': '${{ env.APP_URL }}',
               'build_date': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
@@ -296,7 +314,7 @@ jobs:
             ## TV App v${{ steps.version.outputs.app_version }}
 
             **Platform:** ${{ steps.config.outputs.platform }}
-            **Cobalt:** ${{ env.COBALT_VERSION }}
+            **Cobalt:** ${{ steps.versions.outputs.cobalt_ref }}
             **Starboard API:** ${{ steps.versions.outputs.starboard_api }}
             **Build:** ${{ steps.config.outputs.build_type }}
             **App URL:** ${{ env.APP_URL }}

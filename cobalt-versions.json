@@ -1,9 +1,9 @@
 {
   "cobalt": {
-    "version": "27.lts.1",
+    "version": "27.lts.2",
     "repo": "https://github.com/youtube/cobalt.git",
-    "ref": "27.lts.1",
-    "starboard_api_version": 16
+    "ref": "27.lts.2",
+    "starboard_api_version": 18
   },
   "platforms": {
     "aosp-arm": {

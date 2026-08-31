@@ -49,7 +49,7 @@ export PATH="$(pwd)/depot_tools:$PATH"
 mkdir cobalt-build && cd cobalt-build
 cat > .gclient << EOF
 solutions = [{
-  "url": "https://github.com/youtube/cobalt.git@27.lts.1",
+  "url": "https://github.com/youtube/cobalt.git@27.lts.2",
   "managed": False,
   "name": "src/cobalt",
 }]
