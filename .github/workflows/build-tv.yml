@@ -153,6 +153,9 @@ jobs:
           restore-keys: |
             ccache-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}-${{ steps.config.outputs.platform }}
 
+      - name: Ensure cobalt-build directory exists
+        run: mkdir -p "${{ runner.workspace }}/cobalt-build"
+
       - name: Clone and sync Cobalt
         working-directory: ${{ runner.workspace }}/cobalt-build
         run: |
