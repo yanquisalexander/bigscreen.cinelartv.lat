@@ -261,6 +261,11 @@
               title={category.title}
               focusKey="home-row-{catIdx}"
               preferredChildFocusKey={preferredChild}
+              items={category.content ?? []}
+              itemKey={(item) => item.id}
+              itemWidth={192}
+              gap={16}
+              overscan={3}
               onUpdateHasFocusedChild={(hasFocused) => {
                 if (hasFocused && rowRefs[catIdx]) {
                   const rowTop = rowRefs[catIdx].offsetTop;
@@ -268,7 +273,7 @@
                 }
               }}
             >
-              {#each category.content ?? [] as item, itemIdx (item.id)}
+              {#snippet children(item: ContentItem, itemIdx: number)}
                 {@const image = resolvePoster(item.images, item.cover_resized ?? item.cover, clientEndpoint)}
                 {@const bannerImage = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint, 'medium')}
                 {@const ambientImage = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint, 'thumbnail')}
@@ -290,7 +295,7 @@
                   onEnterPress={() => handleInfo(item)}
                   playSound={true}
                 />
-              {/each}
+              {/snippet}
             </FocusableRow>
           </div>
         {/each}
