@@ -78,9 +78,30 @@ export class PlayerControlsElement extends LitElement {
       opacity: 1;
       pointer-events: none;
       transition: opacity 180ms ease, transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+
+    .player-watermark .advisory-badge {
+      opacity: 0;
+      transform: translateX(1em);
+      transition: opacity 500ms ease, transform 500ms cubic-bezier(0.4, 0, 0.2, 1);
+      font-size: clamp(0.65rem, 0.85vw, 0.75rem);
+      font-weight: 400;
+      line-height: 1.3;
+      max-width: 14rem;
+      text-align: right;
+      will-change: opacity, transform;
+    }
+
+    .player-watermark .advisory-badge.visible {
+      opacity: 1;
+      transform: translateX(0);
     }
 
     :host(.controls-hidden) .player-watermark { opacity: 0.25; }
+    :host(.controls-hidden) .player-watermark.advisory-active { opacity: 1; }
     :host(.controls-hidden) .top-scrim { opacity: 0; }
     :host([rail-expanded]) .player-watermark { opacity: 0; transform: translateY(-0.5rem); }
 
@@ -269,6 +290,9 @@ export class PlayerControlsElement extends LitElement {
   @state() private _seekPreviewVisible = false;
   @state() private _seekPreviewTime = 0;
   @state() private _seekPreviewDirection: 'forward' | 'backward' = 'forward';
+  @state() private _advisoryVisible = false;
+  @state() private _advisoryShown = false;
+  private _advisoryTimer: ReturnType<typeof setTimeout> | null = null;
 
   private _onPlay: (() => void) | null = null;
   private _onPause: (() => void) | null = null;
@@ -286,6 +310,7 @@ export class PlayerControlsElement extends LitElement {
 
   @property({ type: String }) contentTitle!: string;
   @property({ type: String }) contentSubtitle!: string;
+  @property({ type: String, attribute: 'advisory-text' }) advisoryText!: string;
 
   @property({ type: Boolean, attribute: 'rail-expanded', reflect: true }) railExpanded!: boolean;
   @property({ type: Boolean, attribute: 'settings-open', reflect: true }) settingsOpen!: boolean;
@@ -306,6 +331,7 @@ export class PlayerControlsElement extends LitElement {
     this.contentId = null;
     this.contentTitle = '';
     this.contentSubtitle = '';
+    this.advisoryText = '';
     this.railExpanded = false;
     this.settingsOpen = false;
     this.nextEpisode = null;
@@ -350,6 +376,7 @@ export class PlayerControlsElement extends LitElement {
     if (this.controlsTimer) clearTimeout(this.controlsTimer);
     this.controlsTimer = null;
     if (this.logicTimer) { clearInterval(this.logicTimer); this.logicTimer = null; }
+    if (this._advisoryTimer) { clearTimeout(this._advisoryTimer); this._advisoryTimer = null; }
   }
 
   updated(changedProperties: PropertyValues) {
@@ -394,10 +421,14 @@ export class PlayerControlsElement extends LitElement {
 
       if (!this.showControls) {
         this._clearFocusedStates();
+        this._showAdvisory();
       }
 
       if (this.showControls) {
         this._restartControlsHideTimer();
+
+        // Hide advisory when controls reappear
+        this._hideAdvisory();
 
         if (this._restoreFocusOnShow) {
           this._restoreFocusOnShow = false;
@@ -410,6 +441,11 @@ export class PlayerControlsElement extends LitElement {
 
     if (changedProperties.has('railExpanded')) {
       this._restartControlsHideTimer();
+    }
+
+    if (changedProperties.has('advisoryText')) {
+      this._advisoryShown = false;
+      this._hideAdvisory();
     }
 
     // Cache next-card ref after render (avoids querySelector in logic timer)
@@ -508,7 +544,10 @@ export class PlayerControlsElement extends LitElement {
         ></tv-player-episode-rail>
       </div>
 
-      <div class="player-watermark" aria-hidden="true">CinelarTV</div>
+      <div class="player-watermark ${this._advisoryVisible ? 'advisory-active' : ''}" aria-hidden="true">
+        <span class="advisory-badge ${this._advisoryVisible ? 'visible' : ''}">${this.advisoryText} |&nbsp;</span>
+        CinelarTV
+      </div>
 
       <div class="seek-preview-overlay ${this._seekPreviewVisible ? 'visible' : ''}" aria-hidden="true">
         <div class="seek-preview-badge">
@@ -703,6 +742,23 @@ export class PlayerControlsElement extends LitElement {
         try { SpatialNavigation.setFocus('watch-root'); } catch (_err) { /* noop */ }
       }
     });
+  }
+
+  private _showAdvisory() {
+    if (!this.advisoryText || this._advisoryShown) return;
+    if (this._advisoryTimer) clearTimeout(this._advisoryTimer);
+    this._advisoryVisible = true;
+    this._advisoryTimer = setTimeout(() => {
+      this._advisoryVisible = false;
+      this._advisoryShown = true;
+      this._advisoryTimer = null;
+    }, 5000);
+  }
+
+  private _hideAdvisory() {
+    if (this._advisoryTimer) clearTimeout(this._advisoryTimer);
+    this._advisoryTimer = null;
+    this._advisoryVisible = false;
   }
 
   private _restartControlsHideTimer() {

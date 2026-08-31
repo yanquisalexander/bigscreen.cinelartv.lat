@@ -532,6 +532,9 @@
         ? `${(watchData.content.content_type === "TVSHOW" || watchData.content.contentType === "TVSHOW") && currentSeasonNumber ? `T${currentSeasonNumber} · ` : ""}${watchData.episode.title}`
         : "";
       if (el.contentSubtitle !== subtitle) el.contentSubtitle = subtitle;
+
+      const advisory = watchData.content.content_rating?.description ?? '';
+      if (el.advisoryText !== advisory) el.advisoryText = advisory;
     }
 
     const epData = episodesData;

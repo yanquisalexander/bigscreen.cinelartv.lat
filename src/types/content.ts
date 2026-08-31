@@ -132,6 +132,15 @@ export interface ContinueWatching {
   finished?: boolean;
 }
 
+export interface ContentRating {
+  code: string;
+  system: string;
+  name: string;
+  description?: string;
+  min_age?: number;
+  color?: string;
+}
+
 export interface WatchContent {
   id: string;
   title: string;
@@ -145,6 +154,8 @@ export interface WatchContent {
   year?: number | null;
   images?: ContentImages;
   segments?: Segment[];
+  content_rating?: ContentRating;
+  advisory_text?: string;
 }
 
 export interface WatchEpisode {
