@@ -1,6 +1,6 @@
 <script lang="ts">
-  import FocusContainer from '@/components/tv/FocusContainer.svelte';
-  import Focusable from '@/components/tv/Focusable.svelte';
+  import { SpatialNavigation, getCurrentFocusKey, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
+  import { FocusableRegistrar } from '@/components/tv/spatialFocus';
   import { svelteConfigStore } from '@/stores/configStore';
   import { resolveEpisodeThumbnail } from '@/utils/helpers';
   import type { Episode } from '@/types/content';
@@ -11,6 +11,7 @@
     seasonIndex: number;
     focusKey?: string;
     preferredChildFocusKey?: string;
+    parentFocusKey?: string;
     onPlayEpisode: (episodeId: string | number) => void;
     onFocusEpisode?: (episodeId: string | number) => void;
     onArrowUp?: (direction: string) => boolean;
@@ -22,114 +23,354 @@
     seasonIndex,
     focusKey = 'detail-episodes',
     preferredChildFocusKey,
+    parentFocusKey = 'content-root',
     onPlayEpisode,
     onFocusEpisode,
     onArrowUp,
     onArrowLeft,
   }: Props = $props();
 
-  let scrollEl = $state<HTMLDivElement | null>(null);
-  let rafId = 0;
+  const clientEndpoint = $derived($svelteConfigStore.config.CLIENT_ENDPOINT);
+
+  let viewportEl = $state<HTMLDivElement | null>(null);
+  let trackEl = $state<HTMLDivElement | null>(null);
+  let scrollLeft = $state(0);
+  let viewportWidth = $state(0);
+  let itemWidth = $state(0);
+  let gap = $state(0);
+  let metricsReady = $state(false);
+  let renderedKeys: string[] = [];
+  let lastFocusedKey = '';
+
+  const OVERSCAN = 2;
+  const registrar = new FocusableRegistrar();
+
+  const visibleRange = $derived.by(() => {
+    if (!metricsReady || episodes.length === 0) return { start: 0, end: Math.min(episodes.length, 10) };
+    const step = itemWidth + gap;
+    const start = Math.max(0, Math.floor(scrollLeft / step) - OVERSCAN);
+    const visibleCount = Math.ceil(viewportWidth / step);
+    const end = Math.min(episodes.length, start + visibleCount + OVERSCAN * 2);
+    return { start, end };
+  });
+
+  const visibleEpisodes = $derived(episodes.slice(visibleRange.start, visibleRange.end));
+
+  function computeMetrics() {
+    if (!viewportEl) return;
+    const temp = document.createElement('div');
+    temp.className = 'dcard';
+    temp.style.cssText = 'position:absolute;visibility:hidden;width:clamp(156px,18vw,230px);';
+    viewportEl.appendChild(temp);
+    itemWidth = temp.offsetWidth;
+    gap = parseFloat(getComputedStyle(viewportEl).gap) || 12;
+    temp.remove();
+    viewportWidth = viewportEl.clientWidth;
+    metricsReady = true;
+    syncFocusables();
+  }
+
+  function scrollToItem(index: number) {
+    const step = itemWidth + gap;
+    const totalWidth = Math.max(0, episodes.length * step - gap);
+    const endPadding = itemWidth * 0.35;
+    const maxScroll = Math.max(0, totalWidth - viewportWidth + endPadding);
+    const x = index * step;
+    scrollLeft = Math.max(0, Math.min(x - viewportWidth / 2 + itemWidth / 2, maxScroll));
+  }
+
+  function syncFocusables() {
+    if (!trackEl) return;
+    const cards = trackEl.querySelectorAll('.dcard');
+    for (const key of renderedKeys) registrar.unregister(key);
+    renderedKeys = [];
+
+    if (episodes.length === 0) return;
+
+    cards.forEach((card) => {
+      const index = parseInt(card.getAttribute('data-ep-index') || '-1', 10);
+      if (index < 0 || index >= episodes.length) return;
+      const episode = episodes[index];
+      if (!episode) return;
+      const fKey = `detail-ep-${episode.id}`;
+      registrar.register([{
+        focusKey: fKey,
+        node: card as HTMLElement,
+        parentFocusKey,
+        onEnterPress: () => onPlayEpisode(episode.id),
+        onArrowPress: (direction: string) => {
+          if (direction === 'up' && onArrowUp) return onArrowUp(direction);
+          if (direction === 'left') {
+            if (index === 0 && onArrowLeft) return onArrowLeft(direction);
+            if (index > 0) {
+              scrollToItem(index - 1);
+              requestAnimationFrame(() => {
+                try { SpatialNavigation.setFocus(`detail-ep-${episodes[index - 1].id}`); } catch (_e) { /* noop */ }
+              });
+              return false;
+            }
+          }
+          if (direction === 'right') {
+            if (index < episodes.length - 1) {
+              scrollToItem(index + 1);
+              requestAnimationFrame(() => {
+                try { SpatialNavigation.setFocus(`detail-ep-${episodes[index + 1].id}`); } catch (_e) { /* noop */ }
+              });
+              return false;
+            }
+          }
+          if (direction === 'down') return false;
+          return true;
+        },
+        onFocus: () => {
+          lastFocusedKey = fKey;
+          scrollToItem(index);
+          card.setAttribute('data-focused', 'true');
+          onFocusEpisode?.(episode.id);
+        },
+        onBlur: () => {
+          card.setAttribute('data-focused', 'false');
+        },
+      }]);
+      renderedKeys.push(fKey);
+    });
+  }
+
+  function destroyFocusables() {
+    for (const key of renderedKeys) registrar.unregister(key);
+    renderedKeys = [];
+  }
 
   $effect(() => {
-    const el = scrollEl;
-    if (!el) return;
-
-    const handleScroll = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        const focused = el.querySelector<HTMLElement>('[data-focused="true"]');
-        if (!focused) return;
-
-        const containerWidth = el.clientWidth;
-        const cardWidth = focused.clientWidth;
-        const cardLeft = focused.offsetLeft;
-        const scrollLeft = cardLeft - containerWidth / 2 + cardWidth / 2;
-
-        el.scrollTo({ left: scrollLeft, behavior: 'smooth' });
-      });
-    };
-
-    const observer = new MutationObserver(handleScroll);
-    observer.observe(el, { attributes: true, subtree: true, attributeFilter: ['data-focused'] });
-
-    return () => {
-      observer.disconnect();
-      cancelAnimationFrame(rafId);
-    };
+    if (episodes.length > 0 && viewportEl && !metricsReady) {
+      requestAnimationFrame(() => computeMetrics());
+    }
+    return () => destroyFocusables();
   });
+
+  $effect(() => {
+    const el = viewportEl;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      viewportWidth = el.clientWidth;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+
+  $effect(() => {
+    if (metricsReady) syncFocusables();
+  });
+
+  $effect(() => {
+    return () => destroyFocusables();
+  });
+
+  function resolveThumb(ep: Episode) {
+    return resolveEpisodeThumbnail(ep.images, ep.thumbnail_resized ?? ep.thumbnail, clientEndpoint);
+  }
+
+  function cardX(index: number) {
+    return index * (itemWidth + gap);
+  }
 </script>
 
-<FocusContainer
-  focusKey="{focusKey}-{seasonIndex}"
-  {preferredChildFocusKey}
-  trackChildren={true}
-  saveLastFocusedChild={true}
->
-  <div class="relative">
-    <div class="pointer-events-none absolute inset-y-0 left-0 w-[clamp(1.5rem,4vw,3rem)] bg-gradient-to-r from-bg to-transparent z-10"></div>
-    <div class="pointer-events-none absolute inset-y-0 right-0 w-[clamp(1.5rem,4vw,3rem)] bg-gradient-to-l from-bg to-transparent z-10"></div>
-
+<div class="detail-episode-rail" class:hidden={episodes.length === 0}>
+  <div class="dviewport" bind:this={viewportEl}>
     <div
-      bind:this={scrollEl}
-      class="flex gap-[clamp(0.75rem,1.2vw,1.125rem)] overflow-x-auto hide-scrollbar py-[clamp(0.5rem,1vh,0.875rem)]"
+      class="dtrack"
+      bind:this={trackEl}
+      style="transform: translateX({-scrollLeft}px) translateZ(0);"
     >
-      {#each episodes as episode, idx (episode.id)}
-        {@const clientEndpoint = $svelteConfigStore.config.CLIENT_ENDPOINT}
-        {@const thumbUrl = resolveEpisodeThumbnail(episode.images, episode.thumbnail_resized ?? episode.thumbnail, clientEndpoint)}
+      {#each visibleEpisodes as episode, i (episode.id)}
+        {@const realIndex = visibleRange.start + i}
+        {@const thumbUrl = resolveThumb(episode)}
         {@const progress = episode.continue_watching ? Math.round((episode.continue_watching.progress / episode.continue_watching.duration) * 100) : undefined}
-        {@const episodeNum = episode.position ?? idx + 1}
+        {@const episodeNum = episode.position ?? realIndex + 1}
 
-        <Focusable
-          focusKey="detail-episode-{episode.id}"
-          onEnterPress={() => onPlayEpisode(episode.id)}
-          onFocus={() => onFocusEpisode?.(episode.id)}
-          onArrowPress={(dir) => {
-            if (dir === 'up' && onArrowUp) return onArrowUp(dir);
-            if (dir === 'left' && idx === 0 && onArrowLeft) return onArrowLeft(dir);
-            return true;
-          }}
-          focusedClass="ring-white scale-[1.03]"
-          class="tv-no-select relative shrink-0 cursor-pointer rounded-xl overflow-hidden w-[clamp(13rem,14vw,18rem)] aspect-video bg-surface transition-all duration-200 ease-out will-change-transform ring-2 ring-transparent"
-          playSound={true}
+        <div
+          class="dcard"
+          data-focused="false"
+          data-ep-index={realIndex}
+          style="width: {itemWidth || 180}px; --ep-x: {cardX(realIndex)}px;"
+          role="button"
+          tabindex="-1"
         >
-          {#snippet children()}
+          <span class="dthumb">
             {#if thumbUrl}
-              <img
-                src={thumbUrl}
-                alt={episode.title}
-                class="absolute inset-0 w-full h-full object-cover"
-                loading="lazy"
-              />
-            {:else}
-              <div class="absolute inset-0 bg-surface-elevated"></div>
+              <img src={thumbUrl} alt="" loading="lazy" />
             {/if}
-
-            <!-- Bottom gradient for label legibility -->
-            <div class="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
-
-            <!-- Episode label + lock -->
-            <div class="absolute bottom-[clamp(0.5rem,1vh,0.75rem)] left-[clamp(0.625rem,1.2vw,0.875rem)] flex items-center gap-[0.375em]">
-              {#if episode.premium}
-                <Lock size={13} class="text-amber-400 shrink-0" />
-              {/if}
-              <span class="text-white text-[clamp(0.8125rem,1.05vw,0.9375rem)] font-bold tracking-wide drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]">
-                T{seasonIndex + 1} E{episodeNum}
-              </span>
+            <span class="dbadge">T{seasonIndex + 1} · E{episodeNum}</span>
+            {#if episode.premium}
+              <span class="dlock"><Lock size={11} /></span>
+            {/if}
+          </span>
+          <span class="dtitle">{episode.title}</span>
+          {#if episode.description}
+            <span class="ddesc">{episode.description}</span>
+          {/if}
+          {#if progress != null && progress > 0}
+            <div class="dprogress">
+              <div class="dprogress-bar" style="width: {Math.min(progress, 100)}%;"></div>
             </div>
-
-            <!-- Progress bar -->
-            {#if progress != null && progress > 0}
-              <div class="absolute bottom-0 left-0 right-0 h-[3px] bg-white/15">
-                <div
-                  class="h-full bg-accent"
-                  style="width: {Math.min(progress, 100)}%;"
-                ></div>
-              </div>
-            {/if}
-          {/snippet}
-        </Focusable>
+          {/if}
+        </div>
       {/each}
     </div>
   </div>
-</FocusContainer>
+</div>
+
+<style>
+  .detail-episode-rail {
+    display: block;
+    width: 100%;
+    contain: layout style;
+  }
+  .detail-episode-rail.hidden { display: none; }
+
+  .dviewport {
+    position: relative;
+    width: 100%;
+    height: clamp(10rem, 22vh, 16rem);
+    overflow: hidden;
+    padding: clamp(0.35rem, 0.8vh, 0.55rem) 0;
+  }
+
+  .dtrack {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    top: 0;
+    left: 0;
+    will-change: transform;
+  }
+
+  .dcard {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: block;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    outline: 0;
+    color: #fff;
+    text-align: left;
+    cursor: pointer;
+    transform: translateX(var(--ep-x, 0px));
+    transition: opacity 200ms ease, border-color 200ms ease;
+    opacity: 1;
+  }
+
+  .dcard[data-focused="true"] { z-index: 2; }
+
+  .dthumb {
+    display: block;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border: 2px solid transparent;
+    border-radius: 0.75rem;
+    background: #262626;
+    transition: border-color 200ms ease, transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dcard[data-focused="true"] .dthumb {
+    border-color: #fff;
+    transform: scale(1.03);
+  }
+
+  .dthumb :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .dthumb::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .dbadge {
+    position: absolute;
+    top: clamp(0.35rem, 0.6vh, 0.5rem);
+    left: clamp(0.35rem, 0.6vw, 0.5rem);
+    z-index: 2;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    font-size: clamp(0.55rem, 0.7vw, 0.65rem);
+    font-weight: 600;
+    padding: clamp(0.1rem, 0.2vh, 0.15rem) clamp(0.3rem, 0.5vw, 0.4rem);
+    border-radius: clamp(0.2rem, 0.4vw, 0.25rem);
+    pointer-events: none;
+  }
+
+  .dlock {
+    position: absolute;
+    top: clamp(0.35rem, 0.6vh, 0.5rem);
+    right: clamp(0.35rem, 0.6vw, 0.5rem);
+    z-index: 2;
+    color: #fbbf24;
+    pointer-events: none;
+  }
+
+  .dtitle {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0.4rem 0 0;
+    color: rgba(255,255,255,0.9);
+    font-size: clamp(0.75rem, 1.1vw, 0.875rem);
+    font-weight: 600;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dcard[data-focused="true"] .dtitle {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .ddesc {
+    display: none;
+    width: 100%;
+    margin: 0.25rem 0 0;
+    color: rgba(255,255,255,0.45);
+    font-size: clamp(0.65rem, 0.85vw, 0.75rem);
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dcard[data-focused="true"] .ddesc {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .dcard[data-focused="true"] .ddesc { color: rgba(255,255,255,0.6); }
+
+  .dprogress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgba(255,255,255,0.15);
+  }
+
+  .dprogress-bar {
+    height: 100%;
+    background: var(--color-accent, #e11d48);
+    border-radius: 0;
+  }
+</style>

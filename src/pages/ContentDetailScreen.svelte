@@ -3,7 +3,6 @@
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import FocusableButton from '@/components/tv/FocusableButton.svelte';
   import DetailHero from '@/components/detail/DetailHero.svelte';
-  import DetailOverview from '@/components/detail/DetailOverview.svelte';
   import DetailSeasonSelector from '@/components/detail/DetailSeasonSelector.svelte';
   import DetailEpisodeRail from '@/components/detail/DetailEpisodeRail.svelte';
   import DetailRecommendations from '@/components/detail/DetailRecommendations.svelte';
@@ -312,12 +311,6 @@
 
       <!-- Content sections -->
       <div class="px-[clamp(2rem,5vw,6rem)] pb-[clamp(5rem,12vh,7.5rem)] flex flex-col gap-[clamp(2.5rem,6vh,4.5rem)]">
-        <!-- Overview -->
-        <DetailOverview
-          description={content.description}
-          class="pt-[clamp(1.5rem,3vh,2.5rem)]"
-        />
-
         <!-- Seasons & Episodes -->
         {#if seasons.length > 0}
           <section>
