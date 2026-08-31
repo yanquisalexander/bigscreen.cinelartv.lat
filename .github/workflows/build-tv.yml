@@ -35,19 +35,19 @@ on:
 
 env:
   APP_URL: https://bigscreen.cinelartv.lat
-  DEPOT_TOOLS_UPDATE: 0
+  COBALT_PACKAGE: com.abstudios.cinelar.mediaclient
 
 jobs:
   build:
     name: Build + Package
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 360
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Resolve platform and build type
+      - name: Resolve config
         id: config
         run: |
           PLATFORM="${{ inputs.platform || 'aosp-arm' }}"
@@ -65,57 +65,6 @@ jobs:
           echo "starboard_api=$STARBOARD_API" >> "$GITHUB_OUTPUT"
           echo "Cobalt: $COBALT_REF | Starboard: $STARBOARD_API"
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            git curl python3 python3-dev xz-utils \
-            lsb-release file ccache pkg-config \
-            libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev \
-            libxi-dev libgl-dev libegl-dev libgles2-mesa-dev
-
-      - name: Setup Java 17
-        if: startsWith(steps.config.outputs.platform, 'aosp-')
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Restore Android SDK + NDK
-        if: startsWith(steps.config.outputs.platform, 'aosp-')
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.workspace }}/android-sdk
-          key: android-sdk-${{ runner.os }}-ndk26.1
-          restore-keys: |
-            android-sdk-${{ runner.os }}-
-
-      - name: Setup Android SDK + NDK
-        if: startsWith(steps.config.outputs.platform, 'aosp-')
-        run: |
-          ANDROID_HOME="${{ runner.workspace }}/android-sdk"
-          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
-
-          # Skip if already cached
-          if [ -d "$ANDROID_HOME/cmdline-tools/latest/bin" ]; then
-            echo "Android SDK already present, skipping download"
-          else
-            mkdir -p "$ANDROID_HOME"
-            CMDLINE_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
-            curl -sL "$CMDLINE_URL" -o /tmp/cmdtools.zip
-            unzip -qo /tmp/cmdtools.zip -d "$ANDROID_HOME/cmdline-tools"
-            mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest" 2>/dev/null || true
-          fi
-
-          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125"
-
-          NDK_HOME="$ANDROID_HOME/ndk/26.1.10909125"
-          echo "ANDROID_NDK_HOME=$NDK_HOME" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_ROOT=$NDK_HOME" >> "$GITHUB_ENV"
-          echo "NDK_HOME=$NDK_HOME" >> "$GITHUB_ENV"
-
       - name: Cache depot_tools
         uses: actions/cache@v4
         with:
@@ -132,35 +81,49 @@ jobs:
           fi
           echo "$DEPOT_PATH" >> "$GITHUB_PATH"
           "$DEPOT_PATH/ensure_bootstrap"
-          echo "depot_tools ready"
 
-      - name: Cache Cobalt dependencies
+      - name: Cache Android SDK + NDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.workspace }}/android-sdk
+          key: android-sdk-${{ runner.os }}-ndk26.1
+          restore-keys: |
+            android-sdk-${{ runner.os }}-
+
+      - name: Setup Android SDK + NDK
+        run: |
+          ANDROID_HOME="${{ runner.workspace }}/android-sdk"
+          if [ -d "$ANDROID_HOME/cmdline-tools/latest/bin" ]; then
+            echo "Android SDK already present, skipping download"
+          else
+            mkdir -p "$ANDROID_HOME"
+            curl -sL "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -o /tmp/cmdtools.zip
+            unzip -qo /tmp/cmdtools.zip -d "$ANDROID_HOME/cmdline-tools"
+            mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest" 2>/dev/null || true
+          fi
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          NDK_HOME="$ANDROID_HOME/ndk/26.1.10909125"
+          echo "ANDROID_NDK_HOME=$NDK_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$NDK_HOME" >> "$GITHUB_ENV"
+
+      - name: Cache Cobalt source
         uses: actions/cache@v4
         with:
           path: |
             ${{ runner.workspace }}/cobalt-build/src
             !${{ runner.workspace }}/cobalt-build/src/out
-          key: cobalt-deps-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}-${{ steps.config.outputs.platform }}
+          key: cobalt-src-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}
           restore-keys: |
-            cobalt-deps-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}-
-            cobalt-deps-${{ runner.os }}-
-
-      - name: Cache compiler output
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/ccache
-          key: ccache-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}-${{ steps.config.outputs.platform }}
-          restore-keys: |
-            ccache-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}-${{ steps.config.outputs.platform }}
-
-      - name: Ensure cobalt-build directory exists
-        run: mkdir -p "${{ runner.workspace }}/cobalt-build"
+            cobalt-src-${{ runner.os }}-
 
       - name: Clone and sync Cobalt
         working-directory: ${{ runner.workspace }}/cobalt-build
         run: |
           COBALT_REF="${{ steps.versions.outputs.cobalt_ref }}"
-          # A tag checkout is detached, so compare commits rather than branch names.
+          mkdir -p src
           if [ -d "src/.git" ]; then
             CURRENT=$(cd src && git rev-parse HEAD 2>/dev/null || true)
             EXPECTED=$(cd src && git rev-parse "$COBALT_REF^{commit}" 2>/dev/null || true)
@@ -169,75 +132,95 @@ jobs:
               exit 0
             fi
           fi
-
           rm -rf src
-          git clone --single-branch --branch "$COBALT_REF" \
-            --depth 1 \
+          git clone --single-branch --branch "$COBALT_REF" --depth 1 \
             https://github.com/youtube/cobalt.git src
-
           cd src
-          echo "solutions = [{
-            \"name\": \"src\",
-            \"url\": \"https://github.com/youtube/cobalt.git\",
-            \"managed\": False,
+          echo 'solutions = [{
+            "name": "src",
+            "url": "https://github.com/youtube/cobalt.git",
+            "managed": false
           }]
-          target_os = [ \"linux\", \"android\" ]" > ../.gclient
-
+          target_os = ["linux", "android"]' > ../.gclient
           gclient sync --no-history --shallow -r "$(git rev-parse @)"
         timeout-minutes: 50
 
-      - name: Install build deps + hooks
-        working-directory: ${{ runner.workspace }}/cobalt-build/src
-        run: |
-          sudo -E build/install-build-deps.sh || echo "install-build-deps warning (non-fatal)"
-          gclient runhooks || echo "runhooks warning (non-fatal)"
-        timeout-minutes: 20
+      - name: Cache compiler output (ccache)
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ccache
+          key: ccache-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}-${{ steps.config.outputs.platform }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ steps.versions.outputs.cobalt_ref }}-
 
-      - name: Install Linux sysroot
-        working-directory: ${{ runner.workspace }}/cobalt-build/src
-        run: |
-          PLATFORM="${{ steps.config.outputs.platform }}"
-          case "$PLATFORM" in
-            aosp-arm64) ARCH="arm64" ;;
-            aosp-x86) ARCH="x86" ;;
-            *) ARCH="arm" ;;
-          esac
-          python3 build/linux/sysroot_scripts/install-sysroot.py --arch="$ARCH"
-
-      - name: Configure (GN)
-        working-directory: ${{ runner.workspace }}/cobalt-build/src
+      - name: Build with Docker
         run: |
           PLATFORM="${{ steps.config.outputs.platform }}"
           BUILD_TYPE="${{ steps.config.outputs.build_type }}"
-          python3 cobalt/build/gn.py \
-            -p "$PLATFORM" \
-            -c "$BUILD_TYPE" \
-            --no-rbe
+          COBALT_REF="${{ steps.versions.outputs.cobalt_ref }}"
+          CONTAINER="ghcr.io/youtube/cobalt/cobalt-build-android:${COBALT_REF}"
+          PKG="com.abstudios.cinelar.mediaclient"
 
-          ccache --set-config=max_size=5G
-          ccache --zero-stats
-          echo 'cc_wrapper = "ccache"' >> "out/${PLATFORM}_${BUILD_TYPE}/args.gn"
-          gn gen "out/${PLATFORM}_${BUILD_TYPE}"
+          echo "Pulling Docker image: $CONTAINER"
+          docker pull "$CONTAINER"
 
-      - name: Build (Ninja)
-        working-directory: ${{ runner.workspace }}/cobalt-build/src
-        run: |
-          PLATFORM="${{ steps.config.outputs.platform }}"
-          BUILD_TYPE="${{ steps.config.outputs.build_type }}"
-          autoninja -C "out/${PLATFORM}_${BUILD_TYPE}" cobalt_loader
+          docker run --rm \
+            -v "${{ runner.workspace }}:/workspace" \
+            -v "${{ runner.temp }}/ccache:/tmp/ccache" \
+            -w /workspace/cobalt-build/src \
+            -e ANDROID_HOME=/workspace/android-sdk \
+            -e ANDROID_NDK_HOME=/workspace/android-sdk/ndk/26.1.10909125 \
+            -e ANDROID_NDK_ROOT=/workspace/android-sdk/ndk/26.1.10909125 \
+            -e NDK_HOME=/workspace/android-sdk/ndk/26.1.10909125 \
+            -e CCACHE_DIR=/tmp/ccache \
+            -e DEPOT_TOOLS_UPDATE=0 \
+            -e PYTHONPATH=/workspace/cobalt-build/src \
+            "$CONTAINER" /bin/bash -c "
+              set -e
+              export PATH=\"/workspace/depot_tools:/workspace/cobalt-build/src/third_party/ninja:\$PATH\"
 
-      - name: Show compiler-cache result
-        if: always()
-        run: ccache --show-stats || true
+              echo '=== Installing build deps ==='
+              build/install-build-deps.sh || echo 'install-build-deps warning (non-fatal)'
+              gclient runhooks || echo 'runhooks warning (non-fatal)'
+
+              echo '=== Configuring ccache ==='
+              ccache --max-size=15G
+              ccache --zero-stats
+
+              echo '=== Running GN config ==='
+              python3 cobalt/build/gn.py -p '$PLATFORM' -c '$BUILD_TYPE' --no-rbe
+
+              echo '=== Injecting optimized build args ==='
+              cat >> out/${PLATFORM}_${BUILD_TYPE}/args.gn << 'GNARGS'
+          symbol_level = 0
+          v8_symbol_level = 0
+          blink_symbol_level = 0
+          is_official_build = true
+          GNARGS
+
+              echo 'android_package_name = \"$PKG\"' >> out/${PLATFORM}_${BUILD_TYPE}/args.gn
+              echo 'cc_wrapper = \"ccache\"' >> out/${PLATFORM}_${BUILD_TYPE}/args.gn
+
+              echo '=== Generating build files ==='
+              gn gen out/${PLATFORM}_${BUILD_TYPE}
+
+              echo '=== Building cobalt_loader ==='
+              autoninja -C out/${PLATFORM}_${BUILD_TYPE} cobalt_loader
+
+              echo '=== ccache stats ==='
+              ccache --show-stats
+            "
+        timeout-minutes: 300
 
       - name: Verify build
+        if: always()
         working-directory: ${{ runner.workspace }}/cobalt-build/src
         run: |
           PLATFORM="${{ steps.config.outputs.platform }}"
           BUILD_TYPE="${{ steps.config.outputs.build_type }}"
           BUILD_DIR="out/${PLATFORM}_${BUILD_TYPE}"
           echo "=== Build output ==="
-          ls -lh "$BUILD_DIR/"
+          ls -lh "$BUILD_DIR/" 2>/dev/null || echo "No build output found"
           echo "=== APKs ==="
           ls -lh "$BUILD_DIR/apks/" 2>/dev/null || echo "No apks/ dir"
           for f in "$BUILD_DIR"/apks/*.apk; do
@@ -251,7 +234,6 @@ jobs:
           BUILD_DIR="${{ runner.workspace }}/cobalt-build/src/out/${PLATFORM}_${BUILD_TYPE}"
           PACKAGE_DIR="build/tv/${PLATFORM}"
           mkdir -p "$PACKAGE_DIR"
-
           cp -r "$BUILD_DIR/apks/"*.apk "$PACKAGE_DIR/" 2>/dev/null || true
           cp -r "$BUILD_DIR/"*.so "$PACKAGE_DIR/" 2>/dev/null || true
 
@@ -263,32 +245,24 @@ jobs:
               'cobalt_version': '${{ steps.versions.outputs.cobalt_ref }}',
               'starboard_api': ${{ steps.versions.outputs.starboard_api }},
               'app_url': '${{ env.APP_URL }}',
+              'package': '${{ env.COBALT_PACKAGE }}',
               'build_date': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
-              'commit': '${{ github.sha }}',
-              'run': '${{ github.run_number }}'
+              'commit': '${{ github.sha }}'
           }
           with open(os.path.join('$PACKAGE_DIR', 'manifest.json'), 'w') as f:
               json.dump(manifest, f, indent=2)
           "
 
-          cat > "$PACKAGE_DIR/start.sh" << 'EOF'
-          #!/bin/bash
-          set -e
-          SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-          APK=$(find "$SCRIPT_DIR" -name "*.apk" | head -1)
-          if [ -z "$APK" ]; then
-            echo "ERROR: No APK found"
-            exit 1
-          fi
-          echo "Installing Cobalt APK..."
-          adb install -r "$APK"
-          echo "Launching with app URL..."
-          adb shell am start --esa commandLineArgs "url=https://bigscreen.cinelartv.lat" dev.cobalt.coat/dev.cobalt.app.MainActivity
-          echo "Done. Check TV screen."
-          EOF
+          echo '#!/bin/bash' > "$PACKAGE_DIR/start.sh"
+          echo 'set -e' >> "$PACKAGE_DIR/start.sh"
+          echo 'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"' >> "$PACKAGE_DIR/start.sh"
+          echo 'APK=$(find "$SCRIPT_DIR" -name "*.apk" | head -1)' >> "$PACKAGE_DIR/start.sh"
+          echo 'if [ -z "$APK" ]; then echo "ERROR: No APK found"; exit 1; fi' >> "$PACKAGE_DIR/start.sh"
+          echo 'adb install -r "$APK"' >> "$PACKAGE_DIR/start.sh"
+          echo 'adb shell am start --esa commandLineArgs "url=https://bigscreen.cinelartv.lat" com.abstudios.cinelar.mediaclient/com.abstudios.cinelar.mediaclient.MainActivity' >> "$PACKAGE_DIR/start.sh"
           chmod +x "$PACKAGE_DIR/start.sh"
 
-          echo "Package:"
+          echo "=== Package contents ==="
           find "$PACKAGE_DIR" -type f
 
       - name: Upload artifact
