@@ -128,6 +128,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      'shaka-player': resolve(__dirname, 'node_modules/shaka-player/dist/shaka-player.compiled.js'),
     },
   },
   build: {

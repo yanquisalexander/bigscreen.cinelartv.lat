@@ -1,7 +1,7 @@
 import { pdbg } from './playerDebug';
+import shaka from 'shaka-player'; // ✅ Importación estática limpia
 
-// Tipos
-type PlayerEvent = 'playing' | 'paused' | 'buffering' | 'error' | 'timeupdate' | 'durationchange' | 'ended' | 'trackschanged';
+type PlayerEvent = 'playing' | 'paused' | 'buffering' | 'error' | 'timeupdate' | 'durationchange' | 'ended' | 'trackschanged' | 'avdesync' | 'driftsync';
 type EventCallback = (data?: any) => void;
 
 export interface TvPlayerProfile {
@@ -23,14 +23,6 @@ interface StoredPlayerPerformance {
 
 const PERF_STORAGE_KEY = 'cinelar_player_perf';
 
-// Importación segura de Shaka (ajusta la ruta según tu bundler: Vite, Rolldown, etc.)
-import * as shakaModule from 'shaka-player/dist/shaka-player.compiled.js';
-const _mod = shakaModule as any;
-const shaka: any =
-  _mod.Player ? _mod :
-    _mod.default?.Player ? _mod.default :
-      (typeof globalThis !== 'undefined' && (globalThis as any).shaka?.Player) ? (globalThis as any).shaka : _mod;
-
 export class CinelarPlayerEngine {
   private player: any = null;
   private videoElement: HTMLVideoElement | null = null;
@@ -51,13 +43,16 @@ export class CinelarPlayerEngine {
   private bwSaveIntervalId: ReturnType<typeof setInterval> | null = null;
   private perfCheckIntervalId: ReturnType<typeof setInterval> | null = null;
 
+  // ─── DRIFT RECOVERY (Solo para casos externos muy específicos) ───
+  private driftRecoveryMs: number | null = null;
+  private lastProgressSync = 0;
+
   constructor(videoElement: HTMLVideoElement) {
     this.videoElement = videoElement;
     pdbg('engine.constructor', 'video element received');
     this.initShaka();
   }
 
-  // ─── Persistencia de Rendimiento (Técnica "Sticky Cap" de YouTube) ───
   private getStoredPerformance(): StoredPlayerPerformance | null {
     try {
       const raw = localStorage.getItem(PERF_STORAGE_KEY);
@@ -69,19 +64,17 @@ export class CinelarPlayerEngine {
     try {
       const current = this.getStoredPerformance() || {};
       localStorage.setItem(PERF_STORAGE_KEY, JSON.stringify({ ...current, ...data, updatedAt: Date.now() }));
-    } catch { /* noop */ }
+    } catch { }
   }
 
   private async detectTvProfile(): Promise<TvPlayerProfile> {
     const stored = this.getStoredPerformance();
-
     const codecs = {
       h264: typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported('video/mp4; codecs="avc1.640028"'),
       hevc: typeof MediaSource !== 'undefined' && (MediaSource.isTypeSupported('video/mp4; codecs="hvc1.2.4.L150.B0"') || MediaSource.isTypeSupported('video/mp4; codecs="hev1.1.6.L150.B0"')),
       vp9: typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported('video/webm; codecs="vp09.00.10.08"'),
       av1: typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported('video/mp4; codecs="av01.0.08M.08"'),
     };
-
     let decoderMaxHeight = 1080;
     let maxFps = 30;
     try {
@@ -98,7 +91,7 @@ export class CinelarPlayerEngine {
           }
         }
       }
-    } catch { /* noop */ }
+    } catch { }
 
     const screenH = Math.max(screen.height, screen.width);
     let displayMaxHeight = 720;
@@ -109,52 +102,36 @@ export class CinelarPlayerEngine {
     const cores = navigator.hardwareConcurrency ?? 2;
     const memory = (navigator as any).deviceMemory ?? 2;
     const isLowEndDevice = cores <= 2 || memory <= 2 || decoderMaxHeight < 1080;
-
-    const bandwidthEstimate = stored?.bandwidth && stored.bandwidth > 1_000_000
-      ? stored.bandwidth
-      : (isLowEndDevice ? 5_000_000 : 10_000_000);
+    const bandwidthEstimate = stored?.bandwidth && stored.bandwidth > 1_000_000 ? stored.bandwidth : (isLowEndDevice ? 5_000_000 : 10_000_000);
 
     const prof: TvPlayerProfile = { displayMaxHeight, decoderMaxHeight, maxFps, codecs, bandwidthEstimate, isLowEndDevice };
-
     if (stored?.performanceCapHeight) {
       prof.performanceCap = { maxHeight: stored.performanceCapHeight, reason: stored.performanceCapReason || 'persisted_cap' };
     }
-
     return prof;
   }
 
   private getEffectiveMaxHeight(): number {
     if (!this.profile) return 1080;
-    return Math.min(
-      this.profile.displayMaxHeight,
-      this.profile.decoderMaxHeight,
-      this.profile.performanceCap?.maxHeight ?? 2160
-    );
+    return Math.min(this.profile.displayMaxHeight, this.profile.decoderMaxHeight, this.profile.performanceCap?.maxHeight ?? 2160);
   }
 
   private applyPerformanceCap(newMaxHeight: number, reason: string) {
     if (!this.player || !this.profile) return;
     const currentCap = this.profile.performanceCap?.maxHeight ?? 2160;
     if (currentCap <= newMaxHeight) return;
-
     pdbg('engine.cap', `Rendimiento ajustado a ${newMaxHeight}p. Razón: ${reason}`);
     this.profile.performanceCap = { maxHeight: newMaxHeight, reason };
     this.saveStoredPerformance({ performanceCapHeight: newMaxHeight, performanceCapReason: reason, stabilityStreakMs: 0 });
-
     const effective = this.getEffectiveMaxHeight();
-    try {
-      this.player.configure({ abr: { restrictions: { maxHeight: effective } } });
-    } catch { /* noop */ }
+    try { this.player.configure({ abr: { restrictions: { maxHeight: effective } } }); } catch { }
   }
 
   private reduceQualityForInstability(reason: string) {
     const now = performance.now();
-    // Avoid repeatedly changing tracks while the decoder/network is recovering.
     if (now - this.lastStallRecoveryAt < 15_000) return;
-
     const effective = this.getEffectiveMaxHeight();
     if (effective <= 720) return;
-
     this.lastStallRecoveryAt = now;
     this.applyPerformanceCap(effective > 1080 ? 1080 : 720, reason);
   }
@@ -162,7 +139,6 @@ export class CinelarPlayerEngine {
   private getBufferAhead(): number {
     const video = this.videoElement;
     if (!video) return 0;
-
     for (let i = 0; i < video.buffered.length; i++) {
       if (video.buffered.start(i) <= video.currentTime && video.buffered.end(i) >= video.currentTime) {
         return Math.max(0, video.buffered.end(i) - video.currentTime);
@@ -174,37 +150,54 @@ export class CinelarPlayerEngine {
   private noteStall() {
     const now = performance.now();
     this.stallTimestamps.push(now);
-    this.stallTimestamps = this.stallTimestamps.filter((timestamp) => now - timestamp <= 60_000);
+    this.stallTimestamps = this.stallTimestamps.filter((t) => now - t <= 60_000);
     pdbg('engine.health', 'stall', { recentStalls: this.stallTimestamps.length, bufferAhead: this.getBufferAhead() });
+    if (this.stallTimestamps.length >= 3) this.reduceQualityForInstability('repeated_stalls');
+  }
 
-    // Repeated rebuffering is a stronger signal than a single transient network event.
-    if (this.stallTimestamps.length >= 3) {
-      this.reduceQualityForInstability('repeated_stalls');
+  // ═══════════════════════════════════════════════
+  // DRIFT RECOVERY (Seguro y limitado)
+  // ═══════════════════════════════════════════════
+
+  public setDriftRecoveryMs(ms: number) {
+    this.driftRecoveryMs = ms;
+    pdbg('engine.drift', `driftRecoveryMs set ${ms}ms`);
+  }
+
+  public handleAdBreakEnd() {
+    if (this.driftRecoveryMs !== null && this.driftRecoveryMs > 0 && this.videoElement) {
+      // 🛡️ CORTAFUEGOS: Nunca recuperar más de 100ms. 
+      const safeRecoveryMs = Math.min(this.driftRecoveryMs, 100);
+      const current = this.videoElement.currentTime;
+      const target = Math.max(0, current - (safeRecoveryMs / 1000));
+
+      if (Math.abs(current - target) > 0.05) {
+        pdbg('engine.drift', `driftRecovery seek (capped a 100ms): ${current.toFixed(3)} -> ${target.toFixed(3)}`);
+        try { this.videoElement.currentTime = target; } catch { }
+      }
+      this.driftRecoveryMs = null;
     }
   }
+
+  // ═══════════════════════════════════════════════
+  // MONITOR DE RENDIMIENTO
+  // ═══════════════════════════════════════════════
 
   private checkDroppedFramesAndEvaluate() {
     const video = this.videoElement;
     if (!video || typeof video.getVideoPlaybackQuality !== 'function' || video.paused) return;
-
     try {
       const q = video.getVideoPlaybackQuality();
       if (q) {
         const previous = this.lastPlaybackQuality;
-        this.lastPlaybackQuality = {
-          total: q.totalVideoFrames,
-          dropped: q.droppedVideoFrames,
-        };
+        this.lastPlaybackQuality = { total: q.totalVideoFrames, dropped: q.droppedVideoFrames };
         if (!previous) return;
-
-        // Use the last sample, not the session-wide ratio. A short startup hiccup
-        // must not permanently make the player lower quality minutes later.
         const renderedSinceLastCheck = q.totalVideoFrames - previous.total;
         const droppedSinceLastCheck = q.droppedVideoFrames - previous.dropped;
         if (renderedSinceLastCheck <= 0 || droppedSinceLastCheck < 0) return;
-
         const dropRatio = droppedSinceLastCheck / renderedSinceLastCheck;
         const effective = this.getEffectiveMaxHeight();
+
         pdbg('engine.health', 'frame sample', {
           renderedSinceLastCheck,
           droppedSinceLastCheck,
@@ -212,17 +205,13 @@ export class CinelarPlayerEngine {
           bufferAhead: Number(this.getBufferAhead().toFixed(1)),
         });
 
-        // Lower the decoder load before frame loss becomes visible as A/V drift.
         if (renderedSinceLastCheck >= 90 && dropRatio > 0.08 && effective > 720) {
           this.reduceQualityForInstability(`frame_drops_${Math.round(dropRatio * 100)}%`);
-        }
-        // 2. Mecanismo de Recuperación (YouTube "Sticky" con prueba)
-        else if (dropRatio < 0.02 && this.profile?.performanceCap) {
+        } else if (dropRatio < 0.02 && this.profile?.performanceCap) {
           const stored = this.getStoredPerformance() || {};
-          const newStreak = (stored.stabilityStreakMs || 0) + 5000; // +5s por chequeo exitoso
+          const newStreak = (stored.stabilityStreakMs || 0) + 5000;
           this.saveStoredPerformance({ stabilityStreakMs: newStreak });
-
-          if (newStreak > 300000) { // 5 minutos de estabilidad
+          if (newStreak > 300000) {
             const nextTestCap = this.profile.performanceCap.maxHeight >= 1080 ? 2160 : 1080;
             pdbg('engine.cap', `Probando resolución superior: ${nextTestCap}p tras estabilidad`);
             this.profile.performanceCap = { maxHeight: nextTestCap, reason: 'stability_recovery_test' };
@@ -231,7 +220,7 @@ export class CinelarPlayerEngine {
           }
         }
       }
-    } catch { /* noop */ }
+    } catch { }
   }
 
   private updateBandwidthMemory() {
@@ -239,23 +228,14 @@ export class CinelarPlayerEngine {
     try {
       const stats = this.player.getStats();
       const bw = stats?.estimatedBandwidth;
-      if (bw && bw > 500_000 && bw < 100_000_000) {
-        this.saveStoredPerformance({ bandwidth: Math.round(bw) });
-      }
-    } catch { /* noop */ }
+      if (bw && bw > 500_000 && bw < 100_000_000) this.saveStoredPerformance({ bandwidth: Math.round(bw) });
+    } catch { }
   }
 
-  public getProfile(): TvPlayerProfile | null {
-    return this.profile;
-  }
+  public getProfile(): TvPlayerProfile | null { return this.profile; }
 
-  // ─── Inicialización de Shaka ───
   private initShaka() {
     if (!this.videoElement) return;
-    if (!shaka || !shaka.Player) {
-      pdbg('engine.initShaka', 'Shaka Player no se pudo cargar');
-      return;
-    }
 
     try {
       shaka.polyfill.installAll();
@@ -266,19 +246,22 @@ export class CinelarPlayerEngine {
         this.profile = prof;
         const maxH = this.getEffectiveMaxHeight();
         const isLowEnd = prof.isLowEndDevice;
-
         pdbg('engine.initShaka', 'TV profile initialized', { effectiveMaxHeight: maxH, isLowEndDevice: isLowEnd });
 
+        // ✅ CONFIGURACIÓN OPTIMIZADA Y SIN ERRORES DE VALIDACIÓN
         this.player.configure({
           streaming: {
             bufferingGoal: isLowEnd ? 25 : 40,
             rebufferingGoal: 4,
             bufferBehind: isLowEnd ? 20 : 30,
-            safeSeekOffset: 5,                      // Evita seeks a zonas no bufferizadas
+            safeSeekOffset: 5,
             stallEnabled: true,
             stallThreshold: 1,
+            stallSkip: 0.1, // Shaka salta micro-gaps automáticamente
+            durationBackoff: 1,
             segmentPrefetchLimit: isLowEnd ? 1 : 2,
             maxDisabledTime: 30,
+            inaccurateManifestTolerance: 2,
             retryParameters: { maxAttempts: 5, baseDelay: 1000, backoffFactor: 2, fuzzFactor: 0.5, timeout: 8000 },
           },
           abr: {
@@ -287,21 +270,26 @@ export class CinelarPlayerEngine {
             bandwidthUpgradeTarget: 0.75,
             bandwidthDowngradeTarget: 0.9,
             defaultBandwidthEstimate: prof.bandwidthEstimate,
-            restrictions: { maxHeight: maxH },
-            minTimeToSwitch: 2, // Evita cambios de calidad si el búfer es bajo
+            restrictions: { maxHeight: maxH, maxFrameRate: prof.maxFps },
+            minTimeToSwitch: 2,
           },
           preferredAudioLanguage: 'es',
           manifest: {
             retryParameters: { maxAttempts: 4, baseDelay: 1000, backoffFactor: 2, fuzzFactor: 0.5, timeout: 0 },
-            dash: { autoCorrectDrift: true },
+            dash: {
+              autoCorrectDrift: true, // ✅ Shaka alinea los timestamps a nivel de SourceBuffer
+              ignoreMinBufferTime: false,
+            },
           },
+          mediaSource: {
+            forceTransmux: false,
+          }
         });
 
         this.player.addEventListener('error', (event: any) => {
           pdbg('engine.shaka-error', `code=${event?.detail?.code}`, event?.detail?.message);
           this.emit('error', event.detail);
         });
-
         this.player.addEventListener('trackschanged', () => this.emit('trackschanged'));
       }).catch((error: any) => {
         pdbg('engine.initShaka', 'profile setup FAILED', error?.message);
@@ -309,11 +297,10 @@ export class CinelarPlayerEngine {
 
       this.attachPromise = this.player.attach(this.videoElement).catch((e: any) => {
         pdbg('engine.attach', 'attach() FAILED', e);
-        try { this.player?.detach(); } catch { /* ignore */ }
+        try { this.player?.detach(); } catch { }
         this.player = null;
       });
 
-      // Listeners de video nativo
       const emitBuffering = (val: boolean) => {
         if (this._bufferingState !== val) {
           this._bufferingState = val;
@@ -322,14 +309,20 @@ export class CinelarPlayerEngine {
       };
 
       this._videoListeners = [
-        ['play', () => this.emit('playing')],
+        ['play', () => { this.emit('playing'); }],
         ['pause', () => { this.updateBandwidthMemory(); this.emit('paused'); }],
         ['waiting', () => { emitBuffering(true); this.noteStall(); }],
         ['stalled', () => { emitBuffering(true); this.noteStall(); }],
         ['playing', () => emitBuffering(false)],
         ['canplay', () => emitBuffering(false)],
         ['canplaythrough', () => emitBuffering(false)],
-        ['timeupdate', () => this.emit('timeupdate', this.videoElement?.currentTime)],
+        ['timeupdate', () => {
+          const now = performance.now();
+          if (now - this.lastProgressSync > 250) {
+            this.lastProgressSync = now;
+            this.emit('timeupdate', this.videoElement?.currentTime);
+          }
+        }],
         ['durationchange', () => this.emit('durationchange', this.videoElement?.duration)],
         ['ended', () => { this.updateBandwidthMemory(); this.emit('ended'); }],
       ];
@@ -338,7 +331,6 @@ export class CinelarPlayerEngine {
         this.videoElement.addEventListener(event, handler);
       }
 
-      // Chequeo periódico de rendimiento (cada 5s) y ancho de banda (cada 15s)
       this.perfCheckIntervalId = setInterval(() => this.checkDroppedFramesAndEvaluate(), 5000);
       this.bwSaveIntervalId = setInterval(() => this.updateBandwidthMemory(), 15000);
 
@@ -353,11 +345,9 @@ export class CinelarPlayerEngine {
     return clean.endsWith('.m3u8') || clean.endsWith('.mpd');
   }
 
-  // ─── Carga de Stream (Cola serializada) ───
   public load(url: string, startTime?: number): Promise<void> {
     const token = ++this.loadToken;
     pdbg('engine.load', 'queued', { url, startTime, token });
-
     const run = this.loadQueue.then(async () => {
       if (token !== this.loadToken) {
         pdbg('engine.load', 'skipped (superseded)', token);
@@ -365,20 +355,15 @@ export class CinelarPlayerEngine {
       }
       await this.doLoad(url, startTime);
     });
-
-    this.loadQueue = run.catch(() => { /* keep the queue alive */ });
+    this.loadQueue = run.catch(() => { });
     return run;
   }
 
   private async doLoad(url: string, startTime?: number): Promise<void> {
     const video = this.videoElement;
     if (!video) return;
-
-    // A load can be triggered immediately after mount. Wait until Shaka is attached
-    // and the TV-specific safety limits are in place before selecting a stream.
     await this.initialization;
     await this.attachPromise;
-
     const resumeSec = (startTime && startTime > 0) ? startTime : undefined;
 
     if (this.player && this.isAdaptiveManifest(url)) {
@@ -393,11 +378,7 @@ export class CinelarPlayerEngine {
         throw e;
       }
     }
-
-    // Fallback nativo (MP4 progresivo o si Shaka falló)
-    if (this.player) {
-      try { await this.player.detach(); } catch { /* ignore */ }
-    }
+    if (this.player) { try { await this.player.detach(); } catch { } }
     pdbg('engine.load', 'native fallback (video.src)', url);
     if (resumeSec && resumeSec > 0) {
       const seekOnce = () => {
@@ -410,45 +391,50 @@ export class CinelarPlayerEngine {
     video.load();
   }
 
-  // ─── Controles ───
   public play() {
     const video = this.videoElement;
     if (!video) return;
     pdbg('engine.play', 'calling video.play()');
-
     const doPlay = () => {
       const p = video.play();
       if (!p) return;
-      p.then(() => { this.playRetried = false; })
-        .catch((err: any) => {
-          const name = err?.name ?? 'UnknownError';
-          pdbg('engine.play', 'rejected', name, err?.message);
-          if (!this.playRetried && (name === 'AbortError' || name === 'NotAllowedError')) {
-            this.playRetried = true;
-            const retry = () => {
-              video.removeEventListener('loadedmetadata', retry);
-              video.removeEventListener('canplay', retry);
-              pdbg('engine.play', 'retrying after media-ready event');
-              video.play().catch(() => { });
-            };
-            video.addEventListener('loadedmetadata', retry);
-            video.addEventListener('canplay', retry);
-          }
-        });
+      p.then(() => {
+        this.playRetried = false;
+      }).catch((err: any) => {
+        const name = err?.name ?? 'UnknownError';
+        pdbg('engine.play', 'rejected', name, err?.message);
+        if (!this.playRetried && (name === 'AbortError' || name === 'NotAllowedError')) {
+          this.playRetried = true;
+          const retry = () => {
+            video.removeEventListener('loadedmetadata', retry);
+            video.removeEventListener('canplay', retry);
+            pdbg('engine.play', 'retrying after media-ready event');
+            video.play().catch(() => { });
+          };
+          video.addEventListener('loadedmetadata', retry);
+          video.addEventListener('canplay', retry);
+        }
+      });
     };
     doPlay();
   }
 
   public pause() { this.videoElement?.pause(); }
+
   public seek(time: number) {
     if (this.player && this.player.seek) {
-      this.player.seek(time);
+      const seekRange = this.player.seekRange();
+      if (seekRange) {
+        const clamped = Math.max(seekRange.start, Math.min(seekRange.end - 0.5, time));
+        this.player.seek(clamped);
+      } else {
+        this.player.seek(time);
+      }
     } else if (this.videoElement) {
       this.videoElement.currentTime = time;
     }
   }
 
-  // ─── Gestión de Pistas y Calidad ───
   public getVariantTracksInfo() {
     if (!this.player) return null;
     const cfg = this.player.getConfiguration();
@@ -479,50 +465,29 @@ export class CinelarPlayerEngine {
     } catch { return null; }
   }
 
-  /**
-   * OPTIMIZACIÓN CLAVE: Cambio de calidad manual seguro para TV
-   */
   public selectQuality(option: number | 'auto') {
     if (!this.player || !this.videoElement) return;
-
     if (option === 'auto') {
       this.player.configure({ abr: { enabled: true } });
       return;
     }
-
-    // 1. Guardar pista de audio activa para no perderla al cambiar de video
     const activeAudio = this.player.getAudioTracks().find((t: any) => t.active);
-
-    // 2. Desactivar ABR para forzar la calidad
     this.player.configure({ abr: { enabled: false } });
-
-    // 3. Buscar candidatos y ordenar por mayor bitrate (mejor calidad dentro de esa resolución)
-    const candidates = this.player.getVariantTracks()
-      .filter((v: any) => v.height === option)
-      .sort((a: any, b: any) => (b.bandwidth || 0) - (a.bandwidth || 0));
-
+    const candidates = this.player.getVariantTracks().filter((v: any) => v.height === option).sort((a: any, b: any) => (b.bandwidth || 0) - (a.bandwidth || 0));
     if (!candidates.length) return;
 
-    // 4. Verificar búfer adelantado para evitar glitch visual (técnica de YouTube)
     const video = this.videoElement;
     const buffered = video.buffered;
     const currentTime = video.currentTime || 0;
     let hasSafeBuffer = false;
-
     for (let i = 0; i < buffered.length; i++) {
       if (buffered.start(i) <= currentTime && buffered.end(i) - currentTime >= 2.0) {
         hasSafeBuffer = true;
         break;
       }
     }
-
-    // 5. Cambiar pista. false = no limpiar búfer (cambio instantáneo y suave)
     this.player.selectVariantTrack(candidates[0], !hasSafeBuffer);
-
-    // 6. Restaurar pista de audio
-    if (activeAudio) {
-      this.player.selectAudioTrack(activeAudio, false);
-    }
+    if (activeAudio) this.player.selectAudioTrack(activeAudio, false);
   }
 
   public selectAudioTrack(language: string, role?: string, index?: number) {
@@ -530,22 +495,13 @@ export class CinelarPlayerEngine {
     try {
       const tracks = this.player.getAudioTracks();
       let target: any = null;
-      if (typeof index === 'number' && index >= 0 && index < tracks.length) {
-        target = tracks[index];
-      } else {
-        target = tracks.find((t: any) => {
-          const langMatch = t.language === language;
-          if (role) return langMatch && (t.roles || []).includes(role);
-          return langMatch;
-        });
-      }
+      if (typeof index === 'number' && index >= 0 && index < tracks.length) target = tracks[index];
+      else target = tracks.find((t: any) => { const langMatch = t.language === language; if (role) return langMatch && (t.roles || []).includes(role); return langMatch; });
       if (target) {
         this.player.selectAudioTrack(target, false);
         if (this.videoElement?.paused) this.videoElement.play().catch(() => { });
       }
-    } catch (e: any) {
-      pdbg('engine.audio', 'error', e?.message);
-    }
+    } catch (e: any) { pdbg('engine.audio', 'error', e?.message); }
   }
 
   public applyPreferredAudioLanguage(preferred?: string) {
@@ -553,35 +509,23 @@ export class CinelarPlayerEngine {
     const tracks = this.getAudioTracksInfo();
     if (!tracks || tracks.length <= 1) return;
     const lang = preferred.toLowerCase().split('-')[0];
-    const match = tracks.find((t) => t.language.toLowerCase().startsWith(lang));
-    if (match && !match.active) {
-      this.selectAudioTrack(match.language, match.role || undefined);
-    }
+    const match = tracks.find((t: any) => t.language.toLowerCase().startsWith(lang));
+    if (match && !match.active) this.selectAudioTrack(match.language, match.role || undefined);
   }
 
-  // ─── Limpieza y Eventos ───
   public destroy() {
     pdbg('engine.destroy');
-    this.loadToken++; // invalidar cargas en cola
+    this.loadToken++;
     this._bufferingState = false;
     this.lastPlaybackQuality = null;
-
     if (this.bwSaveIntervalId) { clearInterval(this.bwSaveIntervalId); this.bwSaveIntervalId = null; }
     if (this.perfCheckIntervalId) { clearInterval(this.perfCheckIntervalId); this.perfCheckIntervalId = null; }
-
     this.updateBandwidthMemory();
-
     if (this.videoElement) {
-      for (const [event, handler] of this._videoListeners) {
-        this.videoElement.removeEventListener(event, handler);
-      }
+      for (const [event, handler] of this._videoListeners) this.videoElement.removeEventListener(event, handler);
       this._videoListeners = [];
     }
-
-    if (this.player) {
-      this.player.destroy();
-      this.player = null;
-    }
+    if (this.player) { this.player.destroy(); this.player = null; }
     this.eventListeners.clear();
   }
 
@@ -590,10 +534,7 @@ export class CinelarPlayerEngine {
     this.eventListeners.get(event)!.push(callback);
     return () => {
       const list = this.eventListeners.get(event);
-      if (list) {
-        const idx = list.indexOf(callback);
-        if (idx >= 0) list.splice(idx, 1);
-      }
+      if (list) { const idx = list.indexOf(callback); if (idx >= 0) list.splice(idx, 1); }
     };
   }
 
