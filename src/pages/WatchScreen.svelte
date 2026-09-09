@@ -417,14 +417,14 @@
       engineReady: engine.engineReady,
       url: streamUrl,
       resume,
+      userLang,
     });
-    engine.load(streamUrl, resume)
+    engine.load(streamUrl, resume, userLang)
       .then(() => {
         if (cancelled) return;
         pdbg("watch.load", "engine.load resolved -> play()");
         _playbackStartTime = performance.now();
         engine.play();
-        engine.applyPreferredAudioLanguage(userLang);
       })
       .catch((e: any) => {
         if (cancelled) return;
@@ -857,10 +857,9 @@
             playerError = null;
             if (loadedUrl) {
               const resume = watchData?.continue_watching?.progress ?? 0;
-              engine.load(loadedUrl, resume)
+              engine.load(loadedUrl, resume, userLang)
                 .then(() => {
                   engine.play();
-                  engine.applyPreferredAudioLanguage(userLang);
                 })
                 .catch((e: any) => {
                   playerError = { code: e?.code, message: e?.message ?? "Error al cargar el contenido." };
@@ -936,11 +935,16 @@
         <div>ready: {String(ready)}</div>
         {#if engine.getProfile()}
           <div class="border-t border-green-800 my-1 pt-1"></div>
+          <div>platform: {engine.getProfile()?.platform} (lowEnd: {String(engine.getProfile()?.isLowEndDevice)})</div>
           <div>maxH: {engine.getProfile()?.decoderMaxHeight}p (disp: {engine.getProfile()?.displayMaxHeight}p)</div>
-          <div>lowEnd: {String(engine.getProfile()?.isLowEndDevice)}</div>
           <div>bwEst: {Math.round((engine.getProfile()?.bandwidthEstimate ?? 0) / 1000)}kbps</div>
           {#if engine.getProfile()?.performanceCap}
             <div class="text-yellow-400">perfCap: {engine.getProfile()?.performanceCap?.maxHeight}p ({engine.getProfile()?.performanceCap?.reason})</div>
+          {/if}
+          {#if engine.getSyncDiagnostics()}
+            <div class="border-t border-green-800 my-1 pt-1"></div>
+            <div>skew: {engine.getSyncDiagnostics()?.skewSeconds}s (rate: {engine.getSyncDiagnostics()?.effectiveRate})</div>
+            <div>drops: {Math.round((engine.getSyncDiagnostics()?.dropRatio ?? 0) * 100)}% | resyncs: {engine.getSyncDiagnostics()?.resyncCount}</div>
           {/if}
         {/if}
       </div>

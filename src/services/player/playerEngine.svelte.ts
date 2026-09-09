@@ -58,9 +58,9 @@ export function createPlayerEngine() {
     attachVideo,
     destroy,
 
-    load: (url: string, startTime?: number) => {
-      pdbg('engine.load', { url, startTime, hasEngine: !!engine });
-      return engine?.load(url, startTime) ?? Promise.resolve();
+    load: (url: string, startTime?: number, preferredAudioLang?: string) => {
+      pdbg('engine.load', { url, startTime, preferredAudioLang, hasEngine: !!engine });
+      return engine?.load(url, startTime, preferredAudioLang) ?? Promise.resolve();
     },
 
     play: () => {
@@ -75,6 +75,7 @@ export function createPlayerEngine() {
     getEngine: () => engine,
 
     getProfile: () => engine?.getProfile() ?? null,
+    getSyncDiagnostics: () => engine?.getSyncDiagnostics() ?? null,
     getVariantTracksInfo: () => engine?.getVariantTracksInfo() ?? null,
     getAudioTracksInfo: () => engine?.getAudioTracksInfo() ?? null,
 
