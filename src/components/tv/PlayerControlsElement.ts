@@ -283,6 +283,8 @@ export class PlayerControlsElement extends LitElement {
   private _restoreFocusRetry = 0;
   private _restoreFocusToken = 0;
   private _nextCardRef: any = null;
+  private _seekbarRef: any = null;
+  private _lastHideTimerRestart = 0;
 
   @state() private _isPlaying = false;
   @state() private _duration = 0;
@@ -417,7 +419,7 @@ export class PlayerControlsElement extends LitElement {
       }));
     }
 
-    if (changedProperties.has('isBuffering')) {
+    if (changedProperties.has('isBuffering') && !this.showControls) {
       this._syncOverlayFocusability();
     }
 
@@ -453,9 +455,12 @@ export class PlayerControlsElement extends LitElement {
       this._hideAdvisory();
     }
 
-    // Cache next-card ref after render (avoids querySelector in logic timer)
+    // Cache refs after render (avoids querySelector in logic timer and enter-press)
     if (!this._nextCardRef) {
       this._nextCardRef = this.renderRoot.querySelector('tv-player-next-card');
+    }
+    if (!this._seekbarRef) {
+      this._seekbarRef = this.renderRoot.querySelector('tv-player-seekbar');
     }
   }
 
@@ -479,8 +484,8 @@ export class PlayerControlsElement extends LitElement {
               .showControls=${this.showControls}
               @play-toggle=${this.togglePlayPause}
               @focus-playpause=${() => this._focusControl('watch-playpause')}
-              @seek-start=${() => { this.showControls = true; this._restartControlsHideTimer(); }}
-              @seek-change=${() => { this.showControls = true; this._restartControlsHideTimer(); }}
+              @seek-start=${() => { this._restartControlsHideTimer(); }}
+              @seek-change=${() => { this._restartControlsHideTimer(); }}
               @seek-end=${() => { }}
             ></tv-player-seekbar>
 
@@ -764,8 +769,11 @@ export class PlayerControlsElement extends LitElement {
   }
 
   private _restartControlsHideTimer() {
-    if (this.controlsTimer) clearTimeout(this.controlsTimer);
     if (this.settingsOpen || this.railExpanded) return;
+    const now = performance.now();
+    if (now - this._lastHideTimerRestart < 500) return;
+    this._lastHideTimerRestart = now;
+    if (this.controlsTimer) clearTimeout(this.controlsTimer);
     if (!this.videoEl || this.videoEl.paused) return;
     const currentFocus = getCurrentFocusKey() ?? '';
     if (currentFocus.startsWith('player-settings')) return;
@@ -890,12 +898,12 @@ export class PlayerControlsElement extends LitElement {
       case 'watch-settings': this.toggleSettings(); break;
       case 'watch-captions': this.showCaptionsToast(); break;
       case 'watch-seek-back': {
-        const seekbar = this.renderRoot.querySelector('tv-player-seekbar') as any;
+        const seekbar = this._seekbarRef;
         if (seekbar && typeof seekbar.seekBy === 'function') seekbar.seekBy(-SEEK_STEP_SECONDS);
         break;
       }
       case 'watch-seek-fwd': {
-        const seekbar = this.renderRoot.querySelector('tv-player-seekbar') as any;
+        const seekbar = this._seekbarRef;
         if (seekbar && typeof seekbar.seekBy === 'function') seekbar.seekBy(SEEK_STEP_SECONDS);
         break;
       }
