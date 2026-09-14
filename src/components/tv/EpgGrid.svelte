@@ -51,8 +51,9 @@
   let scrollEl = $state<HTMLDivElement | null>(null);
   let scrollTop = $state(0);
   let scrollLeft = $state(0);
-  let contentOffsetY = $state(0);
   let viewportH = $state(0);
+  let focusedProgram = $state<LiveTvProgram | null>(null);
+  let focusedChannel = $state<LiveTvChannel | null>(null);
 
   let focusRafId = 0;
   let scrollRafId = 0;
@@ -60,14 +61,12 @@
   let _scrollSource: 'user' | 'programmatic' = 'user';
 
   const { appQuality } = getRuntimeConfig();
-  const canAnimate = appQuality !== 'LITE';
 
   function clamp(v: number, min: number, max: number) {
     return Math.max(min, Math.min(max, v));
   }
 
   let nowMinute = $state(Date.now());
-  let nowRaf = $state(Date.now());
 
   $effect(() => {
     const id = setInterval(() => { nowMinute = Date.now(); }, 60_000);
@@ -75,12 +74,31 @@
     return () => clearInterval(id);
   });
 
-  if (canAnimate) {
+  // ── RAF loop: direct DOM updates for now-line and header scroll sync ──
+  // No Svelte $state reads inside the callback — pure DOM manipulation.
+  $effect(() => {
     let rafId = 0;
-    const loop = () => { nowRaf = Date.now(); rafId = requestAnimationFrame(loop); };
-    rafId = requestAnimationFrame(loop);
-    $effect(() => () => cancelAnimationFrame(rafId));
-  }
+    const tick = () => {
+      const wStart = windowStartMs;
+      const tW = trackWidth;
+      if (tW > 0) {
+        const px = clamp(Math.round(((Date.now() - wStart) / 60000) * PX_PER_MIN), 0, tW);
+        const headerNow = document.querySelector<HTMLElement>('[data-now-line-header]');
+        const gridNow = document.querySelector<HTMLElement>('[data-now-line-grid]');
+        if (headerNow) headerNow.style.transform = `translateX(${px}px)`;
+        if (gridNow) gridNow.style.transform = `translateX(${CHANNEL_COL_W + px}px)`;
+      }
+      // Sync header scroll offset (avoids reactive scrollLeft re-renders)
+      const scrollContent = document.querySelector<HTMLElement>('[data-scroll-content]');
+      const scroll = document.querySelector<HTMLElement>('[data-scroll-container]');
+      if (scrollContent && scroll) {
+        scrollContent.style.transform = `translateX(${-scroll.scrollLeft}px)`;
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  });
 
   const anchorMinute = $derived.by(() => {
     const d = new Date(nowMinute);
@@ -92,10 +110,6 @@
   const windowEndMs = $derived(windowStartMs + WINDOW_HOURS * 3600_000);
   const totalMin = WINDOW_HOURS * 60;
   const trackWidth = totalMin * PX_PER_MIN;
-
-  const nowOffsetPx = $derived(
-    clamp(Math.round(((nowRaf - windowStartMs) / 60000) * PX_PER_MIN), 0, trackWidth),
-  );
 
   const hourTicks = $derived.by(() => {
     const nowHourStart = new Date(nowMinute);
@@ -219,8 +233,22 @@
     })),
   );
 
+  let _blocksCache = new Map<string, EpgBlock[]>();
+  let _blocksCacheTime = 0;
+
   function getBlocksForRow(ch: LiveTvChannel): EpgBlock[] {
-    return computeBlocks(ch, nowMinute);
+    const minuteKey = Math.floor(nowMinute / 60000);
+    const cacheKey = ch.id;
+    if (minuteKey === _blocksCacheTime && _blocksCache.has(cacheKey)) {
+      return _blocksCache.get(cacheKey)!;
+    }
+    if (minuteKey !== _blocksCacheTime) {
+      _blocksCache.clear();
+      _blocksCacheTime = minuteKey;
+    }
+    const blocks = computeBlocks(ch, nowMinute);
+    _blocksCache.set(cacheKey, blocks);
+    return blocks;
   }
 
   const blockKey = (channelId: string, program: LiveTvProgram, left: number) =>
@@ -297,6 +325,15 @@
     });
   }
 
+  function updateFocusedProgram(ch: LiveTvChannel, blocks: EpgBlock[], focusKey: string) {
+    const match = blocks.find((b) => {
+      const key = `epg-${ch.id}-${b.program.id}-${b.left}`;
+      return key === focusKey;
+    });
+    focusedProgram = match ? match.program : (blocks[0]?.program ?? null);
+    focusedChannel = ch;
+  }
+
   function focusNextChannel(rowIdx: number): boolean {
     const next = channelRows[rowIdx + 1];
     if (!next) return true;
@@ -352,15 +389,76 @@
     if (!iso) return '';
     return new Date(iso).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
   }
+
+  function getProgramProgress(program: LiveTvProgram): number {
+    const start = new Date(program.start_time).getTime();
+    const end = new Date(program.end_time).getTime();
+    if (end <= start) return 100;
+    return Math.min(100, Math.max(0, ((nowMinute - start) / (end - start)) * 100));
+  }
+
+  function getRemainingText(program: LiveTvProgram): string {
+    const end = new Date(program.end_time).getTime();
+    const diff = Math.max(0, end - nowMinute);
+    const mins = Math.round(diff / 60000);
+    if (mins <= 0) return 'Terminando';
+    if (mins < 60) return `Queda: ${mins} min`;
+    const hrs = Math.floor(mins / 60);
+    const rem = mins % 60;
+    return rem > 0 ? `Queda: ${hrs}h ${rem}min` : `Queda: ${hrs}h`;
+  }
 </script>
 
 <div
   class="h-full w-full overflow-hidden flex flex-col bg-[#0e0e10]"
   style="--row-h: {ROW_H}px; --col-w: {CHANNEL_COL_W}px;"
 >
+  <!-- ── Info Panel (YouTube TV style) ── -->
+  {#if focusedProgram}
+    {@const progress = getProgramProgress(focusedProgram)}
+    <div class="shrink-0 px-6 py-3 bg-[#121214] border-b border-white/5 flex gap-5 min-h-[5rem]">
+      <div class="flex-1 min-w-0">
+        <div class="text-white font-semibold text-[clamp(1rem,1.5vw,1.25rem)] truncate">
+          {focusedProgram.title}
+        </div>
+        <div class="text-white/50 text-[clamp(0.7rem,0.9vw,0.8rem)] mt-0.5 tabular-nums">
+          {formatTime(focusedProgram.start_time)} — {formatTime(focusedProgram.end_time)}
+          {#if focusedProgram.category}
+            <span class="text-white/30 ml-2">• {focusedProgram.category}</span>
+          {/if}
+          <span class="text-white/30 ml-2">• {getRemainingText(focusedProgram)}</span>
+        </div>
+        {#if focusedProgram.description}
+          <p class="text-white/40 text-[clamp(0.65rem,0.8vw,0.75rem)] mt-1.5 line-clamp-2 leading-relaxed">
+            {focusedProgram.description}
+          </p>
+        {/if}
+        <div class="flex items-center gap-2 mt-2">
+          <div class="flex-1 h-[3px] rounded-full bg-white/10 overflow-hidden max-w-[20rem]">
+            <div
+              class="h-full rounded-full bg-[#f03]"
+              style="width: {progress}%; transition: width 1s linear;"
+            ></div>
+          </div>
+        </div>
+      </div>
+      {#if focusedProgram.icon_url}
+        <div class="w-[clamp(8rem,15vw,14rem)] h-[clamp(4rem,8vh,7rem)] rounded-lg overflow-hidden bg-white/5 shrink-0">
+          <img
+            src={focusedProgram.icon_url}
+            alt={focusedProgram.title}
+            class="w-full h-full object-cover"
+            loading="lazy"
+          />
+        </div>
+      {/if}
+    </div>
+  {/if}
+
+  <!-- ── Sticky Time Header ── -->
   <div
-    class="flex shrink-0 bg-bg border-b border-white/10"
-    style="height: var(--row-h);"
+    class="flex shrink-0 bg-bg border-b border-white/10 relative z-20"
+    style="height: var(--row-h); position: sticky; top: 0;"
   >
     <div
       class="w-[var(--col-w)] shrink-0 flex items-center justify-center bg-bg border-r border-white/10 text-text-secondary"
@@ -371,8 +469,9 @@
     </div>
     <div class="relative flex-1 overflow-hidden">
       <div
+        data-scroll-content
         class="relative h-full"
-        style="width: {trackWidth}px; transform: translateX({-scrollLeft}px);"
+        style="width: {trackWidth}px;"
       >
         {#each hourTicks as tick (tick.left)}
           <div
@@ -384,31 +483,37 @@
             <span class="mt-6">{tick.label}</span>
           </div>
         {/each}
-        {#if nowOffsetPx > 0 && nowOffsetPx < trackWidth}
-          <div class="absolute top-0 bottom-0 z-10 pointer-events-none" style="left: {nowOffsetPx}px;">
-            <div class="h-full w-[2px] bg-live/80"></div>
-          </div>
-        {/if}
+        <div
+          data-now-line-header
+          class="absolute top-0 bottom-0 z-10 pointer-events-none"
+          style="left: 0; will-change: transform;"
+        >
+          <div class="h-full w-[2px] bg-[#f03]/80"></div>
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- ── Virtual Scroll Grid ── -->
   <div
     bind:this={scrollEl}
     bind:clientHeight={viewportH}
     onscroll={onScroll}
     onwheel={preventUserScroll}
+    data-scroll-container
     class="flex-1 overflow-y-auto overflow-x-auto hide-scrollbar bg-bg"
   >
     <div
       class="relative"
       style="width: {CHANNEL_COL_W + trackWidth}px; height: {totalContentH}px;"
     >
-      {#if nowOffsetPx > 0 && nowOffsetPx < trackWidth}
-        <div class="absolute top-0 bottom-0 z-10 pointer-events-none" style="left: {CHANNEL_COL_W + nowOffsetPx}px;">
-          <div class="h-full w-[2px] bg-live/80"></div>
-        </div>
-      {/if}
+      <div
+        data-now-line-grid
+        class="absolute top-0 bottom-0 z-10 pointer-events-none"
+        style="left: 0; will-change: transform;"
+      >
+        <div class="h-full w-[2px] bg-[#f03]/80"></div>
+      </div>
 
       {#if visibleRowRange.startRow > 0}
         <div style="height: {visibleRowRange.startRow * ROW_H}px;"></div>
@@ -446,7 +551,7 @@
                 focusKey="epg-{row.channel.id}-noprogram"
                 onEnterPress={() => handleRowEnter(row.channel)}
                 onArrowPress={(direction) => handleRowArrow(direction, rowIdx)}
-                onFocus={handleFocusScroll}
+                onFocus={() => { focusedProgram = null; focusedChannel = row.channel; }}
                 focusedClass="!z-20"
                 class="absolute inset-y-1.5 left-2 right-2 rounded-lg cursor-pointer"
                 playSound={true}
@@ -470,7 +575,7 @@
                   focusKey="epg-{row.channel.id}-{block.program.id}-{block.left}"
                   onEnterPress={() => handleRowEnter(row.channel)}
                   onArrowPress={(direction) => handleRowArrow(direction, rowIdx)}
-                  onFocus={handleFocusScroll}
+                  onFocus={() => { handleFocusScroll(); updateFocusedProgram(row.channel, blocks, `epg-${row.channel.id}-${block.program.id}-${block.left}`); }}
                   focusedClass="!z-20"
                   class="absolute top-1.5 bottom-1.5 px-1 cursor-pointer"
                   style="left: {block.left}px; width: {block.width}px;"
@@ -480,7 +585,9 @@
                     <div
                       class="w-full h-full rounded-lg border flex items-center px-4 {focused
                         ? 'border-white bg-white text-black shadow-lg shadow-black/30'
-                        : 'border-white/5 bg-[#1d1d1f] text-white/90 hover:bg-[#232326]'}"
+                        : block.isLive
+                          ? 'border-[#f03]/30 bg-[#1d1d1f] text-white/90'
+                          : 'border-white/5 bg-[#1d1d1f] text-white/90 hover:bg-[#232326]'}"
                     >
                       <p class="truncate font-semibold text-[clamp(0.75rem,0.9vw,0.85rem)] leading-none">
                         {block.program.title}
