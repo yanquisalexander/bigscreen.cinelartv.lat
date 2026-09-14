@@ -14,7 +14,7 @@ import './PlayerSkipButtonElement';
 import './PlayerNextCardElement';
 
 const CONTROLS_HIDE_DELAY = 5000;
-const LOGIC_TICK_MS = 1000;
+const LOGIC_TICK_MS = 2000;
 const SEEK_STEP_SECONDS = 10;
 
 interface EngineLike {
@@ -594,9 +594,6 @@ export class PlayerControlsElement extends LitElement {
       );
       this._engineUnsubs.push(
         this.engineRef.on('paused', () => { this._isPlaying = false; })
-      );
-      this._engineUnsubs.push(
-        this.engineRef.on('buffering', (val: any) => { this.isBuffering = val !== false; })
       );
       this._engineUnsubs.push(
         this.engineRef.on('durationchange', (d: any) => { this._duration = d || 0; })

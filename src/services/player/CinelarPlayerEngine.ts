@@ -70,7 +70,9 @@ export class CinelarPlayerEngine {
   private playRetried = false;
 
   private profile: TvPlayerProfile | null = null;
-  private stallTimestamps: number[] = [];
+  private stallRing: number[] = [];
+  private stallRingIdx = 0;
+  private stallRingSize = 16;
   private lastPlaybackQuality: { total: number; dropped: number } | null = null;
   private lastStallRecoveryAt = 0;
   private bwSaveIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -98,17 +100,31 @@ export class CinelarPlayerEngine {
     this.initShaka();
   }
 
+  private _perfCache: StoredPlayerPerformance | null = null;
+  private _perfCacheAt = 0;
+  private static PERF_CACHE_TTL = 5000;
+
   private getStoredPerformance(): StoredPlayerPerformance | null {
+    const now = performance.now();
+    if (this._perfCache && (now - this._perfCacheAt) < CinelarPlayerEngine.PERF_CACHE_TTL) {
+      return this._perfCache;
+    }
     try {
       const raw = localStorage.getItem(PERF_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
+      const parsed = raw ? JSON.parse(raw) : null;
+      this._perfCache = parsed;
+      this._perfCacheAt = now;
+      return parsed;
     } catch { return null; }
   }
 
   private saveStoredPerformance(data: Partial<StoredPlayerPerformance>) {
     try {
       const current = this.getStoredPerformance() || {};
-      localStorage.setItem(PERF_STORAGE_KEY, JSON.stringify({ ...current, ...data, updatedAt: Date.now() }));
+      const merged = { ...current, ...data, updatedAt: Date.now() };
+      localStorage.setItem(PERF_STORAGE_KEY, JSON.stringify(merged));
+      this._perfCache = merged;
+      this._perfCacheAt = performance.now();
     } catch { }
   }
 
@@ -234,10 +250,18 @@ export class CinelarPlayerEngine {
 
   private noteStall() {
     const now = performance.now();
-    this.stallTimestamps.push(now);
-    this.stallTimestamps = this.stallTimestamps.filter((t) => now - t <= 60_000);
-    pdbg('engine.health', 'stall', { recentStalls: this.stallTimestamps.length, bufferAhead: this.getBufferAhead() });
-    if (this.stallTimestamps.length >= 3) this.reduceQualityForInstability('repeated_stalls');
+    if (this.stallRing.length < this.stallRingSize) {
+      this.stallRing.push(now);
+    } else {
+      this.stallRing[this.stallRingIdx] = now;
+    }
+    this.stallRingIdx = (this.stallRingIdx + 1) % this.stallRingSize;
+    let recentCount = 0;
+    for (let i = 0; i < this.stallRing.length; i++) {
+      if (now - this.stallRing[i] <= 60_000) recentCount++;
+    }
+    pdbg('engine.health', 'stall', { recentStalls: recentCount, bufferAhead: this.getBufferAhead() });
+    if (recentCount >= 3) this.reduceQualityForInstability('repeated_stalls');
   }
 
   // ═══════════════════════════════════════════════

@@ -243,10 +243,11 @@ export class PlayerSeekbarElement extends LitElement {
   private _startSeekbarLoop() {
     if (!this.videoEl) return;
     const video = this.videoEl;
-    const TICK_MS = 100;
+    const TICK_MS = 250;
     let lastPct = -1;
     let lastDur = 0;
     let lastBufferedPct = -1;
+    let lastAriaPct = -1;
     let nextTickTime = 0;
 
     const timeLabel = this._el('[data-current-time]');
@@ -292,8 +293,12 @@ export class PlayerSeekbarElement extends LitElement {
           thumb.style.setProperty('--thumb-x', `${thumbX}px`);
         }
         if (seekbar) {
-          seekbar.setAttribute('aria-valuenow', String(Math.round(pct)));
-          seekbar.setAttribute('aria-valuetext', `${formatTime(ct)} de ${formatTime(dur)}`);
+          const roundedPct = Math.round(pct);
+          if (roundedPct !== lastAriaPct) {
+            lastAriaPct = roundedPct;
+            seekbar.setAttribute('aria-valuenow', String(roundedPct));
+            seekbar.setAttribute('aria-valuetext', `${formatTime(ct)} de ${formatTime(dur)}`);
+          }
         }
       }
     };

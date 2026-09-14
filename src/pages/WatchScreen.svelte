@@ -76,10 +76,10 @@
   let debugVisible = $state(false);
   $effect(() => { debugVisible = $svelteSettingsStore.debugMode; });
 
-  const forceShowAds = $derived(
-    typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("_force_show_ads") === "true",
-  );
+  const forceShowAds = (() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("_force_show_ads") === "true";
+  })();
 
   let controlsEl = $state<any>(null);
   let adOverlayEl = $state<any>(null);
@@ -518,11 +518,11 @@
     const el = controlsEl;
     if (!el || !engine.engineReady) return;
 
-    el.engineRef = engine.getEngine();
-    el.videoEl = videoEl;
-    el.segments = allSegments;
-    el.clientEndpoint = clientEndpoint;
-    el.nextEpisode = nextEpisode;
+    if (el.engineRef !== engine.getEngine()) el.engineRef = engine.getEngine();
+    if (el.videoEl !== videoEl) el.videoEl = videoEl;
+    if (el.segments !== allSegments) el.segments = allSegments;
+    if (el.clientEndpoint !== clientEndpoint) el.clientEndpoint = clientEndpoint;
+    if (el.nextEpisode !== nextEpisode) el.nextEpisode = nextEpisode;
 
     if (watchData) {
       const title = watchData.content.title;
@@ -563,34 +563,25 @@
     return unsub;
   });
 
-  // Playback start listener (first frame)
+  // Playback start detection — uses reactive engine.isPlaying instead of raw engine event
   $effect(() => {
-    const rawEngine = engine.getEngine();
-    if (!rawEngine || _playbackStarted) return;
-    const unsub = rawEngine.on("playing", () => {
-      if (_playbackStarted) return;
+    if (engine.isPlaying && !_playbackStarted) {
       _playbackStarted = true;
       const startupMs = Math.round(performance.now() - _playbackStartTime);
       const contentType = (watchData?.content?.content_type ?? watchData?.content?.contentType ?? 'movie') as string;
       trackPlaybackStart(contentId, contentType as any, 'detail', startupMs, undefined, undefined, episodeId);
-    });
-    return unsub;
+    }
   });
 
-  // Buffer tracking
+  // Buffer tracking — uses reactive engine.isBuffering instead of raw engine event
   $effect(() => {
-    const rawEngine = engine.getEngine();
-    if (!rawEngine) return;
-    const unsub = rawEngine.on("buffering", (buffering: boolean) => {
-      if (buffering) {
-        _bufferCount++;
-        _lastBufferStart = performance.now();
-      } else if (_lastBufferStart > 0) {
-        _bufferTotalMs += performance.now() - _lastBufferStart;
-        _lastBufferStart = 0;
-      }
-    });
-    return unsub;
+    if (engine.isBuffering) {
+      _bufferCount++;
+      _lastBufferStart = performance.now();
+    } else if (_lastBufferStart > 0) {
+      _bufferTotalMs += performance.now() - _lastBufferStart;
+      _lastBufferStart = 0;
+    }
   });
 
   // Controls events
