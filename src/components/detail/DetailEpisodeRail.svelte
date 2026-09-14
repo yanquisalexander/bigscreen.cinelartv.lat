@@ -30,6 +30,7 @@
 
   let scrollEl = $state<HTMLDivElement | null>(null);
   let rafId = 0;
+  let currentOffset = 0;
 
   $effect(() => {
     const el = scrollEl;
@@ -44,9 +45,20 @@
         const containerWidth = el.clientWidth;
         const cardWidth = focused.clientWidth;
         const cardLeft = focused.offsetLeft;
-        const scrollLeft = cardLeft - containerWidth / 2 + cardWidth / 2;
+        const padding = 40;
 
-        el.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+        const cardRelativeLeft = cardLeft - currentOffset;
+        const cardRelativeRight = cardRelativeLeft + cardWidth;
+
+        if (cardRelativeRight > containerWidth - padding) {
+          currentOffset = cardLeft + cardWidth + padding - containerWidth;
+        } else if (cardRelativeLeft < padding) {
+          currentOffset = cardLeft - padding;
+        }
+
+        currentOffset = Math.max(0, currentOffset);
+
+        el.style.transform = `translateX(${-currentOffset}px) translateZ(0px)`;
       });
     };
 
@@ -66,16 +78,17 @@
   trackChildren={true}
   saveLastFocusedChild={true}
 >
-  <div class="relative">
+  <div class="relative overflow-x-hidden hide-scrollbar py-[clamp(0.5rem,1vh,0.875rem)]">
     <div
       bind:this={scrollEl}
-      class="flex gap-[clamp(0.75rem,1.2vw,1.125rem)] overflow-x-auto hide-scrollbar py-[clamp(0.5rem,1vh,0.875rem)] px-[clamp(1rem,2vw,2rem)]"
+      class="flex gap-[clamp(0.75rem,1.2vw,1.125rem)] px-[clamp(1rem,2vw,2rem)]"
+      style="transition: transform 150ms linear; will-change: transform;"
     >
       {#each episodes as episode, idx (episode.id)}
         {@const clientEndpoint = $svelteConfigStore.config.CLIENT_ENDPOINT}
         {@const thumbUrl = resolveEpisodeThumbnail(episode.images, episode.thumbnail_resized ?? episode.thumbnail, clientEndpoint)}
         {@const progress = episode.continue_watching ? Math.round((episode.continue_watching.progress / episode.continue_watching.duration) * 100) : undefined}
-        {@const episodeNum = episode.position ?? idx + 1}
+        {@const episodeNum = (episode.position ?? idx) + 1}
 
         <Focusable
           focusKey="detail-episode-{episode.id}"
