@@ -16,6 +16,7 @@ import LiveTVScreen from '@/pages/LiveTVScreen.svelte';
 
 // Loading placeholder for async routes
 import RouteLoadingPlaceholder from '@/components/loading/RouteLoadingPlaceholder.svelte';
+import ContentDetailScreen from "@/pages/ContentDetailScreen.svelte";
 
 const GUEST_ALLOWED_PATHS = ['/home', '/search', '/live'];
 const GUEST_BLOCKED_PREFIXES = ['/watch', '/select-profile'];
@@ -77,8 +78,7 @@ export const routes = {
   }),
 
   '/content/:contentId': wrap({
-    asyncComponent: () => import('@/pages/ContentDetailScreen.svelte'),
-    loadingComponent: RouteLoadingPlaceholder,
+    component: ContentDetailScreen,
     conditions: [requireAuthOrGuest],
   }),
 
