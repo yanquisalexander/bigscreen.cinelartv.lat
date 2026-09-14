@@ -193,7 +193,7 @@
         <div class="absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent"></div>
         <div class="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/30"></div>
         <div class="absolute bottom-[clamp(2.5rem,7vh,4.5rem)] left-[clamp(2.5rem,5vw,5rem)] flex flex-col items-start gap-3 z-10">
-          <div class="h-3 w-16 rounded bg-white/10 animate-pulse-slow"></div>
+          <div class="h-3 w-16 rounded bg-white/10 animate-pulse-slow mt-4"></div>
           <div class="h-[clamp(2rem,3.2vw,2.8rem)] w-[clamp(14rem,28vw,22rem)] rounded-lg bg-white/10 animate-pulse-slow"></div>
           <div class="h-3 w-[clamp(16rem,24vw,20rem)] rounded bg-white/10 animate-pulse-slow"></div>
           <div class="h-3 w-[clamp(12rem,18vw,16rem)] rounded bg-white/10 animate-pulse-slow"></div>
@@ -201,7 +201,7 @@
         </div>
       </div>
       <div class="relative px-[clamp(3rem,7.5vw,6rem)] pt-[clamp(1rem,2vh,1.5rem)] pb-[clamp(3rem,8vh,4rem)] space-y-[clamp(1.5rem,4vh,2rem)]">
-        {#each [1, 2, 3] as i (i)}
+        {#each [1] as i (i)}
           <div>
             <div class="h-[clamp(1.125rem,2.4vh,1.5rem)] w-[clamp(10rem,15vw,12rem)] bg-surface rounded mb-[clamp(0.75rem,2vh,1rem)] animate-pulse-slow"></div>
             <div class="flex gap-[clamp(0.5rem,1vw,0.75rem)]">
