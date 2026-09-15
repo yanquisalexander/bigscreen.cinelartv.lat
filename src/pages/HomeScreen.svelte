@@ -285,7 +285,7 @@
 
       <div
         class="relative z-10"
-        style="top: {heroHeight + heroExpandOffset}px; transition: top 700ms ease-in-out;"
+        style="transform: translateY({heroHeight + heroExpandOffset}px); transition: transform 700ms ease-in-out; will-change: transform;"
       >
         {#if data?.content}
           <VirtualizedShelves

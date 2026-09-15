@@ -198,7 +198,7 @@
       <!-- Backdrop: se extiende al fondo del viewport en immersive via bottom negativo (absoluto, sin reflow) -->
       <div
         class="absolute inset-x-0 top-0 overflow-hidden pointer-events-none bg-black"
-        style="bottom: {showTrailer ? -expandOffset : 0}px; transition: bottom 700ms ease-in-out;"
+        style="bottom: {showTrailer ? -expandOffset : 0}px;"
       >
         <!-- Layer 1: Background crossfade -->
         <div class="absolute inset-0" style="will-change: opacity;">
