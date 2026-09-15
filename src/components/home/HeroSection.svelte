@@ -13,6 +13,7 @@
     onInfo: (item: ContentItem) => void;
     clientEndpoint: string;
     firstRowFocusKey?: string;
+    focusable?: boolean;
     onImmersiveChange?: (immersive: boolean) => void;
     onUpdateHasFocusedChild?: (focused: boolean) => void;
   }
@@ -22,6 +23,7 @@
     onInfo,
     clientEndpoint,
     firstRowFocusKey,
+    focusable = true,
     onImmersiveChange,
     onUpdateHasFocusedChild: externalUpdateFocus,
   }: Props = $props();
@@ -90,9 +92,6 @@
 
   function onUpdateHasFocusedChild(focused: boolean) {
     hasFocusedChild = focused;
-    if (focused && heroEl) {
-      heroEl.scrollIntoView({ behavior: canAnimate ? 'smooth' : 'auto', block: 'start' });
-    }
     externalUpdateFocus?.(focused);
   }
 
@@ -187,6 +186,7 @@
     preferredChildFocusKey="hero-view-more"
     trackChildren={true}
     saveLastFocusedChild={true}
+    {focusable}
     {onUpdateHasFocusedChild}
   >
     <!-- Slot: reserva el espacio base en el flujo; SIEMPRE altura fija, nunca cambia -->
@@ -195,8 +195,11 @@
       class="relative w-full bg-black"
       style="height: {baseHeight}px;"
     >
-      <!-- Backdrop: siempre cubre el viewport a pantalla completa; se revela al desvanecerse el telon -->
-      <div class="absolute inset-x-0 top-0 h-[100dvh] overflow-hidden pointer-events-none">
+      <!-- Backdrop: se extiende al fondo del viewport en immersive via bottom negativo (absoluto, sin reflow) -->
+      <div
+        class="absolute inset-x-0 top-0 overflow-hidden pointer-events-none bg-black"
+        style="bottom: {showTrailer ? -expandOffset : 0}px; transition: bottom 700ms ease-in-out;"
+      >
         <!-- Layer 1: Background crossfade -->
         <div class="absolute inset-0" style="will-change: opacity;">
           {#if prevBannerUrl}
@@ -236,18 +239,18 @@
           </div>
         {/if}
 
-        <!-- Layer 3: Contrast gradients -->
+        <!-- Layer 3: Contrast gradients (sin z-index para que queden debajo de los shelves) -->
         <div
-          class="absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent pointer-events-none transition-opacity duration-700 z-20 {showTrailer ? 'opacity-20' : 'opacity-100'}"
+          class="absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent pointer-events-none transition-opacity duration-700 {showTrailer ? 'opacity-20' : 'opacity-100'}"
         ></div>
         <div
-          class="absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent pointer-events-none transition-opacity duration-700 z-20 {showTrailer ? 'opacity-30' : 'opacity-100'}"
+          class="absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent pointer-events-none transition-opacity duration-700 {showTrailer ? 'opacity-30' : 'opacity-100'}"
         ></div>
 
         <!-- Gradient overlay -->
         <div
-          class="absolute inset-0 pointer-events-none z-10 transition-opacity duration-700 {showTrailer ? 'opacity-0' : 'opacity-100'}"
-          style="background: linear-gradient(to bottom, transparent 70%, rgb(var(--color-bg)) 100%);"
+          class="absolute inset-x-0 bottom-0 pointer-events-none transition-all duration-700 {showTrailer ? 'opacity-0' : 'opacity-100'}"
+          style="height: 150px; background: linear-gradient(to bottom, transparent, rgb(var(--color-bg)));"
         ></div>
       </div>
 

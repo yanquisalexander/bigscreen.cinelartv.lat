@@ -2,8 +2,7 @@
   import { push } from 'svelte-spa-router';
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import Focusable from '@/components/tv/Focusable.svelte';
-  import FocusableCard from '@/components/tv/FocusableCard.svelte';
-  import FocusableRow from '@/components/tv/FocusableRow.svelte';
+  import VirtualizedShelves from '@/components/home/VirtualizedShelves.svelte';
   import HeroSection from '@/components/home/HeroSection.svelte';
   import ExitDialog from '@/components/ui/ExitDialog.svelte';
   import {  svelteAuthStore } from '@/stores/authStore';
@@ -21,16 +20,12 @@
   let error = $state(false);
   let showExitDialog = $state(false);
   let heroImmersive = $state(false);
+  const TOP_INSET = 160;
   let scrollY = $state(0);
-  let rowRefs = $state<Record<number, HTMLElement>>({});
+  let viewportHeight = $state(0);
 
   const tokens = $derived($svelteAuthStore.tokens);
   const clientEndpoint = $derived($svelteConfigStore.config.CLIENT_ENDPOINT);
-
-  function progressPercent(item: ContentItem): number {
-    if (!item.progress || !item.duration) return 0;
-    return Math.min(100, Math.round((item.progress / item.duration) * 100));
-  }
 
   async function fetchData() {
     error = false;
@@ -129,6 +124,21 @@
   const firstRowId = $derived(data?.content?.[0]?.content?.[0]?.id);
   const firstRowFocusKey = $derived(firstRowId != null ? `home-row-0-item-${firstRowId}` : undefined);
   const preferredChildFocusKey = $derived(bannerItems.length > 0 ? 'hero-section' : 'home-row-0');
+  const heroHeight = $derived(
+    bannerItems.length > 0
+      ? Math.max(420, Math.min(68 * (viewportHeight / 100), 660))
+      : 0,
+  );
+
+  const heroOpacity = $derived(
+    heroHeight > 0 ? Math.max(0, 1 - scrollY / heroHeight) : 0,
+  );
+
+  const heroFocusable = $derived(heroOpacity > 0.3);
+
+  const heroExpandOffset = $derived(
+    heroImmersive ? Math.max(0, viewportHeight - heroHeight) : 0,
+  );
 
   function focusTopNav() {
     setFocus('topnav');
@@ -137,8 +147,17 @@
 
   function focusHeroFromFirstRow(direction: string) {
     if (direction !== 'up' || bannerItems.length === 0) return focusTopNav();
-    setFocus('hero-view-more');
+    scrollY = 0;
+    requestAnimationFrame(() => {
+      setFocus('hero-view-more');
+    });
     return false;
+  }
+
+  function handleShelfFocusUpdate(catIdx: number, hasFocused: boolean, shelfY: number) {
+    if (hasFocused) {
+      scrollY = Math.max(0, heroHeight + shelfY - TOP_INSET);
+    }
   }
 
   $effect(() => {
@@ -175,6 +194,13 @@
     };
     window.addEventListener('keydown', handleBack);
     return () => window.removeEventListener('keydown', handleBack);
+  });
+
+  $effect(() => {
+    viewportHeight = window.innerHeight;
+    const onResize = () => { viewportHeight = window.innerHeight; };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   });
 </script>
 
@@ -232,68 +258,49 @@
     </div>
   {:else}
     <div
-      class="w-full h-full transition-transform duration-300 ease-out will-change-transform"
-      style="transform: translateY(-{scrollY}px);"
+      class="absolute inset-0"
+      style="transform: translateY(-{scrollY}px); transition: transform 200ms ease-out; will-change: transform;"
     >
       {#if bannerItems.length > 0}
-        <HeroSection
-          items={bannerItems}
-          onPlay={handlePlay}
-          onInfo={handleInfo}
-          {clientEndpoint}
-          {firstRowFocusKey}
-          onImmersiveChange={(imm) => { heroImmersive = imm; }}
-          onUpdateHasFocusedChild={(focused) => {
-            if (focused) scrollY = 0;
-          }}
-        />
+        <div
+          class="absolute left-0 right-0"
+          style="top: 0; height: {heroHeight}px;"
+        >
+          <div style="opacity: {heroOpacity}; pointer-events: {heroFocusable ? 'auto' : 'none'}; height: 100%;">
+            <HeroSection
+              items={bannerItems}
+              onPlay={handlePlay}
+              onInfo={handleInfo}
+              {clientEndpoint}
+              {firstRowFocusKey}
+              focusable={heroFocusable}
+              onImmersiveChange={(imm) => { heroImmersive = imm; }}
+              onUpdateHasFocusedChild={(focused) => {
+                if (focused) scrollY = 0;
+              }}
+            />
+          </div>
+        </div>
       {/if}
 
-      <div class="relative z-25 pb-[clamp(3rem,8vh,4rem)] transition-opacity duration-700 will-change-opacity {heroImmersive ? 'opacity-0 pointer-events-none' : ''}">
-        <div
-          class="relative h-[clamp(14rem,24vh,20rem)] -mt-[clamp(6rem,9vh,7rem)] -mb-[clamp(6rem,12vh,10rem)] bg-gradient-to-b from-transparent via-bg via-bg/70 to-bg/10 pointer-events-none"
-        ></div>
-        {#each data?.content ?? [] as category, catIdx (catIdx)}
-          {@const preferredChild = category.content?.[0]?.id != null ? `home-row-${catIdx}-item-${category.content[0].id}` : undefined}
-
-          <div bind:this={rowRefs[catIdx]}>
-            <FocusableRow
-              title={category.title}
-              focusKey="home-row-{catIdx}"
-              preferredChildFocusKey={preferredChild}
-              onUpdateHasFocusedChild={(hasFocused) => {
-                if (hasFocused && rowRefs[catIdx]) {
-                  const rowTop = rowRefs[catIdx].offsetTop;
-                  scrollY = Math.max(0, rowTop - 160);
-                }
-              }}
-            >
-              {#each category.content ?? [] as item, itemIdx (item.id)}
-                {@const image = resolvePoster(item.images, item.cover_resized ?? item.cover, clientEndpoint)}
-                {@const bannerImage = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint, 'medium')}
-                {@const ambientImage = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint, 'thumbnail')}
-
-                <FocusableCard
-                  variant="row"
-                  focusKey="home-row-{catIdx}-item-{item.id}"
-                  title={item.title}
-                  description={item.description}
-                  year={item.year!}
-                  {image}
-                  {bannerImage}
-                  ambientImageUrl={ambientImage}
-                  progress={progressPercent(item)}
-                  onArrowPress={(direction) => {
-                    if (catIdx === 0 && direction === 'up') return focusHeroFromFirstRow(direction);
-                    return true;
-                  }}
-                  onEnterPress={() => handleInfo(item)}
-                  playSound={true}
-                />
-              {/each}
-            </FocusableRow>
-          </div>
-        {/each}
+      <div
+        class="relative z-10"
+        style="top: {heroHeight + heroExpandOffset}px; transition: top 700ms ease-in-out;"
+      >
+        {#if data?.content}
+          <VirtualizedShelves
+            categories={data.content}
+            scrollY={Math.max(0, scrollY - heroHeight)}
+            {viewportHeight}
+            {clientEndpoint}
+            onCardEnterPress={handleInfo}
+            onCardArrowPress={(direction, catIdx) => {
+              if (catIdx === 0 && direction === 'up') return focusHeroFromFirstRow(direction);
+              return true;
+            }}
+            onShelfFocusUpdate={handleShelfFocusUpdate}
+          />
+        {/if}
       </div>
     </div>
   {/if}
