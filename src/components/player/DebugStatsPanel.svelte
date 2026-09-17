@@ -11,7 +11,23 @@
 
   let { engine, videoEl, streamUrl, adPhase, prerollChecked }: Props = $props();
 
-  // ── Snapshot state (updated imperatively in tick) ──
+  const SPARKLINE_MAX = 20;
+  const SPARKLINE_W = 100;
+  const SPARKLINE_H = 8;
+
+  // ── History buffers (plain arrays, no $state) ──
+  const bufferHistory: number[] = [];
+  const dropHistory: number[] = [];
+  const bwHistory: number[] = [];
+  const skewHistory: number[] = [];
+
+  // ── Canvas refs (imperative) ──
+  let bufferCanvas: HTMLCanvasElement | null = null;
+  let bwCanvas: HTMLCanvasElement | null = null;
+  let dropCanvas: HTMLCanvasElement | null = null;
+  let skewCanvas: HTMLCanvasElement | null = null;
+
+  // ── Snapshot state ──
   let snapProfile = $state<any>(null);
   let snapDiag = $state<any>(null);
   let snapHealth = $state<any>(null);
@@ -22,13 +38,43 @@
   let snapBufferAhead = $state(0);
   let snapDate = $state('');
 
-  // ── Update interval: 3s for TV (reduces GPU contention with video decoder) ──
+  // ── Sparkline: stroke-only, no gradient (saves GPU on Smart TV) ──
+  function drawSparkline(
+    canvas: HTMLCanvasElement | null,
+    data: number[],
+    color: string,
+    maxVal?: number,
+  ) {
+    if (!canvas || data.length < 2) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const max = maxVal ?? Math.max(...data, 1);
+    const step = w / (SPARKLINE_MAX - 1);
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Stroke only — no gradient fill, much cheaper on TV GPU
+    ctx.beginPath();
+    for (let i = 0; i < data.length; i++) {
+      const x = i * step;
+      const y = h - (data[i] / max) * h;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // ── Tick: read metrics + draw sparklines ──
   let updateInterval: ReturnType<typeof setInterval> | null = null;
 
   function tick() {
     if (!engine || !videoEl) return;
 
-    // Read all metrics
     snapProfile = engine.getProfile();
     snapDiag = engine.getSyncDiagnostics();
     snapHealth = engine.getBufferHealthScore();
@@ -50,17 +96,38 @@
       ? { video: `${snapProfile.decoderMaxHeight}p`, audio: '—' }
       : null;
     snapDate = new Date().toLocaleString();
+
+    // Push sparkline data
+    if (snapHealth) {
+      bufferHistory.push(snapHealth.bufferSeconds);
+      if (bufferHistory.length > SPARKLINE_MAX) bufferHistory.shift();
+      dropHistory.push(snapHealth.dropRate * 100);
+      if (dropHistory.length > SPARKLINE_MAX) dropHistory.shift();
+    }
+    if (snapDiag) {
+      skewHistory.push(Math.abs(snapDiag.skewSeconds) * 100);
+      if (skewHistory.length > SPARKLINE_MAX) skewHistory.shift();
+    }
+    if (snapProfile) {
+      bwHistory.push((snapProfile.bandwidthEstimate ?? 0) / 1000);
+      if (bwHistory.length > SPARKLINE_MAX) bwHistory.shift();
+    }
+
+    // Draw sparklines imperatively (every 3s, not every 1s)
+    drawSparkline(bufferCanvas, bufferHistory, '#4ade80');
+    drawSparkline(bwCanvas, bwHistory, '#60a5fa', Math.max(...bwHistory, 1000));
+    drawSparkline(dropCanvas, dropHistory, '#f87171', 10);
+    drawSparkline(skewCanvas, skewHistory, '#c084fc', 50);
   }
 
   $effect(() => {
-    updateInterval = setInterval(tick, 3000); // Reduced from 1s to 3s for Smart TV
+    updateInterval = setInterval(tick, 3000);
     tick();
     return () => {
       if (updateInterval) clearInterval(updateInterval);
     };
   });
 
-  // ── sCPN-like ID ──
   function getSessionCpn(): string {
     const id = streamUrl ?? '';
     let hash = 0;
@@ -73,11 +140,11 @@
 </script>
 
 <!--
-  TV Performance Optimizations:
-  - Update interval: 3 seconds (was 1s) - reduces CPU/GPU contention with video decoder
-  - Removed sparkline canvases (4 canvases) - biggest GPU hog
-  - CSS containment: contain: paint - isolates repaints from video compositor
-  - Simplified layout: fewer rows, no complex calculations
+  TV Optimized Debug Stats Panel:
+  - Canvas sparklines: 100×8px (was 200×16), stroke-only (no gradient fill)
+  - Update interval: 3s (was 1s) — 3× less CPU/GPU contention with decoder
+  - contain: paint — isolates panel repaints from video compositor
+  - All canvas draws are imperative (no reactive overhead)
 -->
 <div
   class="stats-panel"
@@ -87,13 +154,11 @@
 >
   <div class="stats-content">
 
-    <!-- Row: Video ID / sCPN -->
     <div class="stats-row">
       <span class="stats-label">Video ID / sCPN</span>
       <span class="stats-value">{streamUrl ? streamUrl.split('/').pop()?.split('?')[0]?.slice(0, 11) ?? '—' : '—'} / {getSessionCpn()}</span>
     </div>
 
-    <!-- Row: Viewport / Frames -->
     <div class="stats-row">
       <span class="stats-label">Viewport / Frames</span>
       <span class="stats-value">
@@ -101,7 +166,6 @@
       </span>
     </div>
 
-    <!-- Row: Current / Optimal Res -->
     <div class="stats-row">
       <span class="stats-label">Current / Optimal Res</span>
       <span class="stats-value">
@@ -112,13 +176,11 @@
       </span>
     </div>
 
-    <!-- Row: Volume / Normalized -->
     <div class="stats-row">
       <span class="stats-label">Volume / Normalized</span>
       <span class="stats-value">{Math.round(videoEl?.volume * 100 ?? 0)}%{videoEl?.muted ? ' (muted)' : ''} / {videoEl?.playbackRate ?? 1}x</span>
     </div>
 
-    <!-- Row: Codecs -->
     <div class="stats-row">
       <span class="stats-label">Codecs HW</span>
       <span class="stats-value">
@@ -126,35 +188,65 @@
       </span>
     </div>
 
-    <!-- Row: Buffer Health Score -->
+    <!-- Sparkline: Connection Speed -->
+    <div class="stats-row stats-sparkline-row">
+      <span class="stats-label">Speed</span>
+      <span class="stats-value stats-sparkline-row">
+        <canvas bind:this={bwCanvas} width={SPARKLINE_W} height={SPARKLINE_H} class="sparkline-canvas"></canvas>
+        <span>{Math.round(snapProfile?.bandwidthEstimate ?? 0)} Kbps</span>
+      </span>
+    </div>
+
+    <!-- Sparkline: Buffer Health -->
+    <div class="stats-row stats-sparkline-row">
+      <span class="stats-label">Buffer</span>
+      <span class="stats-value stats-sparkline-row">
+        <canvas bind:this={bufferCanvas} width={SPARKLINE_W} height={SPARKLINE_H} class="sparkline-canvas"></canvas>
+        <span>{snapBufferAhead.toFixed(1)}s</span>
+      </span>
+    </div>
+
+    <!-- Sparkline: Dropped Frames -->
+    <div class="stats-row stats-sparkline-row">
+      <span class="stats-label">Drops</span>
+      <span class="stats-value stats-sparkline-row">
+        <canvas bind:this={dropCanvas} width={SPARKLINE_W} height={SPARKLINE_H} class="sparkline-canvas"></canvas>
+        <span>{(snapDiag?.dropRatio ?? 0).toFixed(1)}%</span>
+      </span>
+    </div>
+
+    <!-- Sparkline: A/V Sync Skew -->
+    <div class="stats-row stats-sparkline-row">
+      <span class="stats-label">Skew</span>
+      <span class="stats-value stats-sparkline-row">
+        <canvas bind:this={skewCanvas} width={SPARKLINE_W} height={SPARKLINE_H} class="sparkline-canvas"></canvas>
+        <span>{snapDiag?.skewSeconds ?? 0}s</span>
+      </span>
+    </div>
+
     {#if snapHealth}
       <div class="stats-row">
-        <span class="stats-label">Health Score</span>
+        <span class="stats-label">Health</span>
         <span class="stats-value">
           <span class="stats-badge {snapHealth.overall < 30 ? 'badge-red' : snapHealth.overall > 70 ? 'badge-green' : 'badge-yellow'}">
             {snapHealth.overall}%
           </span>
           {snapHealth.recommendation}
-          {#if snapHealth.stallFrequency > 0}
-            <span class="stats-warn"> · {snapHealth.stallFrequency} stalls/min</span>
-          {/if}
         </span>
       </div>
     {/if}
 
-    <!-- Row: Platform -->
     {#if snapProfile}
       <div class="stats-row">
         <span class="stats-label">Platform</span>
         <span class="stats-value">
           {snapProfile.platform}
-          {#if snapProfile.isLowEndDevice}<span class="stats-warn"> (low-end)</span>{/if}
-          · {#if snapProfile.supportsPlaybackRateSlewing}<span class="stats-ok">slewing ✓</span>{:else}<span class="stats-warn">slewing ✗</span>{/if}
+          {#if snapProfile.isLowEndDevice}<span class="stats-warn"> (low)</span>{/if}
+          · {#if snapProfile.supportsPlaybackRateSlewing}<span class="stats-ok">slew✓</span>{:else}<span class="stats-warn">slew✗</span>{/if}
         </span>
       </div>
     {/if}
 
-    <!-- Row: Engine internals -->
     <div class="stats-row">
       <span class="stats-label">Engine</span>
       <span class="stats-value stats-mono">
@@ -162,19 +254,15 @@
       </span>
     </div>
 
-    <!-- Row: Session -->
     {#if snapSession}
       <div class="stats-row">
         <span class="stats-label">Session</span>
         <span class="stats-value stats-mono">
-          {Math.round(snapSession.sessionDurationMs / 1000)}s
-          stalls:{snapSession.totalStalls} qchanges:{snapSession.totalQualityChanges}
-          recovery:{snapSession.recoverySuccesses}/{snapSession.recoveryAttempts}
+          {Math.round(snapSession.sessionDurationMs / 1000)}s stalls:{snapSession.totalStalls} q:{snapSession.totalQualityChanges}
         </span>
       </div>
     {/if}
 
-    <!-- Row: Date -->
     <div class="stats-row">
       <span class="stats-label">Date</span>
       <span class="stats-value">{snapDate}</span>
@@ -201,9 +289,7 @@
     width: clamp(320px, 26vw, 420px);
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
     pointer-events: auto;
-    /* Critical for TV performance: isolate panel repaints from video compositor */
     contain: paint;
-    /* Improve scrolling performance on Smart TV */
     -webkit-overflow-scrolling: touch;
   }
 
@@ -221,17 +307,13 @@
     min-height: clamp(18px, 2.2vh, 24px);
   }
 
-  .stats-row:last-child {
-    border-bottom: none;
-  }
+  .stats-row:last-child { border-bottom: none; }
 
   .stats-label {
     color: rgba(255, 255, 255, 0.5);
     white-space: nowrap;
     flex-shrink: 0;
     font-size: clamp(9px, 0.8vw, 12px);
-    text-transform: none;
-    letter-spacing: 0.01em;
   }
 
   .stats-value {
@@ -246,21 +328,25 @@
     justify-content: flex-end;
   }
 
-  .stats-warn {
-    color: #fbbf24;
-    font-size: clamp(9px, 0.8vw, 12px);
+  .stats-sparkline-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
   }
 
-  .stats-ok {
-    color: #4ade80;
-    font-size: clamp(9px, 0.8vw, 12px);
+  .sparkline-canvas {
+    display: inline-block;
+    vertical-align: bottom;
+    border-radius: 1px;
+    flex-shrink: 0;
+    image-rendering: crisp-edges;
+    /* TV: hint browser to hardware-accelerate this small canvas */
+    content-visibility: auto;
   }
 
-  .stats-mono {
-    font-size: clamp(9px, 0.8vw, 12px);
-    color: rgba(255, 255, 255, 0.4);
-    letter-spacing: 0.02em;
-  }
+  .stats-warn { color: #fbbf24; font-size: clamp(9px, 0.8vw, 12px); }
+  .stats-ok { color: #4ade80; font-size: clamp(9px, 0.8vw, 12px); }
+  .stats-mono { font-size: clamp(9px, 0.8vw, 12px); color: rgba(255, 255, 255, 0.4); letter-spacing: 0.02em; }
 
   .stats-badge {
     display: inline-block;
