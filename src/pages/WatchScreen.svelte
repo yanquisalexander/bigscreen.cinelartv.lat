@@ -47,6 +47,7 @@
     trackPlaybackPause,
     trackPlaybackResume,
     trackPlaybackSeek,
+    trackPlaybackSessionSummary,
   } from "@/lib/analytics";
 
   import "@/components/tv/PlayerControlsElement";
@@ -256,6 +257,22 @@
       if (videoEl && videoEl.duration && _playbackStarted) {
         const watchedPct = (videoEl.currentTime / videoEl.duration) * 100;
         trackPlaybackExit(contentId, videoEl.currentTime, videoEl.duration, watchedPct, 'pagehide');
+      }
+
+      // 3. Enviar session summary (Package 6: Telemetría)
+      const summary = engine.getSessionSummary?.();
+      if (summary && _playbackStarted) {
+        trackPlaybackSessionSummary(contentId, {
+          total_stalls: summary.totalStalls,
+          total_resyncs: summary.totalResyncs,
+          total_quality_changes: summary.totalQualityChanges,
+          avg_drop_rate: summary.avgDropRate,
+          avg_buffer_health: summary.avgBufferHealth,
+          peak_quality_height: summary.peakQualityHeight,
+          session_duration_ms: Math.round(summary.sessionDurationMs),
+          recovery_attempts: summary.recoveryAttempts,
+          recovery_successes: summary.recoverySuccesses,
+        });
       }
       
       stopStreamPing();
@@ -569,7 +586,20 @@
       _playbackStarted = true;
       const startupMs = Math.round(performance.now() - _playbackStartTime);
       const contentType = (watchData?.content?.content_type ?? watchData?.content?.contentType ?? 'movie') as string;
-      trackPlaybackStart(contentId, contentType as any, 'detail', startupMs, undefined, undefined, episodeId);
+      const prof = engine.getProfile();
+      trackPlaybackStart(
+        contentId,
+        contentType as any,
+        'detail',
+        startupMs,
+        undefined,
+        undefined,
+        episodeId,
+        prof?.platform,
+        prof?.isLowEndDevice,
+        prof?.decoderMaxHeight,
+        prof?.bandwidthEstimate,
+      );
     }
   });
 
@@ -936,6 +966,23 @@
             <div class="border-t border-green-800 my-1 pt-1"></div>
             <div>skew: {engine.getSyncDiagnostics()?.skewSeconds}s (rate: {engine.getSyncDiagnostics()?.effectiveRate})</div>
             <div>drops: {Math.round((engine.getSyncDiagnostics()?.dropRatio ?? 0) * 100)}% | resyncs: {engine.getSyncDiagnostics()?.resyncCount}</div>
+          {/if}
+          {#if engine.getBufferHealthScore()}
+            <div class="border-t border-green-800 my-1 pt-1"></div>
+            <div>bufferHealth: <span class="{(engine.getBufferHealthScore()?.overall ?? 0) < 40 ? 'text-red-400' : (engine.getBufferHealthScore()?.overall ?? 0) > 70 ? 'text-green-400' : 'text-yellow-400'}">{engine.getBufferHealthScore()?.overall}%</span></div>
+            <div>bufferAhead: {engine.getBufferHealthScore()?.bufferSeconds}s</div>
+            <div>stalls/min: {engine.getBufferHealthScore()?.stallFrequency}</div>
+            <div>recommendation: {engine.getBufferHealthScore()?.recommendation}</div>
+          {/if}
+          {#if engine.getLiveDriftInfo()}
+            <div class="border-t border-green-800 my-1 pt-1"></div>
+            <div class="text-cyan-400">liveEdge: {engine.getLiveDriftInfo()?.drift}s {engine.getLiveDriftInfo()?.isCatchingUp ? '(catching up)' : ''}</div>
+          {/if}
+          {#if engine.getSessionSummary()}
+            <div class="border-t border-green-800 my-1 pt-1"></div>
+            <div class="text-purple-400">session: {Math.round((engine.getSessionSummary()?.sessionDurationMs ?? 0) / 1000)}s</div>
+            <div>recovery: {engine.getSessionSummary()?.recoverySuccesses}/{engine.getSessionSummary()?.recoveryAttempts}</div>
+            <div>qualityChanges: {engine.getSessionSummary()?.totalQualityChanges}</div>
           {/if}
         {/if}
       </div>

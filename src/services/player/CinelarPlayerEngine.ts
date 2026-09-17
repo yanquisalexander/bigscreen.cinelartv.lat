@@ -11,7 +11,11 @@ type PlayerEvent =
   | 'ended'
   | 'trackschanged'
   | 'avdesync'
-  | 'driftsync';
+  | 'driftsync'
+  | 'livedrift'
+  | 'recovery'
+  | 'healthchange'
+  | 'qualitychange';
 
 type EventCallback = (data?: any) => void;
 
@@ -54,6 +58,28 @@ export interface SyncDiagnostics {
   resyncCount: number;
 }
 
+export interface BufferHealthScore {
+  overall: number;
+  bufferSeconds: number;
+  dropRate: number;
+  effectiveRate: number;
+  stallFrequency: number;
+  recommendation: 'maintain' | 'downgrade' | 'upgrade';
+  timestamp: number;
+}
+
+export interface PlaybackSessionSummary {
+  totalStalls: number;
+  totalResyncs: number;
+  totalQualityChanges: number;
+  avgDropRate: number;
+  avgBufferHealth: number;
+  peakQualityHeight: number;
+  sessionDurationMs: number;
+  recoveryAttempts: number;
+  recoverySuccesses: number;
+}
+
 const PERF_STORAGE_KEY = 'cinelar_player_perf';
 
 export class CinelarPlayerEngine {
@@ -90,6 +116,29 @@ export class CinelarPlayerEngine {
   private slewingActive = false;
   private slewingTimeout: ReturnType<typeof setTimeout> | null = null;
   private lastProgressSync = 0;
+
+  // ─── BUFFER HEALTH SCORE (YouTube TV: Health Score Multifactorial) ───
+  private _lastBufferHealth: BufferHealthScore | null = null;
+  private _stallTimestamps: number[] = [];
+  private _qualityChangeCount = 0;
+  private _peakQualityHeight = 0;
+  private _sessionStartTime = 0;
+  private _totalRecoveryAttempts = 0;
+  private _totalRecoverySuccesses = 0;
+  private _dropRateHistory: number[] = [];
+
+  // ─── LIVE DRIFT MONITOR ───
+  private _liveMode = false;
+  private _liveDriftIntervalId: ReturnType<typeof setInterval> | null = null;
+  private _liveCatchUpActive = false;
+
+  // ─── MSE ERROR RECOVERY ───
+  private _mseRecoveryAttempts = 0;
+  private _maxMseRecoveryAttempts = 3;
+
+  // ─── SOURCEBUFFER BACKPRESSURE ───
+  private _backpressureActive = false;
+  private _originalBufferingGoal = 20;
 
   // ─── DRIFT RECOVERY LEGACY (Para compatibilidad) ───
   private driftRecoveryMs: number | null = null;
@@ -256,6 +305,7 @@ export class CinelarPlayerEngine {
       this.stallRing[this.stallRingIdx] = now;
     }
     this.stallRingIdx = (this.stallRingIdx + 1) % this.stallRingSize;
+    this.noteStallForHealth();
     let recentCount = 0;
     for (let i = 0; i < this.stallRing.length; i++) {
       if (now - this.stallRing[i] <= 60_000) recentCount++;
@@ -348,6 +398,16 @@ export class CinelarPlayerEngine {
 
     // 3. Chequeo de cuadros caídos
     this.checkDroppedFramesAndEvaluate();
+
+    // 4. Buffer Health Score (cada chequeo)
+    const health = this.calculateBufferHealthScore();
+    if (health.recommendation === 'downgrade') {
+      this.reduceQualityForInstability(`health_score_${health.overall}`);
+    }
+    this.emit('healthchange', health);
+
+    // 5. Backpressure evaluation
+    this.evaluateBackpressure();
   }
 
   private recoverFromDesync(skew: number, reason: string) {
@@ -413,17 +473,43 @@ export class CinelarPlayerEngine {
         if (renderedSinceLastCheck <= 0 || droppedSinceLastCheck < 0) return;
         const dropRatio = droppedSinceLastCheck / renderedSinceLastCheck;
         this.lastDropRatio = dropRatio;
+
+        // Track drop rate history for session avg
+        this._dropRateHistory.push(dropRatio);
+        if (this._dropRateHistory.length > 60) this._dropRateHistory.shift();
+
         const effective = this.getEffectiveMaxHeight();
 
+        // ── Compositor vs Decoder Drop Classification ──
+        // corruptedVideoFrames: frames corrupted by the decoder (hardware issues)
+        // droppedVideoFrames: frames dropped by the compositor/browser (rendering overload)
+        const corrupted = (q as any).corruptedVideoFrames ?? 0;
+        const previousCorrupted = (this._lastCorruptedFrames ?? 0);
+        this._lastCorruptedFrames = corrupted;
+        const corruptedDelta = corrupted - previousCorrupted;
+
         if (renderedSinceLastCheck >= 60 && dropRatio > 0.08 && effective > 720) {
+          // Classic drop threshold exceeded
           this.reduceQualityForInstability(`frame_drops_${Math.round(dropRatio * 100)}%`);
-        } else if (dropRatio < 0.02 && this.profile?.performanceCap) {
+        } else if (corruptedDelta > 5 && corruptedDelta > droppedSinceLastCheck) {
+          // Decoder-level corruption — hardware can't keep up with codec/resolution
+          pdbg('engine.health', 'Decoder corruption detected', { corrupted: corruptedDelta, dropped: droppedSinceLastCheck });
+          this.reduceQualityForInstability(`decoder_corruption_${corruptedDelta}`);
+        } else if (droppedSinceLastCheck > 10 && corruptedDelta === 0) {
+          // Drops without corruption = compositor/GPU overload (UI too heavy)
+          pdbg('engine.health', 'Compositor overload suspected', { dropped: droppedSinceLastCheck, corrupted: 0 });
+          this.emit('healthchange', { ...this._lastBufferHealth, compositorOverload: true });
+        }
+
+        // Stability streak for quality upgrade testing
+        if (dropRatio < 0.02 && this.profile?.performanceCap) {
           const stored = this.getStoredPerformance() || {};
           const newStreak = (stored.stabilityStreakMs || 0) + 5000;
           this.saveStoredPerformance({ stabilityStreakMs: newStreak });
           if (newStreak > 300000) {
             const nextTestCap = this.profile.performanceCap.maxHeight >= 1080 ? 2160 : 1080;
             pdbg('engine.cap', `Probando resolución superior: ${nextTestCap}p tras estabilidad`);
+            this.noteQualityChange(this.profile.performanceCap.maxHeight, nextTestCap);
             this.profile.performanceCap = { maxHeight: nextTestCap, reason: 'stability_recovery_test' };
             this.saveStoredPerformance({ performanceCapHeight: nextTestCap, performanceCapReason: 'stability_recovery_test', stabilityStreakMs: 0 });
             this.player?.configure({ abr: { restrictions: { maxHeight: nextTestCap } } });
@@ -433,12 +519,298 @@ export class CinelarPlayerEngine {
     } catch { }
   }
 
+  private _lastCorruptedFrames: number | null = null;
+
   private updateBandwidthMemory() {
     if (!this.player) return;
     try {
       const stats = this.player.getStats();
       const bw = stats?.estimatedBandwidth;
       if (bw && bw > 500_000 && bw < 100_000_000) this.saveStoredPerformance({ bandwidth: Math.round(bw) });
+    } catch { }
+  }
+
+  // ═══════════════════════════════════════════════
+  // BUFFER HEALTH SCORE (YouTube TV: Health Score Multifactorial)
+  // ═══════════════════════════════════════════════
+
+  private calculateBufferHealthScore(): BufferHealthScore {
+    const bufferAhead = this.getBufferAhead();
+    const dropRate = this.lastDropRatio;
+    const effectiveRate = this.lastEffectiveRate;
+
+    // Stall frequency: stalls per minute
+    const now = performance.now();
+    this._stallTimestamps = this._stallTimestamps.filter(t => now - t < 60_000);
+    const stallFrequency = this._stallTimestamps.length;
+
+    // ── Sub-scores (0-100) ──
+
+    // Buffer score: 0s = 0, 20s+ = 100
+    const bufferScore = Math.min(100, (bufferAhead / 20) * 100);
+
+    // Drop rate score: 0% = 100, 10%+ = 0
+    const dropScore = Math.max(0, 100 - (dropRate * 1000));
+
+    // Effective rate score: 1.0 = 100, <0.85 or >1.15 = 0
+    const rateDeviation = Math.abs(effectiveRate - 1.0);
+    const rateScore = Math.max(0, 100 - (rateDeviation * 667));
+
+    // Stall frequency score: 0/min = 100, 5+/min = 0
+    const stallScore = Math.max(0, 100 - (stallFrequency * 20));
+
+    // Weighted composite
+    const overall = Math.round(
+      bufferScore * 0.40 +
+      dropScore * 0.30 +
+      rateScore * 0.20 +
+      stallScore * 0.10
+    );
+
+    // Recommendation
+    let recommendation: BufferHealthScore['recommendation'] = 'maintain';
+    if (overall < 40) recommendation = 'downgrade';
+    else if (overall > 80 && this.profile?.performanceCap) recommendation = 'upgrade';
+
+    const score: BufferHealthScore = {
+      overall,
+      bufferSeconds: Number(bufferAhead.toFixed(2)),
+      dropRate: Number(dropRate.toFixed(4)),
+      effectiveRate: Number(effectiveRate.toFixed(3)),
+      stallFrequency,
+      recommendation,
+      timestamp: now,
+    };
+
+    this._lastBufferHealth = score;
+    return score;
+  }
+
+  private noteStallForHealth() {
+    this._stallTimestamps.push(performance.now());
+  }
+
+  private noteQualityChange(fromHeight: number, toHeight: number) {
+    this._qualityChangeCount++;
+    if (toHeight > this._peakQualityHeight) this._peakQualityHeight = toHeight;
+  }
+
+  public getBufferHealthScore(): BufferHealthScore | null {
+    return this._lastBufferHealth;
+  }
+
+  public getSessionSummary(): PlaybackSessionSummary {
+    const dropRates = this._dropRateHistory;
+    const avgDropRate = dropRates.length > 0
+      ? dropRates.reduce((a, b) => a + b, 0) / dropRates.length
+      : 0;
+    const avgBufferHealth = this._lastBufferHealth?.overall ?? 50;
+
+    return {
+      totalStalls: this._stallTimestamps.length,
+      totalResyncs: this.resyncCount,
+      totalQualityChanges: this._qualityChangeCount,
+      avgDropRate: Number(avgDropRate.toFixed(4)),
+      avgBufferHealth: Math.round(avgBufferHealth),
+      peakQualityHeight: this._peakQualityHeight,
+      sessionDurationMs: this._sessionStartTime > 0 ? performance.now() - this._sessionStartTime : 0,
+      recoveryAttempts: this._totalRecoveryAttempts,
+      recoverySuccesses: this._totalRecoverySuccesses,
+    };
+  }
+
+  // ═══════════════════════════════════════════════
+  // LIVE DRIFT CATCH-UP (YouTube TV: Live Drift Correction)
+  // ═══════════════════════════════════════════════
+
+  public setLiveMode(enabled: boolean) {
+    if (this._liveMode === enabled) return;
+    this._liveMode = enabled;
+    pdbg('engine.live', `liveMode ${enabled ? 'ENABLED' : 'DISABLED'}`);
+
+    if (enabled) {
+      this._sessionStartTime = performance.now();
+      this.startLiveDriftMonitor();
+    } else {
+      this.stopLiveDriftMonitor();
+      this.resetLiveCatchUp();
+    }
+  }
+
+  private startLiveDriftMonitor() {
+    this.stopLiveDriftMonitor();
+    this._liveDriftIntervalId = setInterval(() => this.checkLiveDrift(), 3000);
+  }
+
+  private stopLiveDriftMonitor() {
+    if (this._liveDriftIntervalId) {
+      clearInterval(this._liveDriftIntervalId);
+      this._liveDriftIntervalId = null;
+    }
+  }
+
+  private checkLiveDrift() {
+    const video = this.videoElement;
+    if (!video || !this.player || video.paused || this._bufferingState) return;
+
+    try {
+      const seekRange = this.player.seekRange?.();
+      if (!seekRange || !Number.isFinite(seekRange.start) || !Number.isFinite(seekRange.end)) return;
+
+      const liveEdge = seekRange.end;
+      const currentTime = video.currentTime;
+      const drift = liveEdge - currentTime;
+
+      // Live Drift thresholds (YouTube TV: vcu module)
+      const CATCH_UP_THRESHOLD = 3.0;   // Start catch-up if > 3s behind
+      const CATCH_UP_TARGET = 1.0;      // Target: within 1s of live edge
+      const CATCH_UP_RATE = 1.05;        // Playback rate during catch-up
+
+      if (drift > CATCH_UP_THRESHOLD && !this._liveCatchUpActive) {
+        // Start catch-up
+        this._liveCatchUpActive = true;
+        if (this.profile?.supportsPlaybackRateSlewing) {
+          video.playbackRate = CATCH_UP_RATE;
+          pdbg('engine.live', `Catch-up started: drift=${drift.toFixed(2)}s, rate=${CATCH_UP_RATE}`);
+        }
+        this.emit('livedrift', { drift, action: 'catchup_start', rate: CATCH_UP_RATE });
+      } else if (this._liveCatchUpActive && drift <= CATCH_UP_TARGET) {
+        this.resetLiveCatchUp();
+        pdbg('engine.live', `Catch-up completed: drift=${drift.toFixed(2)}s`);
+        this.emit('livedrift', { drift, action: 'catchup_complete' });
+      } else if (this._liveCatchUpActive && drift > CATCH_UP_THRESHOLD + 5) {
+        // Drift grew too large (network issue), fall back to seek
+        this.resetLiveCatchUp();
+        this.seek(liveEdge - 2);
+        pdbg('engine.live', `Emergency seek: drift=${drift.toFixed(2)}s`);
+        this.emit('livedrift', { drift, action: 'emergency_seek' });
+      }
+    } catch { }
+  }
+
+  private resetLiveCatchUp() {
+    if (this._liveCatchUpActive && this.videoElement) {
+      this.videoElement.playbackRate = 1.0;
+    }
+    this._liveCatchUpActive = false;
+  }
+
+  public getLiveDriftInfo(): { drift: number; isCatchingUp: boolean } | null {
+    if (!this._liveMode || !this.player) return null;
+    try {
+      const seekRange = this.player.seekRange?.();
+      if (!seekRange || !Number.isFinite(seekRange.end) || !this.videoElement) return null;
+      return {
+        drift: Number((seekRange.end - this.videoElement.currentTime).toFixed(2)),
+        isCatchingUp: this._liveCatchUpActive,
+      };
+    } catch { return null; }
+  }
+
+  // ═══════════════════════════════════════════════
+  // MSE ERROR SURGICAL RECOVERY (YouTube TV: Rollback without Restart)
+  // ═══════════════════════════════════════════════
+
+  private attemptMseRecovery(error: any): boolean {
+    if (this._mseRecoveryAttempts >= this._maxMseRecoveryAttempts) {
+      pdbg('engine.recovery', `Max MSE recovery attempts reached (${this._maxMseRecoveryAttempts})`);
+      return false;
+    }
+
+    const severity = error?.severity ?? 2;
+    const code = error?.code ?? 0;
+    const category = error?.category ?? 0;
+
+    // Only attempt recovery for RECOVERABLE errors
+    if (severity !== 1) return false;
+
+    this._mseRecoveryAttempts++;
+    this._totalRecoveryAttempts++;
+    pdbg('engine.recovery', `MSE recovery attempt ${this._mseRecoveryAttempts}/${this._maxMseRecoveryAttempts}`, { code, category });
+
+    try {
+      const video = this.videoElement;
+      if (!video || !this.player) return false;
+
+      // Strategy 1: For MEDIA errors, try removing the faulty buffer range
+      if (category === 3) { // MEDIA category
+        const currentTime = video.currentTime;
+        // Remove a small window around current time and let Shaka refill
+        try {
+          // Use Shaka's internal MSE engine to remove buffer
+          const buffered = video.buffered;
+          for (let i = buffered.length - 1; i >= 0; i--) {
+            if (buffered.start(i) >= currentTime - 0.5 && buffered.start(i) <= currentTime + 5) {
+              // Found a range near the error point - let Shaka handle recovery
+              this.player.retryStreaming();
+              this._totalRecoverySuccesses++;
+              pdbg('engine.recovery', 'Shaka retryStreaming after media error');
+              return true;
+            }
+          }
+        } catch { }
+      }
+
+      // Strategy 2: For NETWORK errors, just retry
+      if (category === 1) { // NETWORK category
+        this.player.retryStreaming();
+        this._totalRecoverySuccesses++;
+        pdbg('engine.recovery', 'Shaka retryStreaming after network error');
+        return true;
+      }
+
+      // Strategy 3: For STREAMING errors with recoverable severity, try disabling/re-enabling variant
+      if (category === 5) { // STREAMING category
+        const currentTime = video.currentTime;
+        this.player.retryStreaming();
+        // Small seek to force rebuffer from a clean point
+        video.currentTime = Math.max(0, currentTime - 0.1);
+        this._totalRecoverySuccesses++;
+        pdbg('engine.recovery', 'Shaka retryStreaming + micro-seek after streaming error');
+        return true;
+      }
+
+    } catch (e: any) {
+      pdbg('engine.recovery', 'MSE recovery attempt failed', e?.message);
+    }
+
+    return false;
+  }
+
+  // ═══════════════════════════════════════════════
+  // SOURCEBUFFER BACKPRESSURE (YouTube TV: NeedMoreInputBackpressure)
+  // ═══════════════════════════════════════════════
+
+  private evaluateBackpressure() {
+    const video = this.videoElement;
+    if (!video || !this.profile) return;
+
+    const health = this._lastBufferHealth;
+    if (!health) return;
+
+    // Activate backpressure if health is poor and we have a lot of buffer
+    if (health.overall < 30 && health.bufferSeconds > 10 && !this._backpressureActive) {
+      this._backpressureActive = true;
+      // Reduce buffering goal to prevent decoder overload
+      const reducedGoal = Math.max(5, Math.floor(this._originalBufferingGoal * 0.5));
+      try {
+        this.player?.configure({ streaming: { bufferingGoal: reducedGoal } });
+        pdbg('engine.backpressure', `Activated: reduced bufferingGoal to ${reducedGoal}s (health=${health.overall})`);
+      } catch { }
+    } else if (this._backpressureActive && health.overall >= 60) {
+      this._backpressureActive = false;
+      try {
+        this.player?.configure({ streaming: { bufferingGoal: this._originalBufferingGoal } });
+        pdbg('engine.backpressure', `Deactivated: restored bufferingGoal to ${this._originalBufferingGoal}s`);
+      } catch { }
+    }
+  }
+
+  private initBackpressure() {
+    if (!this.player) return;
+    try {
+      const cfg = this.player.getConfiguration();
+      this._originalBufferingGoal = cfg?.streaming?.bufferingGoal ?? 20;
     } catch { }
   }
 
@@ -540,10 +912,24 @@ export class CinelarPlayerEngine {
         });
 
         this.player.addEventListener('error', (event: any) => {
-          pdbg('engine.shaka-error', `code=${event?.detail?.code}`, event?.detail?.message);
-          this.emit('error', event.detail);
+          const error = event?.detail;
+          pdbg('engine.shaka-error', `code=${error?.code}`, error?.message);
+
+          // Attempt surgical MSE recovery for recoverable errors
+          if (error && error.severity === 1) {
+            const recovered = this.attemptMseRecovery(error);
+            if (recovered) {
+              this.emit('recovery', { type: 'mse_surgical', success: true, code: error.code });
+              return; // Don't propagate to user — recovery succeeded
+            }
+          }
+
+          this.emit('error', error);
         });
         this.player.addEventListener('trackschanged', () => this.emit('trackschanged'));
+
+        // Initialize backpressure monitoring
+        this.initBackpressure();
       }).catch((error: any) => {
         pdbg('engine.initShaka', 'profile setup FAILED', error?.message);
       });
@@ -793,6 +1179,8 @@ export class CinelarPlayerEngine {
     if (this.slewingTimeout) { clearTimeout(this.slewingTimeout); this.slewingTimeout = null; }
     if (this.bwSaveIntervalId) { clearInterval(this.bwSaveIntervalId); this.bwSaveIntervalId = null; }
     if (this.syncCheckIntervalId) { clearInterval(this.syncCheckIntervalId); this.syncCheckIntervalId = null; }
+    this.stopLiveDriftMonitor();
+    this.resetLiveCatchUp();
     this.updateBandwidthMemory();
     if (this.videoElement) {
       for (const [event, handler] of this._videoListeners) this.videoElement.removeEventListener(event, handler);

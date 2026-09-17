@@ -75,6 +75,10 @@ export function trackPlaybackStart(
   quality?: string,
   audio?: string,
   episodeId?: string,
+  platform?: string,
+  isLowEnd?: boolean,
+  decoderMaxHeight?: number,
+  initialBandwidth?: number,
 ): void {
   enqueue({
     event: 'playback_start',
@@ -86,6 +90,10 @@ export function trackPlaybackStart(
       startup_time_ms: startupTimeMs,
       quality,
       audio,
+      platform,
+      is_low_end: isLowEnd,
+      decoder_max_height: decoderMaxHeight,
+      initial_bandwidth: initialBandwidth,
     },
   });
 }
@@ -140,6 +148,82 @@ export function trackPlaybackBuffer(
       content_id: contentId,
       buffer_duration_ms: Math.round(bufferDurationMs),
       buffer_count: bufferCount,
+    },
+  });
+}
+
+export function trackPlaybackQualityChange(
+  contentId: string,
+  fromHeight: number | null,
+  toHeight: number | null,
+  reason: string,
+  isAuto: boolean,
+): void {
+  enqueue({
+    event: 'playback_quality_change',
+    params: {
+      content_id: contentId,
+      from_height: fromHeight,
+      to_height: toHeight,
+      reason,
+      is_auto: isAuto,
+    },
+  });
+}
+
+export function trackPlaybackRecovery(
+  contentId: string,
+  recoveryType: 'mse_surgical' | 'quality_downgrade' | 'live_seek' | 'backpressure',
+  success: boolean,
+  durationMs?: number,
+): void {
+  enqueue({
+    event: 'playback_recovery',
+    params: {
+      content_id: contentId,
+      recovery_type: recoveryType,
+      success,
+      duration_ms: durationMs,
+    },
+  });
+}
+
+export function trackPlaybackSyncEvent(
+  contentId: string,
+  syncType: 'micro_slew' | 'micro_seek' | 'live_catchup',
+  skewSeconds: number,
+  method: string,
+): void {
+  enqueue({
+    event: 'playback_sync_event',
+    params: {
+      content_id: contentId,
+      sync_type: syncType,
+      skew_seconds: Number(skewSeconds.toFixed(3)),
+      method,
+    },
+  });
+}
+
+export function trackPlaybackSessionSummary(
+  contentId: string,
+  summary: {
+    total_stalls: number;
+    total_resyncs: number;
+    total_quality_changes: number;
+    avg_drop_rate: number;
+    avg_buffer_health: number;
+    peak_quality_height: number;
+    session_duration_ms: number;
+    recovery_attempts: number;
+    recovery_successes: number;
+  },
+): void {
+  enqueue({
+    event: 'playback_session_summary',
+    params: {
+      content_id: contentId,
+      ...summary,
     },
   });
 }

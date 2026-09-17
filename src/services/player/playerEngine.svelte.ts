@@ -86,5 +86,11 @@ export function createPlayerEngine() {
     onTracksChanged: (fn: () => void): (() => void) => {
       return engine?.on('trackschanged', fn) ?? (() => { });
     },
+
+    // ── New: Buffer Health & Live Mode ──
+    getBufferHealthScore: () => engine?.getBufferHealthScore() ?? null,
+    getSessionSummary: () => engine?.getSessionSummary() ?? null,
+    setLiveMode: (enabled: boolean) => engine?.setLiveMode(enabled),
+    getLiveDriftInfo: () => engine?.getLiveDriftInfo() ?? null,
   };
 }
