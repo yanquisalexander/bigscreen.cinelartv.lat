@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { CinelarPlayerEngine } from '@/services/player/CinelarPlayerEngine';
+  import { untracked } from 'svelte';
 
   interface Props {
     engine: CinelarPlayerEngine | null;
@@ -15,19 +16,16 @@
   const SPARKLINE_W = 100;
   const SPARKLINE_H = 8;
 
-  // ── History buffers (plain arrays, no $state) ──
   const bufferHistory: number[] = [];
   const dropHistory: number[] = [];
   const bwHistory: number[] = [];
   const skewHistory: number[] = [];
 
-  // ── Canvas refs (imperative) ──
   let bufferCanvas: HTMLCanvasElement | null = null;
   let bwCanvas: HTMLCanvasElement | null = null;
   let dropCanvas: HTMLCanvasElement | null = null;
   let skewCanvas: HTMLCanvasElement | null = null;
 
-  // ── Snapshot state ──
   let snapProfile = $state<any>(null);
   let snapDiag = $state<any>(null);
   let snapHealth = $state<any>(null);
@@ -38,7 +36,6 @@
   let snapBufferAhead = $state(0);
   let snapDate = $state('');
 
-  // ── Sparkline: stroke-only, no gradient (saves GPU on Smart TV) ──
   function drawSparkline(
     canvas: HTMLCanvasElement | null,
     data: number[],
@@ -55,8 +52,6 @@
     const step = w / (SPARKLINE_MAX - 1);
 
     ctx.clearRect(0, 0, w, h);
-
-    // Stroke only — no gradient fill, much cheaper on TV GPU
     ctx.beginPath();
     for (let i = 0; i < data.length; i++) {
       const x = i * step;
@@ -69,19 +64,18 @@
     ctx.stroke();
   }
 
-  // ── Tick: read metrics + draw sparklines ──
   let updateInterval: ReturnType<typeof setInterval> | null = null;
 
   function tick() {
     if (!engine || !videoEl) return;
 
-    snapProfile = engine.getProfile();
-    snapDiag = engine.getSyncDiagnostics();
-    snapHealth = engine.getBufferHealthScore();
-    snapSession = engine.getSessionSummary();
+    const profile = engine.getProfile();
+    const diag = engine.getSyncDiagnostics();
+    const health = engine.getBufferHealthScore();
+    const session = engine.getSessionSummary();
 
-    snapDroppedFrames = videoEl.getVideoPlaybackQuality?.()?.droppedVideoFrames ?? 0;
-    snapTotalFrames = videoEl.getVideoPlaybackQuality?.()?.totalVideoFrames ?? 0;
+    const droppedFrames = videoEl.getVideoPlaybackQuality?.()?.droppedVideoFrames ?? 0;
+    const totalFrames = videoEl.getVideoPlaybackQuality?.()?.totalVideoFrames ?? 0;
 
     const ct = videoEl.currentTime;
     let ahead = 0;
@@ -90,30 +84,37 @@
       const end = videoEl.buffered.end(i);
       if (start <= ct && end >= ct) { ahead = end - ct; break; }
     }
-    snapBufferAhead = Math.max(0, ahead);
 
-    snapCodecInfo = snapProfile
-      ? { video: `${snapProfile.decoderMaxHeight}p`, audio: '—' }
-      : null;
-    snapDate = new Date().toLocaleString();
+    // untracked() prevents $state writes from re-triggering the $effect
+    untracked(() => {
+      snapProfile = profile;
+      snapDiag = diag;
+      snapHealth = health;
+      snapSession = session;
+      snapDroppedFrames = droppedFrames;
+      snapTotalFrames = totalFrames;
+      snapBufferAhead = Math.max(0, ahead);
+      snapCodecInfo = profile
+        ? { video: `${profile.decoderMaxHeight}p`, audio: '—' }
+        : null;
+      snapDate = new Date().toLocaleString();
+    });
 
-    // Push sparkline data
-    if (snapHealth) {
-      bufferHistory.push(snapHealth.bufferSeconds);
+    if (health) {
+      bufferHistory.push(health.bufferSeconds);
       if (bufferHistory.length > SPARKLINE_MAX) bufferHistory.shift();
-      dropHistory.push(snapHealth.dropRate * 100);
+      dropHistory.push(health.dropRate * 100);
       if (dropHistory.length > SPARKLINE_MAX) dropHistory.shift();
     }
-    if (snapDiag) {
-      skewHistory.push(Math.abs(snapDiag.skewSeconds) * 100);
+    if (diag) {
+      skewHistory.push(Math.abs(diag.skewSeconds) * 100);
       if (skewHistory.length > SPARKLINE_MAX) skewHistory.shift();
     }
-    if (snapProfile) {
-      bwHistory.push((snapProfile.bandwidthEstimate ?? 0) / 1000);
+    if (profile) {
+      bwHistory.push((profile.bandwidthEstimate ?? 0) / 1000);
       if (bwHistory.length > SPARKLINE_MAX) bwHistory.shift();
     }
 
-    // Draw sparklines imperatively (every 3s, not every 1s)
     drawSparkline(bufferCanvas, bufferHistory, '#4ade80');
     drawSparkline(bwCanvas, bwHistory, '#60a5fa', Math.max(...bwHistory, 1000));
     drawSparkline(dropCanvas, dropHistory, '#f87171', 10);
@@ -139,13 +140,6 @@
   }
 </script>
 
-<!--
-  TV Optimized Debug Stats Panel:
-  - Canvas sparklines: 100×8px (was 200×16), stroke-only (no gradient fill)
-  - Update interval: 3s (was 1s) — 3× less CPU/GPU contention with decoder
-  - contain: paint — isolates panel repaints from video compositor
-  - All canvas draws are imperative (no reactive overhead)
--->
 <div
   class="stats-panel"
   role="region"
@@ -188,7 +182,6 @@
       </span>
     </div>
 
-    <!-- Sparkline: Connection Speed -->
     <div class="stats-row stats-sparkline-row">
       <span class="stats-label">Speed</span>
       <span class="stats-value stats-sparkline-row">
@@ -197,7 +190,6 @@
       </span>
     </div>
 
-    <!-- Sparkline: Buffer Health -->
     <div class="stats-row stats-sparkline-row">
       <span class="stats-label">Buffer</span>
       <span class="stats-value stats-sparkline-row">
@@ -206,7 +198,6 @@
       </span>
     </div>
 
-    <!-- Sparkline: Dropped Frames -->
     <div class="stats-row stats-sparkline-row">
       <span class="stats-label">Drops</span>
       <span class="stats-value stats-sparkline-row">
@@ -215,7 +206,6 @@
       </span>
     </div>
 
-    <!-- Sparkline: A/V Sync Skew -->
     <div class="stats-row stats-sparkline-row">
       <span class="stats-label">Skew</span>
       <span class="stats-value stats-sparkline-row">
@@ -340,8 +330,6 @@
     border-radius: 1px;
     flex-shrink: 0;
     image-rendering: crisp-edges;
-    /* TV: hint browser to hardware-accelerate this small canvas */
-    content-visibility: auto;
   }
 
   .stats-warn { color: #fbbf24; font-size: clamp(9px, 0.8vw, 12px); }
