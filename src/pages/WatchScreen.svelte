@@ -898,7 +898,7 @@
     </div>
   </FocusContainer>
 {:else}
-  <!-- OPTIMIZACIÓN 4: CSS Containment estricto para evitar Reflows en el navegador de la TV -->
+    <!-- OPTIMIZACIÓN 4: CSS Containment estricto para evitar Reflows en el navegador de la TV -->
   <FocusContainer
     focusKey="watch-root"
     focusable={false}
@@ -906,7 +906,7 @@
     trackChildren={true}
     saveLastFocusedChild={true}
     class="fixed inset-0 w-screen h-screen bg-black overflow-hidden select-none"
-    style="contain: strict; transform: translateZ(0);"
+    style="contain: content; transform: translateZ(0);"
   >
     {#if !ready && !streamLimitError}
       <div class="absolute inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30" style="contain: layout paint;">
@@ -918,16 +918,16 @@
     <video
       bind:this={videoEl}
       class="absolute inset-0 w-full h-full block object-contain object-center"
-      style="contain: strict; transform: translateZ(0);"
+      style="contain: strict;"
       autoplay
       playsinline
-      preload="auto"
+      preload="metadata"
     ></video>
 
     <!-- Capa de gradiente aislada -->
     <div
       class="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60"
-      style="contain: paint; will-change: opacity;"
+      style="contain: paint;"
     ></div>
 
     {#if engine.engineReady}

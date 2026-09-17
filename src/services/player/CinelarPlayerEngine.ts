@@ -279,7 +279,7 @@ export class CinelarPlayerEngine {
 
   private reduceQualityForInstability(reason: string) {
     const now = performance.now();
-    if (now - this.lastStallRecoveryAt < 15_000) return;
+    if (now - this.lastStallRecoveryAt < 30_000) return;
     const effective = this.getEffectiveMaxHeight();
     if (effective <= 720) return;
     this.lastStallRecoveryAt = now;
@@ -488,7 +488,7 @@ export class CinelarPlayerEngine {
         this._lastCorruptedFrames = corrupted;
         const corruptedDelta = corrupted - previousCorrupted;
 
-        if (renderedSinceLastCheck >= 60 && dropRatio > 0.08 && effective > 720) {
+        if (renderedSinceLastCheck >= 60 && dropRatio > 0.15 && effective > 720) {
           // Classic drop threshold exceeded
           this.reduceQualityForInstability(`frame_drops_${Math.round(dropRatio * 100)}%`);
         } else if (corruptedDelta > 5 && corruptedDelta > droppedSinceLastCheck) {
@@ -569,7 +569,7 @@ export class CinelarPlayerEngine {
 
     // Recommendation
     let recommendation: BufferHealthScore['recommendation'] = 'maintain';
-    if (overall < 40) recommendation = 'downgrade';
+    if (overall < 30) recommendation = 'downgrade';
     else if (overall > 80 && this.profile?.performanceCap) recommendation = 'upgrade';
 
     const score: BufferHealthScore = {
@@ -850,14 +850,14 @@ export class CinelarPlayerEngine {
         this.player.configure({
           streaming: {
             // Buffer adaptativo para TV: evita sobrecargar la memoria MSE (30-50MB en Smart TVs)
-            bufferingGoal: isLowEnd ? 12 : 20,
+            bufferingGoal: isLowEnd ? 12 : 15,
             rebufferingGoal: 2,
-            bufferBehind: isLowEnd ? 10 : 15,
+            bufferBehind: isLowEnd ? 10 : 10,
             evictionGoal: 1,
             safeSeekOffset: 2,
             safeSeekEndOffset: 0.5,
             stallEnabled: true,
-            stallThreshold: 1.5,
+            stallThreshold: 3.0,
             // 🛡️ CRUCIAL: stallSkip = 0 elimina micro-saltos de 100ms que rompen los GOPs en decodificadores de TV
             stallSkip: 0,
             // 🛡️ CRUCIAL: Corrige dinámicamente la deriva de timestamps PTS/DTS entre audio y video
@@ -879,15 +879,15 @@ export class CinelarPlayerEngine {
           abr: {
             enabled: true,
             switchInterval: 8,
-            bandwidthUpgradeTarget: 0.75,
-            bandwidthDowngradeTarget: 0.9,
+            bandwidthUpgradeTarget: 0.85,
+            bandwidthDowngradeTarget: 0.65,
             defaultBandwidthEstimate: prof.bandwidthEstimate,
             restrictions: { maxHeight: maxH, maxFrameRate: prof.maxFps },
-            minTimeToSwitch: 2,
+            minTimeToSwitch: 5,
             advanced: {
-              droppedFramesThreshold: 0.12,
-              droppedFramesInterval: 2,
-              droppedFramesBanDuration: 30,
+              droppedFramesThreshold: 0.18,
+              droppedFramesInterval: 3,
+              droppedFramesBanDuration: 45,
             },
           },
           preferredAudioLanguage: 'es',
