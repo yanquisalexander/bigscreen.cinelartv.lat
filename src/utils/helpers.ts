@@ -1,5 +1,11 @@
 import type { ImageVariantSet, ImageVariants, ContentImages, EpisodeImages, ImageSize } from '@/types/content';
 
+export function isBundled(): boolean {
+  if (typeof window === 'undefined') return false;
+  const { protocol } = window.location;
+  return protocol !== 'http:' && protocol !== 'https:';
+}
+
 export function resolveImageUrl(path?: string | null, baseUrl?: string): string | null {
   if (!path) return null;
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
