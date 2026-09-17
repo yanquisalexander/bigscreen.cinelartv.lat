@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import TopNav from './TopNav.svelte';
-  import AmbientBackground from '@/components/home/AmbientBackground.svelte';
 
   interface Props {
     children?: Snippet;
@@ -10,8 +9,6 @@
 
   let { children, hideNav = false }: Props = $props();
 </script>
-
-<AmbientBackground />
 
 {#if hideNav}
   <div class="h-dvh overflow-hidden relative z-10">
