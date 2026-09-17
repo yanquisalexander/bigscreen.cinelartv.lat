@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CinelarPlayerEngine } from '@/services/player/CinelarPlayerEngine';
-  import { untracked } from 'svelte';
+  import { untrack } from 'svelte';
 
   interface Props {
     engine: CinelarPlayerEngine | null;
@@ -85,8 +85,8 @@
       if (start <= ct && end >= ct) { ahead = end - ct; break; }
     }
 
-    // untracked() prevents $state writes from re-triggering the $effect
-    untracked(() => {
+    // untrack() prevents $state writes from re-triggering the $effect
+    untrack(() => {
       snapProfile = profile;
       snapDiag = diag;
       snapHealth = health;
