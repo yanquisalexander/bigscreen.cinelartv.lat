@@ -12,9 +12,9 @@
 
   let { engine, videoEl, streamUrl, adPhase, prerollChecked }: Props = $props();
 
-  const SPARKLINE_MAX = 20;
-  const SPARKLINE_W = 100;
-  const SPARKLINE_H = 8;
+  const SPARKLINE_MAX = 30;
+  const SPARKLINE_W = 200;
+  const SPARKLINE_H = 16;
 
   const bufferHistory: number[] = [];
   const dropHistory: number[] = [];
@@ -52,6 +52,25 @@
     const step = w / (SPARKLINE_MAX - 1);
 
     ctx.clearRect(0, 0, w, h);
+
+    // Fill gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, h);
+    gradient.addColorStop(0, color + '40');
+    gradient.addColorStop(1, color + '05');
+
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let i = 0; i < data.length; i++) {
+      const x = i * step;
+      const y = h - (data[i] / max) * h;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo((data.length - 1) * step, h);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Line
     ctx.beginPath();
     for (let i = 0; i < data.length; i++) {
       const x = i * step;
@@ -60,7 +79,7 @@
       else ctx.lineTo(x, y);
     }
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
   }
 
