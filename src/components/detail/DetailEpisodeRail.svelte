@@ -88,7 +88,7 @@
         {@const clientEndpoint = $svelteConfigStore.config.CLIENT_ENDPOINT}
         {@const thumbUrl = resolveEpisodeThumbnail(episode.images, episode.thumbnail_resized ?? episode.thumbnail, clientEndpoint)}
         {@const progress = episode.continue_watching ? Math.round((episode.continue_watching.progress / episode.continue_watching.duration) * 100) : undefined}
-        {@const episodeNum = (episode.position ?? idx) + 1}
+        {@const episodeNum = idx + 1}
 
         <Focusable
           focusKey="detail-episode-{episode.id}"

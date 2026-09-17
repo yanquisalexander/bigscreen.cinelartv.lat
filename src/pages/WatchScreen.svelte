@@ -37,6 +37,7 @@
   import type { VastAd } from "@/types/vast";
   import { MonitorPlay, AlertTriangle } from "@lucide/svelte";
   import PlayerSettingsPanel from "@/components/player/PlayerSettingsPanel.svelte";
+  import DebugStatsPanel from "@/components/player/DebugStatsPanel.svelte";
   import {
     trackPlayIntent,
     trackPlaybackStart,
@@ -943,49 +944,13 @@
     {/if}
 
     {#if debugVisible}
-      <div class="absolute top-0 right-0 z-50 p-3 bg-black/90 text-green-400 text-xs font-mono leading-5 max-w-xs">
-        <div>engineReady: {String(engine.engineReady)}</div>
-        <div>watchData: {String(Boolean(watchData))}</div>
-        <div>streamUrl: {streamUrl ? "ok" : "null"}</div>
-        <div>prerollChecked: {String(prerollChecked)}</div>
-        <div>adPhase: {adPhase}</div>
-        <div>isPlaying: {String(engine.isPlaying)}</div>
-        <div>isBuffering: {String(engine.isBuffering)}</div>
-        <div>video.paused: {videoEl ? String(videoEl.paused) : "no-el"}</div>
-        <div>video.src: {videoEl?.src ? "ok" : "empty"}</div>
-        <div>ready: {String(ready)}</div>
-        {#if engine.getProfile()}
-          <div class="border-t border-green-800 my-1 pt-1"></div>
-          <div>platform: {engine.getProfile()?.platform} (lowEnd: {String(engine.getProfile()?.isLowEndDevice)})</div>
-          <div>maxH: {engine.getProfile()?.decoderMaxHeight}p (disp: {engine.getProfile()?.displayMaxHeight}p)</div>
-          <div>bwEst: {Math.round((engine.getProfile()?.bandwidthEstimate ?? 0) / 1000)}kbps</div>
-          {#if engine.getProfile()?.performanceCap}
-            <div class="text-yellow-400">perfCap: {engine.getProfile()?.performanceCap?.maxHeight}p ({engine.getProfile()?.performanceCap?.reason})</div>
-          {/if}
-          {#if engine.getSyncDiagnostics()}
-            <div class="border-t border-green-800 my-1 pt-1"></div>
-            <div>skew: {engine.getSyncDiagnostics()?.skewSeconds}s (rate: {engine.getSyncDiagnostics()?.effectiveRate})</div>
-            <div>drops: {Math.round((engine.getSyncDiagnostics()?.dropRatio ?? 0) * 100)}% | resyncs: {engine.getSyncDiagnostics()?.resyncCount}</div>
-          {/if}
-          {#if engine.getBufferHealthScore()}
-            <div class="border-t border-green-800 my-1 pt-1"></div>
-            <div>bufferHealth: <span class="{(engine.getBufferHealthScore()?.overall ?? 0) < 40 ? 'text-red-400' : (engine.getBufferHealthScore()?.overall ?? 0) > 70 ? 'text-green-400' : 'text-yellow-400'}">{engine.getBufferHealthScore()?.overall}%</span></div>
-            <div>bufferAhead: {engine.getBufferHealthScore()?.bufferSeconds}s</div>
-            <div>stalls/min: {engine.getBufferHealthScore()?.stallFrequency}</div>
-            <div>recommendation: {engine.getBufferHealthScore()?.recommendation}</div>
-          {/if}
-          {#if engine.getLiveDriftInfo()}
-            <div class="border-t border-green-800 my-1 pt-1"></div>
-            <div class="text-cyan-400">liveEdge: {engine.getLiveDriftInfo()?.drift}s {engine.getLiveDriftInfo()?.isCatchingUp ? '(catching up)' : ''}</div>
-          {/if}
-          {#if engine.getSessionSummary()}
-            <div class="border-t border-green-800 my-1 pt-1"></div>
-            <div class="text-purple-400">session: {Math.round((engine.getSessionSummary()?.sessionDurationMs ?? 0) / 1000)}s</div>
-            <div>recovery: {engine.getSessionSummary()?.recoverySuccesses}/{engine.getSessionSummary()?.recoveryAttempts}</div>
-            <div>qualityChanges: {engine.getSessionSummary()?.totalQualityChanges}</div>
-          {/if}
-        {/if}
-      </div>
+      <DebugStatsPanel
+        engine={engineInstance}
+        {videoEl}
+        {streamUrl}
+        {adPhase}
+        {prerollChecked}
+      />
     {/if}
   </FocusContainer>
 {/if}
