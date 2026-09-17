@@ -477,7 +477,7 @@
   }
 
   .stats-panel::-webkit-scrollbar {
-    width: 6px;
+    width: 4px;
   }
   .stats-panel::-webkit-scrollbar-track {
     background: transparent;
