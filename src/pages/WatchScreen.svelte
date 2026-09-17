@@ -913,6 +913,7 @@
     <FocusContainer
       focusKey="watch-root"
       focusable={false}
+      isFocusBoundary={true}
       preferredChildFocusKey="watch-playpause"
       trackChildren={true}
       saveLastFocusedChild={true}

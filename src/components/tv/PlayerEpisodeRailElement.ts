@@ -207,7 +207,7 @@ export class PlayerEpisodeRailElement extends LitElement {
 
   render() {
     return html`
-      <div class="episode-rail" ?hidden=${this.episodes.length === 0}>
+      <div class="episode-rail" ?hidden=${this.episodes.length === 0} aria-hidden=${!this.expanded} ?inert=${!this.expanded}>
         ${this._renderEpisodeList()}
       </div>
     `;
