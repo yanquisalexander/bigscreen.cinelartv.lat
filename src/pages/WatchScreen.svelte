@@ -37,6 +37,7 @@
   import type { VastAd } from "@/types/vast";
   import { MonitorPlay, AlertTriangle } from "@lucide/svelte";
   import PlayerSettingsPanel from "@/components/player/PlayerSettingsPanel.svelte";
+  import PlayerStage from "@/components/player/PlayerStage.svelte";
   import DebugStatsPanel from "@/components/player/DebugStatsPanel.svelte";
   import {
     trackPlayIntent,
@@ -898,7 +899,7 @@
     </div>
   </FocusContainer>
 {:else}
-    <!-- OPTIMIZACIÓN 4: CSS Containment estricto para evitar Reflows en el navegador de la TV -->
+    <!-- OPTIMIZACIÓN 4: CSS Containment para evitar Reflows en el navegador de la TV -->
   <FocusContainer
     focusKey="watch-root"
     focusable={false}
@@ -914,15 +915,8 @@
       </div>
     {/if}
 
-    <!-- OPTIMIZACIÓN 5: Aislamiento de renderizado del video y precarga -->
-    <video
-      bind:this={videoEl}
-      class="absolute inset-0 w-full h-full block object-contain object-center"
-      style="contain: strict;"
-      autoplay
-      playsinline
-      preload="metadata"
-    ></video>
+    <!-- Optimización: Video aislado en su propio contenedor para estabilidad del compositor -->
+    <PlayerStage bind:videoEl={videoEl} />
 
     <!-- Capa de gradiente aislada -->
     <div
