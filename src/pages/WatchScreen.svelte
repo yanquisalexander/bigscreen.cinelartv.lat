@@ -899,52 +899,53 @@
     </div>
   </FocusContainer>
 {:else}
-    <!-- OPTIMIZACIÓN 4: CSS Containment para evitar Reflows en el navegador de la TV -->
-  <FocusContainer
-    focusKey="watch-root"
-    focusable={false}
-    preferredChildFocusKey="watch-playpause"
-    trackChildren={true}
-    saveLastFocusedChild={true}
-    class="fixed inset-0 w-screen h-screen bg-black overflow-hidden select-none"
-    style="contain: content; transform: translateZ(0);"
-  >
-    {#if !ready && !streamLimitError}
-      <div class="absolute inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30" style="contain: layout paint;">
-        <p class="text-white/50 text-xl tracking-wide uppercase">Cargando...</p>
-      </div>
-    {/if}
-
-    <!-- Optimización: Video aislado en su propio contenedor para estabilidad del compositor -->
+    <!-- YouTube TV Architecture: Player rendered OUTSIDE FocusContainer as a sibling.
+         This prevents focus/navigation re-renders from affecting the video compositor. -->
     <PlayerStage bind:videoEl={videoEl} />
 
-    <!-- Capa de gradiente aislada -->
+    <!-- Gradient overlay: also outside FocusContainer (visual-only, no interaction) -->
     <div
-      class="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60"
+      class="absolute inset-0 z-[2] pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60"
       style="contain: paint;"
     ></div>
 
-    {#if engine.engineReady}
-      <tv-player-controls
-        bind:this={controlsEl}
-        style="display: {ready ? 'block' : 'none'}; contain: layout style;"
-      ></tv-player-controls>
-    {/if}
+    <!-- UI controls: isolated in FocusContainer with transparent background -->
+    <FocusContainer
+      focusKey="watch-root"
+      focusable={false}
+      preferredChildFocusKey="watch-playpause"
+      trackChildren={true}
+      saveLastFocusedChild={true}
+      class="fixed inset-0 z-[3] w-screen h-screen overflow-hidden select-none"
+      style="contain: layout style;"
+    >
+      {#if !ready && !streamLimitError}
+        <div class="absolute inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30" style="contain: layout paint;">
+          <p class="text-white/50 text-xl tracking-wide uppercase">Cargando...</p>
+        </div>
+      {/if}
 
-    <PlayerSettingsPanel engine={engineInstance} open={settingsOpen} />
+      {#if engine.engineReady}
+        <tv-player-controls
+          bind:this={controlsEl}
+          style="display: {ready ? 'block' : 'none'}; contain: layout style;"
+        ></tv-player-controls>
+      {/if}
 
-    {#if currentAd}
-      <tv-ad-overlay bind:this={adOverlayEl}></tv-ad-overlay>
-    {/if}
+      <PlayerSettingsPanel engine={engineInstance} open={settingsOpen} />
 
-    {#if debugVisible}
-      <DebugStatsPanel
-        engine={engineInstance}
-        {videoEl}
-        {streamUrl}
-        {adPhase}
-        {prerollChecked}
-      />
-    {/if}
-  </FocusContainer>
+      {#if currentAd}
+        <tv-ad-overlay bind:this={adOverlayEl}></tv-ad-overlay>
+      {/if}
+
+      {#if debugVisible}
+        <DebugStatsPanel
+          engine={engineInstance}
+          {videoEl}
+          {streamUrl}
+          {adPhase}
+          {prerollChecked}
+        />
+      {/if}
+    </FocusContainer>
 {/if}
