@@ -11,6 +11,8 @@
   class="player-stage-root"
   aria-hidden="true"
   data-layer="0"
+  tabindex="-1"
+  inert
 >
   <video
     bind:this={videoEl}
