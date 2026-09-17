@@ -799,6 +799,8 @@
   });
 </script>
 
+<div class="fixed inset-0 w-screen h-screen bg-black -z-10"></div>
+
 {#if streamLimitError}
   <FocusContainer
     focusKey="stream-limit-root"
