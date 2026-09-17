@@ -920,7 +920,7 @@
       trackChildren={true}
       saveLastFocusedChild={true}
       class="fixed inset-0 z-[3] w-screen h-screen overflow-hidden select-none"
-      style="contain: layout style;"
+      style="contain: content; transform: translateZ(0);"
     >
       {#if !ready && !streamLimitError}
         <div class="absolute inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30" style="contain: layout paint;">
