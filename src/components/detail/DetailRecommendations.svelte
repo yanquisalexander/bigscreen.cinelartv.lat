@@ -60,7 +60,7 @@
   >
     <div
       bind:this={scrollEl}
-      class="flex gap-[clamp(0.75rem,1.5vw,1.25rem)] overflow-x-auto hide-scrollbar py-[clamp(0.5rem,1vh,0.75rem)]"
+      class="flex gap-[clamp(1rem,2vw,1.5rem)] overflow-x-auto hide-scrollbar py-[clamp(0.5rem,1vh,0.75rem)]"
     >
       {#each items as item (item.id)}
         {@const clientEndpoint = $svelteConfigStore.config.CLIENT_ENDPOINT}
@@ -74,8 +74,8 @@
             if (dir === 'up' && onArrowUp) return onArrowUp(dir);
             return true;
           }}
-          focusedClass="ring-2 ring-white/90 z-10 scale-[1.03]"
-          class="tv-no-select shrink-0 cursor-pointer w-[clamp(10rem,14vw,13rem)] rounded-xl overflow-hidden transition-all duration-200 ease-out"
+          focusedClass="ring-2 ring-white/40 z-10 scale-[1.04] shadow-xl shadow-black/50"
+          class="tv-no-select shrink-0 cursor-pointer w-[clamp(11rem,16vw,15rem)] rounded-2xl overflow-hidden transition-all duration-200 ease-out"
           playSound={true}
         >
           {#snippet children()}
@@ -101,7 +101,7 @@
               <!-- Premium badge -->
               {#if isPremium}
                 <div class="absolute top-[clamp(0.375rem,0.8vh,0.5rem)] right-[clamp(0.375rem,0.8vw,0.5rem)]">
-                  <span class="bg-amber-500/90 text-black text-[clamp(0.5rem,0.7vw,0.625rem)] font-bold px-[clamp(0.25rem,0.5vw,0.375rem)] py-[clamp(0.0625rem,0.15vh,0.125rem)] rounded">
+                  <span class="bg-gold text-black text-[clamp(0.5rem,0.7vw,0.625rem)] font-bold px-[clamp(0.25rem,0.5vw,0.375rem)] py-[clamp(0.0625rem,0.15vh,0.125rem)] rounded">
                     PREMIUM
                   </span>
                 </div>

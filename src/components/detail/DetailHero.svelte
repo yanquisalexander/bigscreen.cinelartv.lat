@@ -109,19 +109,19 @@
 
   const genreTags = $derived((content.categories ?? []).slice(0, 4).map((c) => c.name));
 
-  const heroMaskStyle = $derived(
+  const backdropMaskStyle = $derived(
     enabled
-      ? 'mask-image: linear-gradient(to bottom, black 90%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 90%, transparent 100%);'
+      ? 'mask-image: linear-gradient(to right, transparent 0%, transparent 25%, black 40%); -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 25%, black 40%);'
       : ''
   );
 </script>
 
-<div class="relative w-full overflow-hidden min-h-[clamp(36rem,86vh,60rem)] bg-bg" style={heroMaskStyle}>
+<div class="relative w-full overflow-hidden min-h-[clamp(30rem,72vh,50rem)] bg-bg">
   <!-- Backdrop -->
   {#if enabled}
     <div
       class="absolute inset-0 overflow-hidden content-detail-backdrop transition-opacity duration-700 ease-in-out"
-      style="opacity: {hasBackdrop ? 1 : 0};"
+      style="opacity: {hasBackdrop ? 1 : 0}; {backdropMaskStyle}"
     >
       <canvas
         width={canvasSize.w}
@@ -137,13 +137,14 @@
       alt=""
       aria-hidden="true"
       class="absolute inset-0 w-full h-full object-cover opacity-40"
+      style={backdropMaskStyle}
     />
   {/if}
-  <div class="absolute inset-0 bg-gradient-to-r from-bg via-bg/80 to-transparent"></div>
+  <div class="absolute inset-0 bg-gradient-to-t from-bg/60 via-bg/15 to-transparent"></div>
 
   <!-- Content grid -->
   <div
-    class="relative h-full grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_clamp(14rem,22vw,22rem)] items-center gap-[clamp(1rem,3vw,3rem)] px-[clamp(2rem,5vw,6rem)] pt-[clamp(4rem,10vh,8.5rem)] pb-[clamp(2rem,5vh,4.5rem)] min-h-[clamp(30rem,75vh,60rem)]"
+    class="relative h-full grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_clamp(14rem,22vw,22rem)] items-end gap-[clamp(1rem,3vw,3rem)] px-[clamp(2rem,5vw,6rem)] pt-[clamp(3rem,8vh,6rem)] pb-[clamp(1.5rem,3vh,2.5rem)] min-h-[clamp(26rem,64vh,44rem)]"
   >
     <FocusContainer
       focusKey="detail-hero"
@@ -153,53 +154,49 @@
       saveLastFocusedChild={true}
       class="flex flex-col items-start max-w-[46rem]"
     >
-      <!-- Eyebrow -->
-      {#if contentType}
-        <span class="inline-flex items-center gap-[0.45em] text-accent text-[clamp(0.6875rem,0.85vw,0.75rem)] font-bold uppercase tracking-[0.22em] mb-[clamp(0.75rem,1.6vh,1.125rem)]">
-          <span class="w-[6px] h-[6px] rounded-full bg-accent"></span>
-          {contentType}
-        </span>
-      {/if}
-
       <!-- Logo / Title -->
       {#if logoUrl}
         <img
           src={logoUrl}
           alt={content.title}
-          class="h-[clamp(3rem,7vh,5rem)] max-w-[80%] object-contain object-left mb-[clamp(0.875rem,1.8vh,1.25rem)]"
+          class="h-[clamp(3rem,7vh,5rem)] max-w-[80%] object-contain object-left mb-[clamp(0.75rem,1.5vh,1rem)]"
         />
       {:else}
         <h1
-          class="font-black text-white leading-[0.98] tracking-[-0.03em] text-[clamp(2.5rem,5.2vw,4.25rem)] mb-[clamp(0.875rem,1.8vh,1.25rem)] max-w-[85%]"
+          class="font-black text-white leading-[0.98] tracking-[-0.03em] text-[clamp(2.5rem,5.2vw,4.25rem)] mb-[clamp(0.75rem,1.5vh,1rem)] max-w-[85%]"
         >
           {content.title}
         </h1>
       {/if}
 
-      <!-- Metadata chips -->
-      {#if metadataParts.length > 0}
-        <div class="flex items-center gap-[clamp(0.5rem,1vw,0.625rem)] mb-[clamp(0.75rem,1.6vh,1rem)] flex-wrap">
-          {#each metadataParts as part, i (i)}
-            <span
-              class="px-[clamp(0.625rem,1vw,0.75rem)] py-[clamp(0.25rem,0.5vh,0.3125rem)] rounded bg-black/40 border border-white/20 text-white/90 text-[clamp(0.75rem,1vw,0.8125rem)] font-semibold"
-            >
-              {part}
-            </span>
+      <!-- Metadata inline -->
+      {#if metadataParts.length > 0 || genreTags.length > 0}
+        <div class="flex items-center gap-[clamp(0.375rem,0.7vw,0.5rem)] mb-[clamp(0.75rem,1.6vh,1rem)] text-[clamp(0.8125rem,1.05vw,0.9375rem)] text-white/60 flex-wrap">
+          {#if contentType}
+            <span class="text-white/80 font-medium">{contentType}</span>
+            <span class="text-white/25">·</span>
+          {/if}
+          {#if content.year}
+            <span>{content.year}</span>
+            <span class="text-white/25">·</span>
+          {/if}
+          {#if duration}
+            <span>{duration}</span>
+            <span class="text-white/25">·</span>
+          {/if}
+          {#each genreTags as genre, i (i)}
+            <span>{genre}</span>
+            {#if i < genreTags.length - 1}
+              <span class="text-white/25">·</span>
+            {/if}
           {/each}
         </div>
-      {/if}
-
-      <!-- Genres -->
-      {#if genreTags.length > 0}
-        <p class="text-[clamp(0.8125rem,1.05vw,0.9375rem)] text-white/50 mb-[clamp(1rem,2.2vh,1.5rem)] max-w-[clamp(28rem,40vw,44rem)] truncate tracking-wide">
-          {genreTags.join('   ·   ')}
-        </p>
       {/if}
 
       <!-- Description -->
       {#if content.description}
         <p
-          class="text-[clamp(1rem,1.4vw,1.1875rem)] text-white/80 font-normal max-w-[clamp(36rem,48vw,54rem)] leading-[1.5] mb-[clamp(1.5rem,3.4vh,2.25rem)] line-clamp-3"
+          class="text-[clamp(0.9375rem,1.3vw,1.125rem)] text-white/70 font-normal max-w-[clamp(30rem,40vw,42rem)] leading-[1.5] mb-[clamp(1.5rem,3.4vh,2.25rem)] line-clamp-3"
         >
           {content.description}
         </p>
@@ -207,9 +204,9 @@
 
       <!-- Continue watching -->
       {#if continuePercent != null}
-        <div class="flex items-center gap-[clamp(0.75rem,1.4vw,1rem)] mb-[clamp(1.5rem,3.4vh,2.25rem)] pl-[clamp(0.75rem,1.4vw,1rem)] pr-[clamp(1.25rem,2vw,1.5rem)] py-[clamp(0.625rem,1.2vh,0.8125rem)] rounded-xl bg-black/40 border border-white/10 max-w-[clamp(22rem,32vw,28rem)]">
-          <div class="shrink-0 w-[clamp(2rem,4vh,2.5rem)] h-[clamp(2rem,4vh,2.5rem)] rounded-full bg-accent/20 flex items-center justify-center">
-            <RotateCcw size={16} class="text-accent" />
+        <div class="flex items-center gap-[clamp(0.75rem,1.4vw,1rem)] mb-[clamp(1.5rem,3.4vh,2.25rem)] pl-[clamp(0.75rem,1.4vw,1rem)] pr-[clamp(1.25rem,2vw,1.5rem)] py-[clamp(0.625rem,1.2vh,0.8125rem)] rounded-xl bg-surface-elevated border border-white/10 max-w-[clamp(22rem,32vw,28rem)]">
+          <div class="shrink-0 w-[clamp(2rem,4vh,2.5rem)] h-[clamp(2rem,4vh,2.5rem)] rounded-full bg-surface flex items-center justify-center">
+            <RotateCcw size={16} class="text-white/70" />
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between mb-[0.3125rem]">
@@ -293,7 +290,7 @@
 
     <!-- Floating art poster -->
     <div class="hidden md:flex justify-end relative">
-      <div class="relative rounded-[1.5rem] overflow-hidden border border-white/15 w-[clamp(12rem,18vw,20rem)] aspect-[3/4] bg-surface">
+      <div class="relative rounded-2xl overflow-hidden border border-white/10 w-[clamp(10rem,16vw,18rem)] aspect-[3/4] bg-surface shadow-2xl shadow-black/40">
         {#if posterUrl ?? backdropUrl}
           <img src={posterUrl ?? backdropUrl} alt="" aria-hidden="true" class="w-full h-full object-cover" />
         {:else}
