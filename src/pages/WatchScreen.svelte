@@ -908,7 +908,7 @@
     <!-- Gradient overlay: also outside FocusContainer (visual-only, no interaction) -->
     <div
       class="absolute inset-0 z-[2] pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60"
-      style="contain: paint;"
+      style="contain: paint; will-change: opacity;"
     ></div>
 
     <!-- UI controls: isolated in FocusContainer with transparent background -->
