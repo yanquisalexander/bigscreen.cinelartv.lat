@@ -153,7 +153,7 @@
         return true;
       }}
       focusedClass="!bg-white/10"
-      class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] px-[clamp(0.75rem,1.2vw,1rem)] py-[clamp(0.625rem,1vh,0.875rem)] rounded-2xl mb-[clamp(1rem,2vh,1.5rem)] cursor-pointer transition-colors duration-150"
+      class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] px-[clamp(0.75rem,1.2vw,1rem)] py-[clamp(0.625rem,1vh,0.875rem)] rounded-2xl mb-[clamp(1rem,2vh,1.5rem)] cursor-pointer"
       playSound={true}
     >
       {#snippet children()}
@@ -206,7 +206,7 @@
           return true;
         }}
         focusedClass="!bg-white/10"
-        class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] px-[clamp(0.75rem,1.2vw,1rem)] py-[clamp(0.5rem,0.8vh,0.65rem)] rounded-xl text-[clamp(0.85rem,1.1vw,0.95rem)] font-medium cursor-pointer transition-colors duration-150 {isActive ? 'text-white bg-white/5' : 'text-text-secondary hover:text-white'}"
+        class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] px-[clamp(0.75rem,1.2vw,1rem)] py-[clamp(0.5rem,0.8vh,0.65rem)] rounded-xl text-[clamp(0.85rem,1.1vw,0.95rem)] font-medium cursor-pointer {isActive ? 'text-white bg-white/5' : 'text-text-secondary hover:text-white'}"
         playSound={true}
       >
         {#snippet children()}
@@ -254,7 +254,7 @@
               return true;
             }}
             focusedClass="!bg-white/5"
-            class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.875rem,1.5vh,1.125rem)] cursor-pointer transition-colors duration-150"
+            class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.875rem,1.5vh,1.125rem)] cursor-pointer"
             playSound={true}
           >
             {#snippet children()}
@@ -269,7 +269,7 @@
                   </span>
                 </div>
               </div>
-              <div class="relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full flex-shrink-0 transition-colors duration-200 {prefersModernPlayback ? 'bg-accent-light' : 'bg-white/20'}">
+              <div class="relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full flex-shrink-0 {prefersModernPlayback ? 'bg-accent-light' : 'bg-white/20'}">
                 <div
                   class="absolute top-1/2 -translate-y-1/2 w-[clamp(1.1rem,1.8vw,1.3rem)] h-[clamp(1.1rem,1.8vw,1.3rem)] rounded-full bg-white transition-all duration-200 shadow-md {prefersModernPlayback ? 'left-[clamp(1.4rem,2.3vw,1.7rem)]' : 'left-[clamp(0.2rem,0.35vw,0.3rem)]'}"
                 ></div>
@@ -295,7 +295,7 @@
               return true;
             }}
             focusedClass="!bg-white/5"
-            class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.875rem,1.5vh,1.125rem)] cursor-pointer transition-colors duration-150"
+            class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.875rem,1.5vh,1.125rem)] cursor-pointer"
             playSound={true}
           >
             {#snippet children()}
@@ -310,7 +310,7 @@
                   </span>
                 </div>
               </div>
-              <div class="relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full flex-shrink-0 transition-colors duration-200 {debugMode ? 'bg-accent-light' : 'bg-white/20'}">
+              <div class="relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full flex-shrink-0 {debugMode ? 'bg-accent-light' : 'bg-white/20'}">
                 <div
                   class="absolute top-1/2 -translate-y-1/2 w-[clamp(1.1rem,1.8vw,1.3rem)] h-[clamp(1.1rem,1.8vw,1.3rem)] rounded-full bg-white transition-all duration-200 shadow-md {debugMode ? 'left-[clamp(1.4rem,2.3vw,1.7rem)]' : 'left-[clamp(0.2rem,0.35vw,0.3rem)]'}"
                 ></div>
@@ -337,7 +337,7 @@
               return true;
             }}
             focusedClass="!bg-white/5"
-            class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.875rem,1.5vh,1.125rem)] cursor-pointer transition-colors duration-150"
+            class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.875rem,1.5vh,1.125rem)] cursor-pointer"
             playSound={true}
           >
             {#snippet children()}
@@ -352,7 +352,7 @@
                   </span>
                 </div>
               </div>
-              <div class="relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full flex-shrink-0 transition-colors duration-200 {navigationSoundEnabled ? 'bg-accent-light' : 'bg-white/20'}">
+              <div class="relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full flex-shrink-0 {navigationSoundEnabled ? 'bg-accent-light' : 'bg-white/20'}">
                 <div
                   class="absolute top-1/2 -translate-y-1/2 w-[clamp(1.1rem,1.8vw,1.3rem)] h-[clamp(1.1rem,1.8vw,1.3rem)] rounded-full bg-white transition-all duration-200 shadow-md {navigationSoundEnabled ? 'left-[clamp(1.4rem,2.3vw,1.7rem)]' : 'left-[clamp(0.2rem,0.35vw,0.3rem)]'}"
                 ></div>
@@ -404,7 +404,7 @@
                 return true;
               }}
               focusedClass="!bg-white/5"
-              class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.625rem,1vh,0.875rem)] cursor-pointer transition-colors duration-150"
+              class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.625rem,1vh,0.875rem)] cursor-pointer"
               playSound={true}
             >
               {#snippet children()}
