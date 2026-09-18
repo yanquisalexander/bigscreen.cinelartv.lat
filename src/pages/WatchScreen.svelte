@@ -482,7 +482,7 @@
 
     const timer = setInterval(() => {
       const video = videoEl;
-      if (video && video.duration) {
+      if (video && video.duration && !video.paused) {
         const sessionToken = streamPingToken || getStoredSessionToken() || undefined;
         updateProgress(tokens.accessToken, contentId, episodeId, video.currentTime, video.duration, sessionToken).catch(() => {});
         addContinueWatching({
@@ -908,7 +908,7 @@
     <!-- Gradient overlay: also outside FocusContainer (visual-only, no interaction) -->
     <div
       class="absolute inset-0 z-[2] pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60"
-      style="contain: paint; will-change: opacity;"
+      style="contain: paint;"
     ></div>
 
     <!-- UI controls: isolated in FocusContainer with transparent background -->

@@ -99,7 +99,6 @@ export class PlayerControlsElement extends LitElement {
       line-height: 1.3;
       max-width: 14rem;
       text-align: right;
-      will-change: opacity, transform;
     }
 
     .player-watermark .advisory-badge.visible {
@@ -674,7 +673,7 @@ export class PlayerControlsElement extends LitElement {
 
   private _startLogicTimer() {
     this.logicTimer = setInterval(() => {
-      if (!this.videoEl) return;
+      if (!this.videoEl || this.videoEl.paused) return;
       const ct = this.videoEl.currentTime;
       const dur = this.videoEl.duration || 0;
 

@@ -246,7 +246,7 @@
 
   <div
     class="absolute inset-0 z-[2] pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60"
-    style="contain: paint; will-change: opacity;"
+    style="contain: paint;"
   ></div>
 
   <FocusContainer

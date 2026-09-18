@@ -35,8 +35,15 @@ const runtimeConfig = getRuntimeConfig();
 const { appQuality } = runtimeConfig;
 $body?.classList.add(`app-quality-${appQuality.toLowerCase().replaceAll('_', '-')}`);
 
-// ── Mount Svelte app ─────────────────────────────────────────────────────────
-mount(App, { target: document.getElementById('root')! });
+// ── Wait for splash animation to finish before mounting Svelte ──────────────
+function mountApp() {
+  mount(App, { target: document.getElementById('root')! });
+  document.getElementById('loading-screen')?.remove();
+  document.getElementById('animation')?.remove();
+}
 
-// ── Remove static splash once the app is mounted ────────────────────────────
-document.getElementById('loading-screen')?.remove();
+if (document.getElementById('loading-screen')?.style.opacity === '1') {
+  mountApp();
+} else {
+  document.addEventListener('splash:ended', mountApp, { once: true });
+}
