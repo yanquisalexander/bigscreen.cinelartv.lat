@@ -387,8 +387,8 @@
     border: 2px solid rgba(255, 255, 255, 0.08);
     z-index: 1;
     margin-left: 30px;
-    transition: border-color 200ms ease, transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: -4px 8px 12px rgba(0, 0, 0, 0.5);
+    transition: border-color var(--animation-duration) ease;
+    box-shadow: -4px 8px 12px rgba(0, 0, 0, var(--shadow-opacity));
   }
 
   .top10-poster--top1 {
