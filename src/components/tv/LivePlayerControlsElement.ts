@@ -53,6 +53,8 @@ export class LivePlayerControlsElement extends LitElement {
       display: flex;
       align-items: center;
       gap: 0;
+      transform: translateZ(0);
+      will-change: transform;
     }
 
     :host(.controls-hidden) .player-watermark { opacity: 0; }

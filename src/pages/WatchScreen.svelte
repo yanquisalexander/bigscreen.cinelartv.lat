@@ -901,26 +901,26 @@
     </div>
   </FocusContainer>
 {:else}
-    <!-- YouTube TV Architecture: Player rendered OUTSIDE FocusContainer as a sibling.
-         This prevents focus/navigation re-renders from affecting the video compositor. -->
-    <PlayerStage bind:videoEl={videoEl} />
+    <!-- YouTube TV Compositor Layer: All player elements wrapped in a single
+         position:relative + translateZ(0) container. Forces Chromium to composite
+         video + overlays as one stable GPU layer, preventing reflows on UI updates. -->
+    <div class="player-compositor">
+      <PlayerStage bind:videoEl={videoEl} />
 
-    <!-- Gradient overlay: also outside FocusContainer (visual-only, no interaction) -->
-    <div
-      class="absolute inset-0 z-[2] pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60"
-      style="contain: paint;"
-    ></div>
+      <div
+        class="absolute inset-0 z-[2] pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60"
+        style="contain: paint;"
+      ></div>
 
-    <!-- UI controls: isolated in FocusContainer with transparent background -->
-    <FocusContainer
-      focusKey="watch-root"
-      focusable={false}
-      isFocusBoundary={true}
-      preferredChildFocusKey="watch-playpause"
-      trackChildren={true}
-      saveLastFocusedChild={true}
-      class="fixed inset-0 z-[3] w-screen h-screen overflow-hidden select-none"
-    >
+      <FocusContainer
+        focusKey="watch-root"
+        focusable={false}
+        isFocusBoundary={true}
+        preferredChildFocusKey="watch-playpause"
+        trackChildren={true}
+        saveLastFocusedChild={true}
+        class="absolute inset-0 z-[3] w-full h-full overflow-hidden select-none"
+      >
       {#if !ready && !streamLimitError}
         <div class="absolute inset-0 bg-black flex flex-col items-center justify-center gap-5 z-30" style="contain: layout paint;">
           <p class="text-white/50 text-xl tracking-wide uppercase">Cargando...</p>
@@ -950,4 +950,16 @@
         />
       {/if}
     </FocusContainer>
+    </div>
 {/if}
+
+<style>
+  .player-compositor {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    transform: translateZ(0);
+    will-change: transform;
+    contain: layout style;
+  }
+</style>

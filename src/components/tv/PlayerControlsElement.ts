@@ -85,9 +85,9 @@ export class PlayerControlsElement extends LitElement {
       display: flex;
       align-items: center;
       gap: 0;
-      // Tricky hack to force GPU compositing for smoother transitions on some TVs
+      // Force GPU compositing for smoother transitions on Android TV
       transform: translateZ(0);
-      layer-style: preserve-3d;
+      will-change: transform;
     }
 
     .player-watermark .advisory-badge {
