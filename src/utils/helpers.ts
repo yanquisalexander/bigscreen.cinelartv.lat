@@ -6,6 +6,12 @@ export function isBundled(): boolean {
   return protocol !== 'http:' && protocol !== 'https:';
 }
 
+export function canPlayHttpStreams(): boolean {
+  if (typeof window === 'undefined') return false;
+  const { protocol } = window.location;
+  return protocol !== 'https:';
+}
+
 export function resolveImageUrl(path?: string | null, baseUrl?: string): string | null {
   if (!path) return null;
   if (path.startsWith('http://') || path.startsWith('https://')) return path;

@@ -12,6 +12,7 @@ import type {
   LiveChannelInfo,
   NativePlayerData,
 } from '../types';
+import { canPlayHttpStreams } from '@/utils/helpers';
 
 const WEB_CAPABILITIES: PlatformCapabilities = {
   version: 0,
@@ -53,16 +54,20 @@ function createWebNavigation(): PlatformNavigation {
 }
 
 function createWebMedia(): PlatformMedia {
+  const liveSupported = canPlayHttpStreams();
   return {
     getCapabilities: (): MediaCapabilities => ({
       nativePlayer: false,
-      liveTV: false,
+      liveTV: liveSupported,
       prefersNative: false,
     }),
     prefersNative: () => false,
-    supportsLiveTV: () => false,
+    supportsLiveTV: () => liveSupported,
     playContent: (_data: NativePlayerData): void => {},
-    playLive: (_channel: LiveChannelInfo): boolean => false,
+    playLive: (_channel: LiveChannelInfo): boolean => {
+      if (!liveSupported) return false;
+      return true;
+    },
     onFinished: (_callback: (() => void) | null): void => {},
   };
 }
