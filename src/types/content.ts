@@ -71,8 +71,21 @@ export interface Category {
   name: string;
 }
 
+export type SectionKind =
+  | 'continue_watching'
+  | 'recommended_for_you'
+  | 'you_might_like'
+  | 'new_this_week'
+  | 'trending'
+  | 'added_recently'
+  | 'most_viewed'
+  | 'most_liked'
+  | 'by_genre'
+  | 'top_10_by_country';
+
 export interface ContentCategory {
   title: string;
+  section_kind?: SectionKind;
   content?: ContentItem[];
 }
 

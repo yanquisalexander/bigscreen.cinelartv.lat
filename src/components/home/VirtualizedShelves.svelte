@@ -1,5 +1,6 @@
 <script lang="ts">
   import VirtualizedRow from '@/components/home/VirtualizedRow.svelte';
+  import Top10Row from '@/components/home/Top10Row.svelte';
   import type { ContentItem, ContentCategory } from '@/types/content';
 
   interface Props {
@@ -94,19 +95,35 @@
         class="absolute left-0 right-0"
         style="top: {shelfOffsets[catIdx]}px;"
       >
-        <VirtualizedRow
-          title={category.title}
-          items={category.content ?? []}
-          categoryIndex={catIdx}
-          focusKey="home-row-{catIdx}"
-          {clientEndpoint}
-          parentFocusKey="home-root"
-          {onCardEnterPress}
-          {onCardArrowPress}
-          onUpdateHasFocusedChild={(hasFocused) =>
-            onShelfFocusUpdate?.(catIdx, hasFocused, shelfOffsets[catIdx])}
-          onMeasureHeight={(h) => handleShelfHeight(catIdx, h)}
-        />
+        {#if category.section_kind === 'top_10_by_country'}
+          <Top10Row
+            title={category.title}
+            items={category.content ?? []}
+            categoryIndex={catIdx}
+            focusKey="home-row-{catIdx}"
+            {clientEndpoint}
+            parentFocusKey="home-root"
+            {onCardEnterPress}
+            {onCardArrowPress}
+            onUpdateHasFocusedChild={(hasFocused) =>
+              onShelfFocusUpdate?.(catIdx, hasFocused, shelfOffsets[catIdx])}
+            onMeasureHeight={(h) => handleShelfHeight(catIdx, h)}
+          />
+        {:else}
+          <VirtualizedRow
+            title={category.title}
+            items={category.content ?? []}
+            categoryIndex={catIdx}
+            focusKey="home-row-{catIdx}"
+            {clientEndpoint}
+            parentFocusKey="home-root"
+            {onCardEnterPress}
+            {onCardArrowPress}
+            onUpdateHasFocusedChild={(hasFocused) =>
+              onShelfFocusUpdate?.(catIdx, hasFocused, shelfOffsets[catIdx])}
+            onMeasureHeight={(h) => handleShelfHeight(catIdx, h)}
+          />
+        {/if}
       </div>
     {/if}
   {/each}
