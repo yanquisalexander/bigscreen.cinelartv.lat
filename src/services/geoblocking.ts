@@ -174,6 +174,11 @@ export function getGeoblockConfig(cfg: RemoteConfig = remoteConfig.get()): Geobl
  * Es fail-open: si no se puede detectar la IP o leer la config, permite el acceso.
  */
 export async function checkGeoBlock(): Promise<GeoResult> {
+    // En DEV siempre permitir acceso
+    if (IS_DEV) {
+        return { countryCode: '', countryName: '', blocked: false, message: '' };
+    }
+
     // 1. Obtener país (cache → API)
     let ipInfo = await readCache();
     if (!ipInfo) {

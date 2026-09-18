@@ -13,6 +13,8 @@ import type {
   NativePlayerData,
 } from '../types';
 import { canPlayHttpStreams } from '@/utils/helpers';
+import { liveChannelStore } from '@/stores/liveChannelStore';
+import { push } from 'svelte-spa-router';
 
 const WEB_CAPABILITIES: PlatformCapabilities = {
   version: 0,
@@ -64,8 +66,10 @@ function createWebMedia(): PlatformMedia {
     prefersNative: () => false,
     supportsLiveTV: () => liveSupported,
     playContent: (_data: NativePlayerData): void => {},
-    playLive: (_channel: LiveChannelInfo): boolean => {
+    playLive: (channel: LiveChannelInfo): boolean => {
       if (!liveSupported) return false;
+      liveChannelStore.getState().setChannel(channel);
+      push(`/live/watch/${channel.id}`);
       return true;
     },
     onFinished: (_callback: (() => void) | null): void => {},

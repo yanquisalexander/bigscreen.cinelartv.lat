@@ -24,6 +24,7 @@ const GUEST_BLOCKED_PREFIXES = ['/watch', '/select-profile'];
 function isGuestAllowed(pathname: string): boolean {
   if (GUEST_ALLOWED_PATHS.includes(pathname)) return true;
   if (pathname.startsWith('/content/')) return true;
+  if (pathname.startsWith('/live/watch/')) return true;
   return !GUEST_BLOCKED_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
@@ -69,6 +70,12 @@ export const routes = {
 
   '/live': wrap({
     component: LiveTVScreen,
+    conditions: [requireAuthOrGuest],
+  }),
+
+  '/live/watch/:channelId': wrap({
+    asyncComponent: () => import('@/pages/LiveWatchScreen.svelte'),
+    loadingComponent: RouteLoadingPlaceholder,
     conditions: [requireAuthOrGuest],
   }),
 

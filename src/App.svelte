@@ -29,7 +29,7 @@
   let currentPath = $state(window.location.hash.slice(1) || '/');
 
   // Standalone routes that don't show AppShell sidebar
-  const STANDALONE_PREFIXES = ['/auth', '/blocked', '/select-profile', '/watch'];
+  const STANDALONE_PREFIXES = ['/auth', '/blocked', '/select-profile', '/watch', '/live/watch'];
   const isStandaloneRoute = $derived(
     currentPath === '/' || currentPath === '/auth' ||
     STANDALONE_PREFIXES.some(p => currentPath.startsWith(p))
