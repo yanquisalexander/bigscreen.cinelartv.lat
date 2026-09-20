@@ -41,18 +41,41 @@
     ? { w: 64, h: 36 }
     : { w: 32, h: 18 };
 
-  let canvasEl: HTMLCanvasElement;
+  let canvasEl = $state<HTMLCanvasElement | null>(null);
   let hasBackdrop = $state(false);
 
-  function drawToCanvas(canvas: HTMLCanvasElement, url: string) {
+  let lastDrawnUrl: string | null = null;
+  let activeLoadingImg: HTMLImageElement | null = null;
+
+  function drawToCanvas(canvas: HTMLCanvasElement | null, url: string) {
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    if (activeLoadingImg) {
+      activeLoadingImg.onload = null;
+      activeLoadingImg.onerror = null;
+      activeLoadingImg = null;
+    }
+
     const img = new Image();
     img.crossOrigin = 'anonymous';
+    activeLoadingImg = img;
+
     img.onload = () => {
+      if (activeLoadingImg !== img) return;
+      activeLoadingImg = null;
+      lastDrawnUrl = url;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       requestAnimationFrame(() => { hasBackdrop = true; });
     };
+
+    img.onerror = () => {
+      if (activeLoadingImg === img) {
+        activeLoadingImg = null;
+      }
+    };
+
     img.src = url;
   }
 
@@ -76,9 +99,16 @@
     if (!enabled) return;
     const url = backdropUrl;
     if (!url || !canvasEl) {
+      if (activeLoadingImg) {
+        activeLoadingImg.onload = null;
+        activeLoadingImg.onerror = null;
+        activeLoadingImg = null;
+      }
+      lastDrawnUrl = null;
       hasBackdrop = false;
       return;
     }
+    if (url === lastDrawnUrl) return;
     drawToCanvas(canvasEl, url);
   });
 
