@@ -185,7 +185,7 @@
               desc.style.transform = 'translateY(0)';
             }
             card.style.zIndex = '2';
-            const ambientUrl = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint, 'medium');
+            const ambientUrl = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint, 'small');
             useAmbientStore.getState().setBackdropUrl(ambientUrl ?? null);
             scrollToCard(idx);
             if (!rowHasFocus) {
