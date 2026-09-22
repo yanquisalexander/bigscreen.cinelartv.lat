@@ -7,6 +7,9 @@
   import { svelteConfigStore } from '@/stores/configStore';
   import { toastStore } from '@/stores/toastStore';
   import { getDeviceInfo } from '@/services/NativeBridge';
+  import { detectDeviceCertification } from '@/services/deviceCertification';
+  import type { DeviceCertification } from '@/services/deviceCertification';
+  import { getRuntimeConfig } from '@/runtime';
   import { inputManager } from '@/services/InputManager';
   import { showPanel, buttonItem } from '@/services/overlayPanel';
   import { deassignProfile } from '@/features/auth/session';
@@ -15,7 +18,8 @@
   import {
     Play, Volume2, Palette, Shield, Info, RotateCcw,
     User, Users, ChevronRight, Tv, RefreshCw, Trash2,
-    HelpCircle, FileText, Server, Settings, ChevronDown
+    HelpCircle, FileText, Server, Settings, ChevronDown,
+    ShieldCheck, MonitorPlay, Sparkles
   } from '@lucide/svelte';
 
   const profile = $derived($svelteAuthStore.selectedProfile);
@@ -28,10 +32,35 @@
   const prefersModernPlayback = $derived($svelteSettingsStore.prefersModernPlayback);
   const navigationSoundEnabled = $derived($svelteSettingsStore.navigationSoundEnabled);
   const debugMode = $derived($svelteSettingsStore.debugMode);
+  const runtimeConfig = $derived(getRuntimeConfig());
 
   let deviceInfo = $state<Partial<DeviceInfo>>({});
+  let certification = $state<DeviceCertification | null>(null);
   let signingOut = $state(false);
   let changingProfile = $state(false);
+  let contentPanelEl = $state<HTMLDivElement | null>(null);
+  let _scrollObserver: MutationObserver | null = null;
+
+  function scrollToFocused() {
+    const container = contentPanelEl;
+    if (!container) return;
+    if (_scrollObserver) { _scrollObserver.disconnect(); _scrollObserver = null; }
+    const tryScroll = () => {
+      const focused = container.querySelector('[data-focused="true"]') as HTMLElement | null;
+      if (focused) {
+        focused.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return true;
+      }
+      return false;
+    };
+    if (tryScroll()) return;
+    const observer = new MutationObserver(() => {
+      if (tryScroll()) { observer.disconnect(); _scrollObserver = null; }
+    });
+    _scrollObserver = observer;
+    observer.observe(container, { attributes: true, subtree: true, attributeFilter: ['data-focused'] });
+    setTimeout(() => { observer.disconnect(); _scrollObserver = null; }, 1000);
+  }
 
   $effect(() => {
     async function loadDeviceInfo() {
@@ -41,6 +70,15 @@
       } catch { /* fallback */ }
     }
     loadDeviceInfo();
+  });
+
+  $effect(() => {
+    async function loadCertification() {
+      try {
+        certification = await detectDeviceCertification();
+      } catch { /* fallback */ }
+    }
+    loadCertification();
   });
 
   function handleBack() {
@@ -56,6 +94,18 @@
     setTimeout(() => {
       setFocus('settings-nav-reproduccion');
     }, 50);
+  });
+
+  $effect(() => {
+    if (!contentPanelEl) return;
+    const observer = new MutationObserver(() => {
+      const focused = contentPanelEl?.querySelector('[data-focused="true"]') as HTMLElement | null;
+      if (focused) {
+        focused.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+    observer.observe(contentPanelEl, { attributes: true, subtree: true, attributeFilter: ['data-focused'] });
+    return () => observer.disconnect();
   });
 
   function handleFactoryReset() {
@@ -230,7 +280,7 @@
   </nav>
 
   <!-- Right content panel -->
-  <div class="flex-1 overflow-y-auto hide-scrollbar pt-[calc(var(--topnav-h)+1.5rem)] pb-[clamp(3rem,8vh,4rem)] px-[clamp(3rem,7.5vw,6rem)]">
+  <div bind:this={contentPanelEl} class="flex-1 overflow-y-auto hide-scrollbar pt-[calc(var(--topnav-h)+1.5rem)] pb-[clamp(3rem,8vh,4rem)] px-[clamp(3rem,7.5vw,6rem)]">
 
     {#if activeSection === 'reproduccion'}
       <div data-settings-section="reproduccion">
@@ -420,6 +470,181 @@
               <div class="h-px bg-white/5 ml-[clamp(3rem,5.5vw,4.5rem)]"></div>
             {/if}
           {/each}
+        </div>
+
+        <!-- Certificación de dispositivo -->
+        <h3 class="text-[clamp(0.65rem,0.85vw,0.75rem)] font-bold uppercase tracking-wider text-text-secondary mt-[clamp(1.5rem,3vh,2.5rem)] mb-[clamp(0.75rem,1.2vh,1rem)]">
+          Certificación de dispositivo
+        </h3>
+
+        <!-- App Quality -->
+        <div class="bg-surface rounded-2xl overflow-hidden mb-[clamp(0.75rem,1.5vh,1rem)]">
+          <Focusable
+            focusKey="settings-cert-quality"
+            onEnterPress={() => {}}
+            onArrowPress={(direction) => {
+              if (direction === 'left') {
+                setFocus('settings-nav-informacion');
+                return false;
+              }
+              return true;
+            }}
+            focusedClass="!bg-white/5"
+            class="px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.875rem,1.5vh,1.125rem)] cursor-pointer"
+            playSound={true}
+          >
+            {#snippet children()}
+              <div class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)]">
+                <MonitorPlay class="w-[clamp(1.1rem,1.6vw,1.35rem)] h-[clamp(1.1rem,1.6vw,1.35rem)] text-accent-light" />
+                <div class="flex flex-col">
+                  <span class="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">
+                    App Quality
+                  </span>
+                  <span class="text-text-secondary text-[clamp(0.75rem,1vw,0.85rem)] mt-0.5">
+                    Esto no afecta la reproducción del contenido en CinelarTV; simplemente optimizamos el rendimiento para adaptarlo mejor a tu TV.
+                  </span>
+                </div>
+              </div>
+              <div class="text-white text-[clamp(0.8rem,1.1vw,0.95rem)] font-semibold mt-2 ml-[clamp(1.85rem,2.85rem,2.35rem)]">
+                {runtimeConfig.appQuality}
+              </div>
+            {/snippet}
+          </Focusable>
+        </div>
+
+        <!-- Nivel de certificación + features -->
+        <div class="bg-surface rounded-2xl overflow-hidden">
+          <!-- Nivel de certificación -->
+          <Focusable
+            focusKey="settings-cert-level"
+            onEnterPress={() => {}}
+            onArrowPress={(direction) => {
+              if (direction === 'left') {
+                setFocus('settings-nav-informacion');
+                return false;
+              }
+              return true;
+            }}
+            focusedClass="!bg-white/5"
+            class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.875rem,1.5vh,1.125rem)] cursor-pointer"
+            playSound={true}
+          >
+            {#snippet children()}
+              <div class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)]">
+                <ShieldCheck class="w-[clamp(1.1rem,1.6vw,1.35rem)] h-[clamp(1.1rem,1.6vw,1.35rem)] {certification?.level === 'certified' ? 'text-green-400' : certification?.level === 'standard' ? 'text-yellow-400' : 'text-text-secondary'}" />
+                <span class="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">
+                  Nivel de certificación
+                </span>
+              </div>
+              <span class="text-white text-[clamp(0.8rem,1.1vw,0.95rem)] font-semibold">
+                {certification?.label ?? 'Cargando...'}
+              </span>
+            {/snippet}
+          </Focusable>
+
+          <div class="h-px bg-white/5 ml-[clamp(3rem,5.5vw,4.5rem)]"></div>
+
+          <!-- 4K -->
+          <Focusable
+            focusKey="settings-cert-4k"
+            onEnterPress={() => {}}
+            onArrowPress={(direction) => {
+              if (direction === 'left') {
+                setFocus('settings-nav-informacion');
+                return false;
+              }
+              return true;
+            }}
+            focusedClass="!bg-white/5"
+            class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.625rem,1vh,0.875rem)] cursor-pointer"
+            playSound={true}
+          >
+            {#snippet children()}
+              <span class="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)]">4K</span>
+              <span class="text-[clamp(0.8rem,1.1vw,0.95rem)] font-medium {certification?.supports4K ? 'text-green-400' : 'text-red-400'}">
+                {certification?.supports4K ? 'Soportado' : 'No soportado'}
+              </span>
+            {/snippet}
+          </Focusable>
+
+          <div class="h-px bg-white/5 ml-[clamp(3rem,5.5vw,4.5rem)]"></div>
+
+          <!-- 4K HDR -->
+          <Focusable
+            focusKey="settings-cert-hdr"
+            onEnterPress={() => {}}
+            onArrowPress={(direction) => {
+              if (direction === 'left') {
+                setFocus('settings-nav-informacion');
+                return false;
+              }
+              return true;
+            }}
+            focusedClass="!bg-white/5"
+            class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.625rem,1vh,0.875rem)] cursor-pointer"
+            playSound={true}
+          >
+            {#snippet children()}
+              <span class="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)]">4K HDR</span>
+              <span class="text-[clamp(0.8rem,1.1vw,0.95rem)] font-medium {certification?.supportsHDR ? 'text-green-400' : 'text-red-400'}">
+                {certification?.supportsHDR ? 'Soportado' : 'No soportado'}
+              </span>
+            {/snippet}
+          </Focusable>
+
+          <div class="h-px bg-white/5 ml-[clamp(3rem,5.5vw,4.5rem)]"></div>
+
+          <!-- Codecs -->
+          <Focusable
+            focusKey="settings-cert-codecs"
+            onEnterPress={() => {}}
+            onArrowPress={(direction) => {
+              if (direction === 'left') {
+                setFocus('settings-nav-informacion');
+                return false;
+              }
+              return true;
+            }}
+            focusedClass="!bg-white/5"
+            class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.625rem,1vh,0.875rem)] cursor-pointer"
+            playSound={true}
+          >
+            {#snippet children()}
+              <span class="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)]">Codecs</span>
+              <div class="flex gap-[clamp(0.35rem,0.6vw,0.5rem)]">
+                {#each Object.entries(certification?.codecs ?? {}) as [codec, supported]}
+                  <span class="text-[clamp(0.65rem,0.85vw,0.75rem)] font-medium px-[clamp(0.35rem,0.6vw,0.5rem)] py-0.5 rounded {supported ? 'bg-green-400/15 text-green-400' : 'bg-white/5 text-text-secondary'}">
+                    {codec.toUpperCase()}
+                  </span>
+                {/each}
+              </div>
+            {/snippet}
+          </Focusable>
+
+          <div class="h-px bg-white/5 ml-[clamp(3rem,5.5vw,4.5rem)]"></div>
+
+          <!-- Widevine -->
+          <Focusable
+            focusKey="settings-cert-widevine"
+            onEnterPress={() => {}}
+            onArrowPress={(direction) => {
+              if (direction === 'left') {
+                setFocus('settings-nav-informacion');
+                return false;
+              }
+              return true;
+            }}
+            focusedClass="!bg-white/5"
+            class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.625rem,1vh,0.875rem)] cursor-pointer"
+            playSound={true}
+          >
+            {#snippet children()}
+              <span class="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)]">Widevine DRM</span>
+              <span class="text-[clamp(0.8rem,1.1vw,0.95rem)] font-medium {certification?.widevine ? 'text-green-400' : 'text-red-400'}">
+                {certification?.widevine ? 'Soportado' : 'No soportado'}
+              </span>
+            {/snippet}
+          </Focusable>
         </div>
       </div>
 
