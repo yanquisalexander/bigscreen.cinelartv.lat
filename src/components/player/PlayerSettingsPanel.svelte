@@ -2,7 +2,7 @@
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import Focusable from '@/components/tv/Focusable.svelte';
   import { setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
-  import { Monitor, Volume2, Check } from '@lucide/svelte';
+  import { Monitor, Volume2, Check, ShieldCheck, ShieldAlert, ShieldOff } from '@lucide/svelte';
 
   interface QualityInfo {
     auto: boolean;
@@ -17,12 +17,20 @@
     active: boolean;
   }
 
+  interface DrmInfo {
+    widevine: 'L1' | 'L2' | 'L3' | 'unknown' | 'unsupported';
+    playready: boolean;
+    fairplay: boolean;
+    primary: 'widevine' | 'playready' | 'fairplay' | 'none';
+  }
+
   interface EngineLike {
     getVariantTracksInfo(): QualityInfo | null;
     getAudioTracksInfo(): AudioInfo[] | null;
     selectQuality(option: number | 'auto'): void;
     selectAudioTrack(language: string, role?: string, index?: number): void;
     onTracksChanged?: (fn: () => void) => () => void;
+    getProfile(): { drm?: DrmInfo } | null;
   }
 
   const formatGbPerHour = (bps: number): string => {
@@ -47,6 +55,7 @@
 
   let quality = $state<QualityInfo | null>(null);
   let audio = $state<AudioInfo[] | null>(null);
+  let drm = $state<DrmInfo | null>(null);
   let panelBodyEl = $state<HTMLDivElement | null>(null);
   let didFocus = false;
   let _scrollObserver: MutationObserver | null = null;
@@ -55,6 +64,7 @@
     if (!engine) return;
     quality = engine.getVariantTracksInfo();
     audio = engine.getAudioTracksInfo();
+    drm = engine.getProfile()?.drm ?? null;
   }
 
   function scrollToFocused() {
@@ -233,6 +243,78 @@
         {:else}
           <div class="px-4 py-2 text-[#8e8e93] text-sm">Sin pistas de audio</div>
         {/if}
+
+        <!-- ── Protección de contenido ───────────────────────────────────── -->
+        <div class="text-[#8e8e93] text-[clamp(0.7rem,1vw,0.85rem)] font-bold uppercase tracking-wider mb-2 px-2 mt-4">
+          Protección
+        </div>
+
+        <div class="px-3 py-2 my-1 rounded-xl bg-white/[0.03] space-y-2">
+          <!-- Widevine -->
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              {#if drm?.widevine === 'L1'}
+                <ShieldCheck class="w-4 h-4 text-[#4ade80]" />
+              {:else if drm?.widevine === 'L3'}
+                <ShieldAlert class="w-4 h-4 text-[#fbbf24]" />
+              {:else}
+                <ShieldOff class="w-4 h-4 text-[#6b7280]" />
+              {/if}
+              <span class="text-white/70 text-[clamp(0.75rem,1vw,0.875rem)]">Widevine</span>
+            </div>
+            <span class="text-[clamp(0.7rem,0.9vw,0.8rem)] font-mono
+              {drm?.widevine === 'L1' ? 'text-[#4ade80]' :
+               drm?.widevine === 'L3' ? 'text-[#fbbf24]' :
+               'text-[#6b7280]'}">
+              {drm?.widevine === 'unsupported' ? 'No soportado' : (drm?.widevine ?? '—')}
+            </span>
+          </div>
+
+          <!-- PlayReady -->
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              {#if drm?.playready}
+                <ShieldCheck class="w-4 h-4 text-[#4ade80]" />
+              {:else}
+                <ShieldOff class="w-4 h-4 text-[#6b7280]" />
+              {/if}
+              <span class="text-white/70 text-[clamp(0.75rem,1vw,0.875rem)]">PlayReady</span>
+            </div>
+            <span class="text-[clamp(0.7rem,0.9vw,0.8rem)] font-mono {drm?.playready ? 'text-[#4ade80]' : 'text-[#6b7280]'}">
+              {drm?.playready ? 'Disponible' : 'No soportado'}
+            </span>
+          </div>
+
+          <!-- FairPlay -->
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              {#if drm?.fairplay}
+                <ShieldCheck class="w-4 h-4 text-[#4ade80]" />
+              {:else}
+                <ShieldOff class="w-4 h-4 text-[#6b7280]" />
+              {/if}
+              <span class="text-white/70 text-[clamp(0.75rem,1vw,0.875rem)]">FairPlay</span>
+            </div>
+            <span class="text-[clamp(0.7rem,0.9vw,0.8rem)] font-mono {drm?.fairplay ? 'text-[#4ade80]' : 'text-[#6b7280]'}">
+              {drm?.fairplay ? 'Disponible' : 'No soportado'}
+            </span>
+          </div>
+
+          <!-- DRM primario activo -->
+          {#if drm?.primary && drm.primary !== 'none'}
+            <div class="flex items-center justify-between pt-1 border-t border-white/5">
+              <span class="text-white/40 text-[clamp(0.65rem,0.85vw,0.75rem)]">Activo</span>
+              <span class="text-white/60 text-[clamp(0.65rem,0.85vw,0.75rem)] font-mono uppercase tracking-wide">
+                {drm.primary}
+                {#if drm.primary === 'widevine' && drm.widevine !== 'unsupported'}
+                  · {drm.widevine}
+                {/if}
+              </span>
+            </div>
+          {:else if !drm}
+            <div class="text-white/30 text-[clamp(0.65rem,0.85vw,0.75rem)] text-center py-1">Detectando…</div>
+          {/if}
+        </div>
       </div>
     </FocusContainer>
   </div>

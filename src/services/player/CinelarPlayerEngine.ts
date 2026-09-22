@@ -29,6 +29,16 @@ export type TvPlatform =
   | 'cobalt'
   | 'generic';
 
+export type DrmSecurityLevel = 'L1' | 'L2' | 'L3' | 'unknown' | 'unsupported';
+
+export interface DrmInfo {
+  widevine: DrmSecurityLevel;
+  playready: boolean;
+  fairplay: boolean;
+  /** El DRM más capaz disponible en este dispositivo */
+  primary: 'widevine' | 'playready' | 'fairplay' | 'none';
+}
+
 export interface TvPlayerProfile {
   platform: TvPlatform;
   displayMaxHeight: number;
@@ -39,6 +49,7 @@ export interface TvPlayerProfile {
   performanceCap?: { maxHeight: number; reason: string };
   isLowEndDevice: boolean;
   supportsPlaybackRateSlewing: boolean;
+  drm: DrmInfo;
 }
 
 interface StoredPlayerPerformance {
@@ -189,6 +200,73 @@ export class CinelarPlayerEngine {
     return 'generic';
   }
 
+  private async detectDrm(): Promise<DrmInfo> {
+    const result: DrmInfo = {
+      widevine: 'unsupported',
+      playready: false,
+      fairplay: false,
+      primary: 'none',
+    };
+
+    if (typeof navigator === 'undefined' || !navigator.requestMediaKeySystemAccess) {
+      return result;
+    }
+
+    const baseConfig: MediaKeySystemConfiguration[] = [{
+      initDataTypes: ['cenc'],
+      videoCapabilities: [{ contentType: 'video/mp4; codecs="avc1.42E01E"' }],
+      audioCapabilities: [{ contentType: 'audio/mp4; codecs="mp4a.40.2"' }],
+    }];
+
+    // ── Widevine ──────────────────────────────────────────────────────────────
+    try {
+      const wv = await navigator.requestMediaKeySystemAccess('com.widevine.alpha', baseConfig);
+      // Intentar distinguir L1 vs L3 via getStatusForPolicy (Chrome 70+, algunas webOS)
+      try {
+        const keys = await wv.createMediaKeys();
+        const status: string = await (keys as any).getStatusForPolicy?.({ minHdcpVersion: '2.2' }) ?? '';
+        result.widevine = status === 'usable' ? 'L1' : 'L3';
+      } catch {
+        // getStatusForPolicy no soportado → asumimos L3 (modo software)
+        result.widevine = 'L3';
+      }
+    } catch {
+      result.widevine = 'unsupported';
+    }
+
+    // ── PlayReady ────────────────────────────────────────────────────────────
+    const playreadyKeySystems = [
+      'com.microsoft.playready',
+      'com.microsoft.playready.recommendation',
+      'com.microsoft.playready.hardware',
+    ];
+    for (const ks of playreadyKeySystems) {
+      try {
+        await navigator.requestMediaKeySystemAccess(ks, baseConfig);
+        result.playready = true;
+        break;
+      } catch { /* no soportado */ }
+    }
+
+    // ── FairPlay ─────────────────────────────────────────────────────────────
+    try {
+      await navigator.requestMediaKeySystemAccess('com.apple.fps.1_0', [{
+        initDataTypes: ['skd'],
+        videoCapabilities: [{ contentType: 'video/mp4; codecs="avc1.42E01E"' }],
+      }]);
+      result.fairplay = true;
+    } catch { /* no soportado */ }
+
+    // ── Primary DRM ──────────────────────────────────────────────────────────
+    if (result.widevine !== 'unsupported') result.primary = 'widevine';
+    else if (result.playready) result.primary = 'playready';
+    else if (result.fairplay) result.primary = 'fairplay';
+    else result.primary = 'none';
+
+    pdbg('engine.drm', 'DRM detection complete', result);
+    return result;
+  }
+
   private async detectTvProfile(): Promise<TvPlayerProfile> {
     const platform = this.detectTvPlatform();
     const stored = this.getStoredPerformance();
@@ -203,28 +281,34 @@ export class CinelarPlayerEngine {
     let decoderMaxHeight = 1080;
     let maxFps = 30;
 
-    try {
-      const mc = (navigator as any).mediaCapabilities;
-      if (mc?.decodingInfo) {
-        const res4k60 = await mc.decodingInfo({ type: 'media-source', video: { contentType: 'video/mp4; codecs="avc1.640028"', width: 3840, height: 2160, bitrate: 20000000, framerate: 60 } });
-        if (res4k60?.supported) {
-          decoderMaxHeight = 2160;
-          maxFps = 60;
-        } else {
-          const res4k30 = await mc.decodingInfo({ type: 'media-source', video: { contentType: 'video/mp4; codecs="avc1.640028"', width: 3840, height: 2160, bitrate: 15000000, framerate: 30 } });
-          if (res4k30?.supported) {
-            decoderMaxHeight = 2160;
-            maxFps = 30;
-          } else {
-            const res1080p60 = await mc.decodingInfo({ type: 'media-source', video: { contentType: 'video/mp4; codecs="avc1.640028"', width: 1920, height: 1080, bitrate: 8000000, framerate: 60 } });
-            if (res1080p60?.supported) {
-              decoderMaxHeight = 1080;
+    // Ejecutar detección de capacidades y DRM en paralelo
+    const [drmInfo] = await Promise.all([
+      this.detectDrm(),
+      (async () => {
+        try {
+          const mc = (navigator as any).mediaCapabilities;
+          if (mc?.decodingInfo) {
+            const res4k60 = await mc.decodingInfo({ type: 'media-source', video: { contentType: 'video/mp4; codecs="avc1.640028"', width: 3840, height: 2160, bitrate: 20000000, framerate: 60 } });
+            if (res4k60?.supported) {
+              decoderMaxHeight = 2160;
               maxFps = 60;
+            } else {
+              const res4k30 = await mc.decodingInfo({ type: 'media-source', video: { contentType: 'video/mp4; codecs="avc1.640028"', width: 3840, height: 2160, bitrate: 15000000, framerate: 30 } });
+              if (res4k30?.supported) {
+                decoderMaxHeight = 2160;
+                maxFps = 30;
+              } else {
+                const res1080p60 = await mc.decodingInfo({ type: 'media-source', video: { contentType: 'video/mp4; codecs="avc1.640028"', width: 1920, height: 1080, bitrate: 8000000, framerate: 60 } });
+                if (res1080p60?.supported) {
+                  decoderMaxHeight = 1080;
+                  maxFps = 60;
+                }
+              }
             }
           }
-        }
-      }
-    } catch { }
+        } catch { }
+      })(),
+    ]);
 
     const screenH = typeof screen !== 'undefined' ? Math.max(screen.height, screen.width) : 1080;
     let displayMaxHeight = 720;
@@ -253,6 +337,7 @@ export class CinelarPlayerEngine {
       bandwidthEstimate,
       isLowEndDevice,
       supportsPlaybackRateSlewing,
+      drm: drmInfo,
     };
 
     if (stored?.performanceCapHeight) {

@@ -35,6 +35,7 @@
   let snapTotalFrames = $state(0);
   let snapBufferAhead = $state(0);
   let snapDate = $state('');
+  let snapDrm = $state<{ widevine: string; playready: boolean; fairplay: boolean; primary: string } | null>(null);
 
   function drawSparkline(
     canvas: HTMLCanvasElement | null,
@@ -116,6 +117,7 @@
       snapCodecInfo = profile
         ? { video: `${profile.decoderMaxHeight}p`, audio: '—' }
         : null;
+      snapDrm = profile?.drm ?? null;
       snapDate = new Date().toLocaleString();
     });
 
@@ -198,6 +200,21 @@
       <span class="stats-label">Codecs HW</span>
       <span class="stats-value">
         {#if snapCodecInfo}{snapCodecInfo.video} / {snapCodecInfo.audio}{:else}— / —{/if}
+      </span>
+    </div>
+
+    <div class="stats-row">
+      <span class="stats-label">DRM</span>
+      <span class="stats-value stats-mono">
+        {#if snapDrm}
+          <span class="{snapDrm.widevine !== 'unsupported' ? (snapDrm.widevine === 'L1' ? 'stats-ok' : 'stats-warn') : 'stats-dim'}">
+            WV:{snapDrm.widevine === 'unsupported' ? '✗' : snapDrm.widevine}
+          </span>
+          <span class="{snapDrm.playready ? 'stats-ok' : 'stats-dim'}">PR:{snapDrm.playready ? '✓' : '✗'}</span>
+          <span class="{snapDrm.fairplay ? 'stats-ok' : 'stats-dim'}">FP:{snapDrm.fairplay ? '✓' : '✗'}</span>
+        {:else}
+          <span class="stats-dim">—</span>
+        {/if}
       </span>
     </div>
 
@@ -353,6 +370,7 @@
 
   .stats-warn { color: #fbbf24; font-size: clamp(9px, 0.8vw, 12px); }
   .stats-ok { color: #4ade80; font-size: clamp(9px, 0.8vw, 12px); }
+  .stats-dim { color: rgba(255, 255, 255, 0.2); font-size: clamp(9px, 0.8vw, 12px); }
   .stats-mono { font-size: clamp(9px, 0.8vw, 12px); color: rgba(255, 255, 255, 0.4); letter-spacing: 0.02em; }
 
   .stats-badge {

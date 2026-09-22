@@ -20,7 +20,7 @@
     tabindex="-1"
     autoplay
     playsinline
-    preload="metadata"
+    preload="none"
   ></video>
 </div>
 
