@@ -11,6 +11,8 @@
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="preload" href="/resources/fonts/CTV-Icons.woff2" as="font" type="font/woff2" crossorigin />
+  <!-- Preload startup sound -->
+  <link rel="preload" href="/resources/sounds/ctv_startup.wav" as="audio" type="audio/wav" />
   <link rel="stylesheet" href="/resources/fonts/ctv-icons.css" />
   <title>CinelarTV</title>
 
@@ -341,7 +343,7 @@
       var startupAudio = new Audio('/resources/sounds/ctv_startup.wav');
       startupAudio.volume = 0.6;
       setTimeout(function () {
-        startupAudio.play().catch(function () {});
+        startupAudio.play().catch(function () { });
         requestAnimationFrame(tick);
       }, 200);
     })();
