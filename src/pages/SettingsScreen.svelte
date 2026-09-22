@@ -640,9 +640,17 @@
           >
             {#snippet children()}
               <span class="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)]">Widevine DRM</span>
-              <span class="text-[clamp(0.8rem,1.1vw,0.95rem)] font-medium {certification?.widevine ? 'text-green-400' : 'text-red-400'}">
-                {certification?.widevine ? 'Soportado' : 'No soportado'}
-              </span>
+              <div class="flex items-center gap-[clamp(0.35rem,0.6vw,0.5rem)]">
+                {#if certification?.widevine.supported}
+                  <span class="text-[clamp(0.8rem,1.1vw,0.95rem)] font-medium text-green-400">
+                    {certification.widevine.level}
+                  </span>
+                {:else}
+                  <span class="text-[clamp(0.8rem,1.1vw,0.95rem)] font-medium text-red-400">
+                    No soportado
+                  </span>
+                {/if}
+              </div>
             {/snippet}
           </Focusable>
         </div>

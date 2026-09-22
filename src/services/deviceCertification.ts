@@ -1,6 +1,7 @@
 import { getRuntimeConfig } from '@/runtime';
 
 export type CertificationLevel = 'none' | 'standard' | 'certified';
+export type WidevineLevel = 'L1' | 'L2' | 'L3' | 'none';
 
 export interface DeviceCertification {
   level: CertificationLevel;
@@ -8,7 +9,7 @@ export interface DeviceCertification {
   supports4K: boolean;
   supportsHDR: boolean;
   codecs: { h264: boolean; hevc: boolean; vp9: boolean; av1: boolean };
-  widevine: boolean;
+  widevine: { supported: boolean; level: WidevineLevel };
 }
 
 async function detect4K(): Promise<boolean> {
@@ -62,19 +63,39 @@ function detectCodecs(): { h264: boolean; hevc: boolean; vp9: boolean; av1: bool
   };
 }
 
-async function detectWidevine(): Promise<boolean> {
+async function detectWidevine(): Promise<{ supported: boolean; level: WidevineLevel }> {
   try {
-    if (typeof navigator !== 'undefined' && navigator.requestMediaKeySystemAccess) {
-      await navigator.requestMediaKeySystemAccess('com.widevine.alpha', [
-        {
-          initDataTypes: ['cenc'],
-          videoCapabilities: [{ contentType: 'video/mp4; codecs="avc1.42E01E"' }],
-        },
-      ]);
-      return true;
+    if (typeof navigator === 'undefined' || !navigator.requestMediaKeySystemAccess) {
+      return { supported: false, level: 'none' };
+    }
+
+    const probes: Array<{ robustness: string; level: WidevineLevel }> = [
+      { robustness: 'HW_SECURE_ALL', level: 'L1' },
+      { robustness: 'HW_SECURE_DECODE', level: 'L2' },
+      { robustness: 'SW_SECURE_DECODE', level: 'L3' },
+    ];
+
+    for (const { robustness, level } of probes) {
+      try {
+        const access = await navigator.requestMediaKeySystemAccess('com.widevine.alpha', [
+          {
+            initDataTypes: ['cenc'],
+            videoCapabilities: [
+              { contentType: 'video/mp4; codecs="avc1.42E01E"', robustness },
+            ],
+          },
+        ]);
+        const config = access.getConfiguration();
+        const accepted = config.videoCapabilities?.[0]?.robustness ?? '';
+        if (accepted) {
+          return { supported: true, level };
+        }
+      } catch {
+        continue;
+      }
     }
   } catch {}
-  return false;
+  return { supported: false, level: 'none' };
 }
 
 function resolveCertificationLevel(
@@ -82,9 +103,9 @@ function resolveCertificationLevel(
   supports4K: boolean,
   supportsHDR: boolean,
   codecs: { h264: boolean; hevc: boolean; vp9: boolean; av1: boolean },
-  widevine: boolean,
+  widevine: { supported: boolean; level: WidevineLevel },
 ): CertificationLevel {
-  if (quality === 'FULL_ANIMATION' && supports4K && supportsHDR && (codecs.hevc || codecs.av1) && widevine) {
+  if (quality === 'FULL_ANIMATION' && supports4K && supportsHDR && (codecs.hevc || codecs.av1) && widevine.supported) {
     return 'certified';
   }
   if (quality === 'STANDARD' || quality === 'FULL_ANIMATION') {
