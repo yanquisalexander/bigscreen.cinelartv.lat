@@ -1,6 +1,14 @@
+import { getIpInfo } from '@/services/ip-info';
 import { VastRotation } from '@/services/player/vast-rotation';
 
+// Pre-warm: trigger IP fetch early so it's cached before first ad request
+getIpInfo().catch(() => {});
+
 const PREROLL_TAGS = [
+  {
+    url: 'https://16793.rtb.adp3.net/pre-roll-rp?pubid=1023743&siteid=408327&ip=[IP]&ua=[USER_AGENT]',
+    label: 'adp3-rtb',
+  },
   {
     url: 'https://pubads.g.doubleclick.net/gampad/live/ads?iu=/22530741549/CTV_VAST_ADS&description_url=[DESCRIPTION_URL]&tfcd=0&npa=0&sz=400x300%7C640x480&gdfp_req=1&unviewed_position_start=1&output=vast&env=vp&impl=s&correlator=[CACHEBUSTER]',
     label: 'google-ad-manager',
@@ -12,7 +20,7 @@ const PREROLL_TAGS = [
   {
     url: 'https://expensive-pollution.com/damcF.zhdxGRNjvHZpGkUU/-ermf9EuUZ/UqljkuPIT/cSx/OLD/IZwbNGDiUUtzNkzsEj4yMOjSAP0QO/SvZFsmaKWg1RpAdiDh0cxd',
     label: 'hilltopads',
-  }
+  },
 ];
 
 const POSTROLL_TAGS = [

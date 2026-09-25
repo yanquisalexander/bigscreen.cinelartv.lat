@@ -14,6 +14,7 @@
  */
 
 import { remoteConfig } from '@/services/RemoteConfigService';
+import { getIpInfo } from '@/services/ip-info';
 import type { RemoteConfig } from '@/types/config';
 
 const IS_DEV = import.meta.env.DEV;
@@ -37,16 +38,7 @@ export interface GeoResult {
     message: string; // Mensaje para mostrar al usuario si está bloqueado
 }
 
-interface IpCache {
-    countryCode: string;
-    countryName: string;
-    ts: number;
-}
-
 // ─── Constantes ───────────────────────────────────────────────────────────────
-
-const CACHE_KEY = '@cinelartv/geo_cache';
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
 
 const DEFAULT_CONFIG: GeoblockConfig = {
     enabled: false,
@@ -55,94 +47,10 @@ const DEFAULT_CONFIG: GeoblockConfig = {
     message: 'La aplicación no está disponible en tu región por el momento.',
 };
 
-// ─── Helpers internos ─────────────────────────────────────────────────────────
-
-function codeToName(code: string): string {
-    try {
-        const dn = new Intl.DisplayNames(['es'], { type: 'region' });
-        return dn.of(code) ?? code;
-    } catch {
-        return code;
-    }
-}
-
-async function fetchIpInfo(): Promise<Pick<IpCache, 'countryCode' | 'countryName'>> {
-    // API 1: ipwho.is
-    try {
-        console.log('[geoblock] Intentando ipwho.is…');
-        const res = await fetch('https://ipwho.is/?fields=country,country_code,success', {
-            signal: AbortSignal.timeout(5000),
-        });
-        console.log('[geoblock] ipwho.is status:', res.status, res.ok);
-        if (res.ok) {
-            const data = await res.json();
-            console.log('[geoblock] ipwho.is data:', JSON.stringify(data));
-            if (data.success && data.country_code) {
-                const code = String(data.country_code).toUpperCase();
-                return { countryCode: code, countryName: data.country ?? codeToName(code) };
-            } else {
-                console.warn('[geoblock] ipwho.is respondió pero sin datos válidos:', JSON.stringify(data));
-            }
-        } else {
-            const text = await res.text().catch(() => '(no body)');
-            console.warn('[geoblock] ipwho.is HTTP error:', res.status, text);
-        }
-    } catch (e) {
-        console.warn('[geoblock] ipwho.is excepción:', e);
-    }
-
-    // API 2: ipinfo.io
-    try {
-        console.log('[geoblock] Intentando ipinfo.io…');
-        const res = await fetch('https://ipinfo.io/json', {
-            signal: AbortSignal.timeout(5000),
-        });
-        console.log('[geoblock] ipinfo.io status:', res.status, res.ok);
-        if (res.ok) {
-            const data = await res.json();
-            console.log('[geoblock] ipinfo.io data:', JSON.stringify(data));
-            if (data.country) {
-                const code = String(data.country).toUpperCase();
-                return { countryCode: code, countryName: codeToName(code) };
-            } else {
-                console.warn('[geoblock] ipinfo.io respondió pero sin campo country:', JSON.stringify(data));
-            }
-        } else {
-            const text = await res.text().catch(() => '(no body)');
-            console.warn('[geoblock] ipinfo.io HTTP error:', res.status, text);
-        }
-    } catch (e) {
-        console.warn('[geoblock] ipinfo.io excepción:', e);
-    }
-
-    console.error('[geoblock] Ambos proveedores fallaron. Se permite acceso (fail-open).');
-    return { countryCode: '', countryName: '' };
-}
-
-async function readCache(): Promise<IpCache | null> {
-    if (IS_DEV) return null;
-    try {
-        const raw = localStorage.getItem(CACHE_KEY);
-        if (!raw) return null;
-        const cache: IpCache = JSON.parse(raw);
-        if (Date.now() - cache.ts < CACHE_TTL_MS) return cache;
-    } catch (e) {
-        // ignore
-    }
-    return null;
-}
-
-async function writeCache(data: Omit<IpCache, 'ts'>): Promise<void> {
-    try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, ts: Date.now() }));
-    } catch (e) {
-        // ignore
-    }
-}
-
 export async function clearGeoCache(): Promise<void> {
     try {
-        localStorage.removeItem(CACHE_KEY);
+        localStorage.removeItem('@cinelartv/geo_cache');
+        localStorage.removeItem('@cinelartv/ip_cache');
     } catch {
         // ignore
     }
@@ -179,18 +87,8 @@ export async function checkGeoBlock(): Promise<GeoResult> {
         return { countryCode: '', countryName: '', blocked: false, message: '' };
     }
 
-    // 1. Obtener país (cache → API)
-    let ipInfo = await readCache();
-    if (!ipInfo) {
-        const resolved = await fetchIpInfo();
-        if (resolved.countryCode) {
-            await writeCache({ countryCode: resolved.countryCode, countryName: resolved.countryName });
-            ipInfo = { ...resolved, ts: Date.now() } as IpCache;
-        } else {
-            ipInfo = { countryCode: '', countryName: '', ts: Date.now() };
-        }
-    }
-
+    // 1. Obtener país via shared ip-info module (cache → API)
+    const ipInfo = await getIpInfo();
     const { countryCode, countryName } = ipInfo;
 
     // 2. Obtener config desde RemoteConfig

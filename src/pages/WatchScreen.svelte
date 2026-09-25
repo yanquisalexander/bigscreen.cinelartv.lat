@@ -289,6 +289,10 @@
 
   // Reset ad state on content / episode change
   $effect(() => {
+    // Read reactive values to create dependencies — re-runs on change
+    const _cid = contentId;
+    const _eid = episodeId;
+
     prerollChecked = false;
     adPhase = "none";
     currentAd = null;

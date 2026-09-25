@@ -12,6 +12,7 @@ export interface VastAd {
   title?: string;
   impressionUrls: string[];
   clickThroughUrl?: string;
+  clickTrackingUrls: string[];
   mediaFiles: VastMediaFile[];
   duration: number;
   skipOffset: number;

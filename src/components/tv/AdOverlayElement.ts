@@ -129,7 +129,11 @@ class AdOverlayElement extends HTMLElement {
 
   private onAdPlay() {
     this.showSpinner(false);
-    if (this._ad) trackImpression(this._ad);
+    if (this._ad) {
+      trackImpression(this._ad);
+      trackEvent(this._ad, 'start');
+      trackEvent(this._ad, 'creativeView');
+    }
   }
 
   private onTimeUpdate() {

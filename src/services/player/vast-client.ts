@@ -1,6 +1,56 @@
 import type { VastAd, VastMediaFile } from '@/types/vast';
+import { getCachedIp } from '@/services/ip-info';
 
 const MAX_WRAPPER_DEPTH = 5;
+
+// ─── Placeholder registry ─────────────────────────────────────────────────────
+
+type PlaceholderFn = () => string;
+
+const PLACEHOLDERS: Record<string, PlaceholderFn> = {
+  // Cache busting (multiple variants used by different ad networks)
+  CACHEBUSTER:     () => String(Math.floor(Math.random() * 1e10)),
+  CACHE_BUSTER:    () => String(Math.floor(Math.random() * 1e10)),
+  cb:              () => String(Math.floor(Math.random() * 1e10)),
+  // Timestamps
+  TIMESTAMP:       () => String(Date.now()),
+  timestamp:       () => String(Date.now()),
+  // Page context
+  DESCRIPTION_URL: () => encodeURIComponent(window.location.href),
+  PAGE_URL:        () => encodeURIComponent(window.location.href),
+  DOMAIN:          () => encodeURIComponent(window.location.hostname),
+  REFERRER:        () => encodeURIComponent(document.referrer || ''),
+  APP_NAME:        () => encodeURIComponent('CineLar'),
+  // Player dimensions
+  PLAYER_WIDTH:    () => String(window.innerWidth || 1280),
+  PLAYER_HEIGHT:   () => String(window.innerHeight || 720),
+  WIDTH:           () => String(window.innerWidth || 1280),
+  HEIGHT:          () => String(window.innerHeight || 720),
+  // Device / User (client-side)
+  USER_AGENT:      () => encodeURIComponent(navigator.userAgent),
+  DEVICEUA:        () => encodeURIComponent(navigator.userAgent),
+  UA:              () => encodeURIComponent(navigator.userAgent),
+  LANGUAGE:        () => encodeURIComponent(navigator.language || 'es'),
+  // IP — from shared ip-info cache (geoblocking)
+  IP:              () => encodeURIComponent(getCachedIp()),
+  DEVICEIP:        () => encodeURIComponent(getCachedIp()),
+  CLIENT_IP:       () => encodeURIComponent(getCachedIp()),
+};
+
+/** Allow runtime registration (e.g. from NativeBridge) */
+export function registerPlaceholder(key: string, fn: PlaceholderFn): void {
+  PLACEHOLDERS[key] = fn;
+}
+
+/** Resolve all [MACRO] placeholders in a single regex pass */
+function resolveTagUrl(url: string): string {
+  return url.replace(/\[([A-Za-z_][A-Za-z0-9_]*)\]/g, (match, key) => {
+    const fn = PLACEHOLDERS[key];
+    return fn ? fn() : match; // preserve unknown macros
+  });
+}
+
+// ─── XML parsing helpers ──────────────────────────────────────────────────────
 
 function parseDuration(dur: string): number {
   const parts = dur.split(':').map(Number);
@@ -96,15 +146,24 @@ function parseVastXml(xmlText: string): { ads: VastAd[]; errorUrls: string[] } {
         if (url) impressionUrls.push(url);
       }
 
-      const clickThrough = textContent(
-        inline.querySelector('Creatives')?.querySelector('Linear'),
-        'VideoClickThrough',
-      );
+      const linearEl = inline.querySelector('Creatives')?.querySelector('Linear');
 
-      const durationStr = textContent(inline.querySelector('Creatives')?.querySelector('Linear'), 'Duration');
+      const clickThrough = textContent(linearEl, 'VideoClickThrough');
+
+      // Parse ClickTracking URLs
+      const clickTrackingUrls: string[] = [];
+      const ctNodes = linearEl?.getElementsByTagName('ClickTracking');
+      if (ctNodes) {
+        for (let j = 0; j < ctNodes.length; j++) {
+          const url = ctNodes[j].textContent?.trim();
+          if (url) clickTrackingUrls.push(url);
+        }
+      }
+
+      const durationStr = textContent(linearEl, 'Duration');
       const duration = parseDuration(durationStr);
 
-      const skipOffsetAttr = inline.querySelector('Creatives')?.querySelector('Linear')?.getAttribute('skipOffset');
+      const skipOffsetAttr = linearEl?.getAttribute('skipOffset');
       const skipOffset = skipOffsetAttr ? parseDuration(skipOffsetAttr) : -1;
 
       const trackingEvents = parseTrackingEvents(inline);
@@ -115,6 +174,7 @@ function parseVastXml(xmlText: string): { ads: VastAd[]; errorUrls: string[] } {
         title: textContent(inline, 'AdTitle'),
         impressionUrls,
         clickThroughUrl: clickThrough || undefined,
+        clickTrackingUrls,
         mediaFiles,
         duration,
         skipOffset,
@@ -127,15 +187,37 @@ function parseVastXml(xmlText: string): { ads: VastAd[]; errorUrls: string[] } {
     if (wrapper) {
       const wrapperAdTagUri = textContent(wrapper, 'VASTAdTagURI');
       if (wrapperAdTagUri) {
+        // Parse wrapper-level impressions
+        const wrapperImpressions: string[] = [];
+        const impNodes = wrapper.getElementsByTagName('Impression');
+        for (let j = 0; j < impNodes.length; j++) {
+          const url = impNodes[j].textContent?.trim();
+          if (url) wrapperImpressions.push(url);
+        }
+
+        // Parse wrapper-level tracking events
+        const wrapperTracking = parseTrackingEvents(wrapper);
+
+        // Parse wrapper-level ClickTracking
+        const wrapperClickTracking: string[] = [];
+        const wrapperCtNodes = wrapper.getElementsByTagName('ClickTracking');
+        if (wrapperCtNodes) {
+          for (let j = 0; j < wrapperCtNodes.length; j++) {
+            const url = wrapperCtNodes[j].textContent?.trim();
+            if (url) wrapperClickTracking.push(url);
+          }
+        }
+
         ads.push({
           id,
           system: textContent(wrapper, 'AdSystem'),
           mediaFiles: [],
           duration: 0,
           skipOffset: -1,
-          impressionUrls: [],
-          errorUrls: [],
-          trackingEvents: [],
+          impressionUrls: wrapperImpressions,
+          clickTrackingUrls: wrapperClickTracking,
+          errorUrls: [...errorUrls],
+          trackingEvents: wrapperTracking,
         });
         (ads[ads.length - 1] as any)._wrapperUrl = wrapperAdTagUri;
       }
@@ -156,6 +238,8 @@ function fireUrls(urls: string[]): void {
   }
 }
 
+// ─── Public API ───────────────────────────────────────────────────────────────
+
 export async function fetchVast(
   tagUrl: string,
   depth = 0,
@@ -163,15 +247,11 @@ export async function fetchVast(
 ): Promise<VastAd | null> {
   if (depth >= MAX_WRAPPER_DEPTH) return null;
 
-  let url = tagUrl
-    .replace('[CACHEBUSTER]', String(Math.floor(Math.random() * 1e10)))
-    .replace('[TIMESTAMP]', String(Date.now()))
-    .replace('[DESCRIPTION_URL]', encodeURIComponent(window.location.href));
+  const url = resolveTagUrl(tagUrl);
+  const fetchStart = Date.now();
 
   let xmlText: string;
   try {
-    // Hard timeout: a hanging ad-network request must never block playback
-    // (the preroll gate waits on this promise before loading the stream).
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -195,7 +275,25 @@ export async function fetchVast(
 
   const wrapperUrl = (ad as any)._wrapperUrl;
   if (wrapperUrl && (!ad.mediaFiles || ad.mediaFiles.length === 0)) {
-    return fetchVast(wrapperUrl, depth + 1, timeoutMs);
+    const elapsed = Date.now() - fetchStart;
+    const remaining = timeoutMs - elapsed;
+    if (remaining <= 500) return null;
+
+    const innerAd = await fetchVast(wrapperUrl, depth + 1, remaining);
+    if (innerAd) {
+      // IAB spec: merge wrapper-level tracking into the resolved ad
+      innerAd.impressionUrls = [...ad.impressionUrls, ...innerAd.impressionUrls];
+      innerAd.trackingEvents = [...ad.trackingEvents, ...innerAd.trackingEvents];
+      innerAd.errorUrls = [...ad.errorUrls, ...innerAd.errorUrls];
+      innerAd.clickTrackingUrls = [
+        ...(ad.clickTrackingUrls ?? []),
+        ...(innerAd.clickTrackingUrls ?? []),
+      ];
+      if (ad.clickThroughUrl && !innerAd.clickThroughUrl) {
+        innerAd.clickThroughUrl = ad.clickThroughUrl;
+      }
+    }
+    return innerAd;
   }
 
   if (!ad.mediaFiles || ad.mediaFiles.length === 0) {
@@ -219,6 +317,10 @@ export function trackEvent(ad: VastAd, eventName: string): void {
     .filter((t) => t.event === eventName)
     .map((t) => t.url);
   fireUrls(urls);
+}
+
+export function trackClick(ad: VastAd): void {
+  fireUrls(ad.clickTrackingUrls);
 }
 
 export function trackError(ad: VastAd): void {

@@ -78,8 +78,15 @@ export class VastRotation {
       const remaining = timeoutMs - elapsed;
       const perTag = Math.min(remaining, Math.max(2000, remaining / (this.tags.length - i)));
 
-      const ad = await fetchVast(this.tags[idx].url, 0, perTag);
+      // Try with fast retry on transient failure
+      let ad = await fetchVast(this.tags[idx].url, 0, perTag * 0.65);
       if (ad) return ad;
+
+      const retryBudget = Math.min(2000, timeoutMs - (Date.now() - start));
+      if (retryBudget > 500) {
+        ad = await fetchVast(this.tags[idx].url, 0, retryBudget);
+        if (ad) return ad;
+      }
     }
 
     return null;
