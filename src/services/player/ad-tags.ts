@@ -2,11 +2,11 @@ import { getIpInfo } from '@/services/ip-info';
 import { VastRotation } from '@/services/player/vast-rotation';
 
 // Pre-warm: trigger IP fetch early so it's cached before first ad request
-getIpInfo().catch(() => {});
+getIpInfo().catch(() => { });
 
 const PREROLL_TAGS = [
   {
-    url: 'https://16793.rtb.adp3.net/pre-roll-rp?pubid=1023743&siteid=408327&ip=[IP]&ua=[USER_AGENT]',
+    url: 'https://16793.rtb.adp3.net/pre-roll-rp?pubid=1023743&siteid=408378&ip=[IP]&ua=[USER_AGENT]',
     label: 'adp3-rtb',
   },
   {
