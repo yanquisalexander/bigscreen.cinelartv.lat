@@ -147,14 +147,7 @@ function createV1Media(bridge: V1Bridge, capabilities: PlatformCapabilities): Pl
       });
       return true;
     },
-    enterPiP: async (): Promise<void> => {
-      try {
-        const video = document.querySelector('video');
-        if (video && document.pictureInPictureEnabled) {
-          await video.requestPictureInPicture();
-          return;
-        }
-      } catch (_e) {}
+    enterPiP: (): void => {
       bridge.send({
         version: 1,
         type: V1_MESSAGE_TYPES.MEDIA_ENTER_PIP,
