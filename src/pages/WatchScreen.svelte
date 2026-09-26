@@ -944,7 +944,7 @@
         <tv-player-controls
           bind:this={controlsEl}
           style="display: {ready ? 'block' : 'none'}; contain: layout style;"
-          ?supports-pip=${supportsPip}
+            supports-pip="${supportsPip}"
         ></tv-player-controls>
       {/if}
 
