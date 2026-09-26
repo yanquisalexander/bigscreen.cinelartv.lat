@@ -451,3 +451,25 @@ body.playing-inmersive-trailer .topnav-item {
 .topnav-item {
   transition: opacity var(--animation-duration) ease-in-out;
 }
+
+/* ── Picture-in-Picture (Android TV native PiP) ───────────── */
+html.pip-mode {
+  overflow: hidden;
+}
+
+html.pip-mode .player-compositor {
+  width: 100vw;
+  height: 100vh;
+}
+
+html.pip-mode .player-stage-video {
+  object-fit: cover;
+}
+
+html.pip-mode tv-player-controls,
+html.pip-mode .settings-panel,
+html.pip-mode tv-ad-overlay,
+html.pip-mode [data-debug-panel] {
+  display: none !important;
+  pointer-events: none !important;
+}

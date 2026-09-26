@@ -51,6 +51,11 @@
     color: currentColor;
 }
 
+.ctv-closed-caption:before {
+    content: "\f019";
+    content: "\f019" / "";
+}
+
 .ctv-picture-in-picture:before {
     content: "\f018";
     content: "\f018" / "";
