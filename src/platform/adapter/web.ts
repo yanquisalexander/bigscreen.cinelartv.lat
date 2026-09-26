@@ -57,20 +57,31 @@ function createWebNavigation(): PlatformNavigation {
 
 function createWebMedia(): PlatformMedia {
   const liveSupported = canPlayHttpStreams();
+  const pipSupported = typeof document !== 'undefined' && 'pictureInPictureEnabled' in document;
   return {
     getCapabilities: (): MediaCapabilities => ({
       nativePlayer: false,
       liveTV: liveSupported,
       prefersNative: false,
+      pip: pipSupported,
     }),
     prefersNative: () => false,
     supportsLiveTV: () => liveSupported,
+    supportsPiP: () => pipSupported,
     playContent: (_data: NativePlayerData): void => {},
     playLive: (channel: LiveChannelInfo): boolean => {
       if (!liveSupported) return false;
       liveChannelStore.getState().setChannel(channel);
       push(`/live/watch/${channel.id}`);
       return true;
+    },
+    enterPiP: async (): Promise<void> => {
+      try {
+        const video = document.querySelector('video');
+        if (video && document.pictureInPictureEnabled) {
+          await video.requestPictureInPicture();
+        }
+      } catch (_e) {}
     },
     onFinished: (_callback: (() => void) | null): void => {},
   };

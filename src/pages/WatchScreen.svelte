@@ -23,6 +23,8 @@
     prefersNative as prefersNativePlayer,
     launchNativePlayer,
     setOnNativePlayerFinished,
+    supportsPiP,
+    enterPiP,
   } from "@/services/NativeBridge";
   import { prerollAds, postrollAds } from "@/services/player/ad-tags";
   import { pdbg } from "@/services/player/playerDebug";
@@ -85,6 +87,7 @@
   })();
 
   let controlsEl = $state<any>(null);
+  const supportsPip = supportsPiP();
   let adOverlayEl = $state<any>(null);
   let videoEl = $state<HTMLVideoElement | null>(null);
 
@@ -647,6 +650,10 @@
       focusPlaybackControl();
     };
 
+    const handlePipToggle = () => {
+      enterPiP();
+    };
+
     const handleEpisodeSelect = (e: CustomEvent<{ episodeId: string | number }>) => {
       const selectedEpisodeId = e.detail.episodeId;
       if (String(selectedEpisodeId) !== String(episodeId)) {
@@ -659,6 +666,7 @@
     el.addEventListener("skip", handleSkip);
     el.addEventListener("restart-video", handleRestartVideo);
     el.addEventListener("episode-select", handleEpisodeSelect as EventListener);
+    el.addEventListener("pip-toggle", handlePipToggle);
 
     return () => {
       el.removeEventListener("settings-toggle", handleSettingsToggle);
@@ -666,6 +674,7 @@
       el.removeEventListener("skip", handleSkip);
       el.removeEventListener("restart-video", handleRestartVideo);
       el.removeEventListener("episode-select", handleEpisodeSelect as EventListener);
+      el.removeEventListener("pip-toggle", handlePipToggle);
     };
   });
 
@@ -935,6 +944,7 @@
         <tv-player-controls
           bind:this={controlsEl}
           style="display: {ready ? 'block' : 'none'}; contain: layout style;"
+          ?supports-pip=${supportsPip}
         ></tv-player-controls>
       {/if}
 

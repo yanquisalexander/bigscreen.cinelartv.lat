@@ -43,6 +43,8 @@ export const notifyNativeLogout = (): boolean =>
 
 export const supportsLiveTV = (): boolean =>
   getPlatformInstance().media.supportsLiveTV();
+export const supportsPiP = (): boolean =>
+  getPlatformInstance().media.supportsPiP();
 export const playLiveChannel = (channel: LiveChannelInfo): boolean =>
   getPlatformInstance().media.playLive(channel);
 export const prefersNative = (): boolean =>
@@ -50,6 +52,9 @@ export const prefersNative = (): boolean =>
 
 export const launchNativePlayer = (data: NativePlayerData): void =>
   getPlatformInstance().media.playContent(data);
+
+export const enterPiP = (): void =>
+  getPlatformInstance().media.enterPiP();
 
 export const setOnNativePlayerFinished = (callback: (() => void) | null): void => {
   getPlatformInstance().media.onFinished(callback);

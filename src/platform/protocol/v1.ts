@@ -19,6 +19,8 @@ export const V1_MESSAGE_TYPES = {
   MEDIA_PLAY_LIVE: 'media.playLive',
   MEDIA_PREFERS_NATIVE: 'media.prefersNative',
   MEDIA_SUPPORTS_LIVE_TV: 'media.supportsLiveTV',
+  MEDIA_SUPPORTS_PIP: 'media.supportsPiP',
+  MEDIA_ENTER_PIP: 'media.enterPiP',
 
   TV_SYNC_CONTINUE_WATCHING: 'tv.continueWatching.sync',
   TV_ADD_CONTINUE_WATCHING: 'tv.continueWatching.add',

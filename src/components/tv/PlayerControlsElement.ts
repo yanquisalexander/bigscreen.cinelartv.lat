@@ -326,6 +326,7 @@ export class PlayerControlsElement extends LitElement {
   @property({ type: Object, attribute: false }) skipSegment!: Segment | null;
   @property({ type: Boolean, attribute: 'is-buffering' }) isBuffering!: boolean;
   @property({ type: Boolean, attribute: 'show-controls', reflect: true }) showControls!: boolean;
+  @property({ type: Boolean, attribute: 'supports-pip' }) supportsPip = false;
 
   constructor() {
     super();
@@ -535,6 +536,12 @@ export class PlayerControlsElement extends LitElement {
                     <i class="ctv-icon ctv-closed-caption"></i>
                     <span>Subtítulos</span>
                   </tv-focusable>
+                  ${this.supportsPip ? html`
+                    <tv-focusable id="pip-btn" focus-key="watch-pip" parent-focus-key="watch-root" data-focused="false" class="control-btn pill-btn icon-only"
+                      focusable=${this.showControls ? 'true' : 'false'}>
+                      <i class="ctv-icon ctv-picture-in-picture"></i>
+                    </tv-focusable>
+                  ` : ''}
                   <tv-focusable focus-key="watch-settings" parent-focus-key="watch-root" data-focused="false" class="control-btn pill-btn icon-only"
                     focusable=${this.showControls ? 'true' : 'false'}>
                     <i class="ctv-icon ctv-settings"></i>
@@ -728,6 +735,7 @@ export class PlayerControlsElement extends LitElement {
       'watch-playpause',
       'watch-settings',
       'watch-captions',
+      'watch-pip',
       'watch-episodes',
       'watch-restart',
       'watch-seekbar',
@@ -899,6 +907,7 @@ export class PlayerControlsElement extends LitElement {
       case 'watch-restart': this.restartVideo(); break;
       case 'watch-settings': this.toggleSettings(); break;
       case 'watch-captions': this.showCaptionsToast(); break;
+      case 'watch-pip': this.dispatchEvent(new CustomEvent('pip-toggle', { bubbles: true, composed: true })); break;
       case 'watch-seek-back': {
         const seekbar = this._seekbarRef;
         if (seekbar && typeof seekbar.seekBy === 'function') seekbar.seekBy(-SEEK_STEP_SECONDS);
@@ -959,9 +968,11 @@ export class PlayerControlsElement extends LitElement {
     const key = source?.getAttribute('focus-key');
     this._restartControlsHideTimer();
 
-    if (key === 'watch-settings' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-captions'); return; }
+    if (key === 'watch-settings' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl(this.supportsPip ? 'watch-pip' : 'watch-captions'); return; }
+    if (key === 'watch-pip' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-captions'); return; }
+    if (key === 'watch-pip' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-settings'); return; }
     if (key === 'watch-captions' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-seek-fwd'); return; }
-    if (key === 'watch-captions' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-settings'); return; }
+    if (key === 'watch-captions' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl(this.supportsPip ? 'watch-pip' : 'watch-settings'); return; }
     if (key === 'watch-playpause' && custom.detail?.direction === 'left') { custom.preventDefault(); this._focusControl('watch-seek-back'); return; }
     if (key === 'watch-playpause' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-seek-fwd'); return; }
     if (key === 'watch-seek-back' && custom.detail?.direction === 'right') { custom.preventDefault(); this._focusControl('watch-playpause'); return; }

@@ -129,6 +129,7 @@ function createV1Media(bridge: V1Bridge, capabilities: PlatformCapabilities): Pl
     getCapabilities: (): MediaCapabilities => capabilities.media,
     prefersNative: (): boolean => capabilities.media.prefersNative,
     supportsLiveTV: (): boolean => capabilities.media.liveTV,
+    supportsPiP: (): boolean => capabilities.media.pip,
     playContent: (data: NativePlayerData): void => {
       bridge.send({
         version: 1,
@@ -145,6 +146,12 @@ function createV1Media(bridge: V1Bridge, capabilities: PlatformCapabilities): Pl
         payload: channel,
       });
       return true;
+    },
+    enterPiP: (): void => {
+      bridge.send({
+        version: 1,
+        type: V1_MESSAGE_TYPES.MEDIA_ENTER_PIP,
+      });
     },
     onFinished: (callback: (() => void) | null): void => {
       if (callback) {
@@ -238,7 +245,7 @@ function detectV1Capabilities(_bridge: V1Bridge): PlatformCapabilities {
     platform: 'v1',
     device: { info: true, model: true, nativeVersion: true },
     navigation: { openUrl: true, exitApp: true },
-    media: { nativePlayer: true, liveTV: true, prefersNative: true },
+    media: { nativePlayer: true, liveTV: true, prefersNative: true, pip: true },
     tv: { continueWatching: true, recommendations: true },
     account: { profileChanged: true, logout: true },
     updates: { hasUpdates: true, performUpdate: true },

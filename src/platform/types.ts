@@ -36,6 +36,7 @@ export interface MediaCapabilities {
   nativePlayer: boolean;
   liveTV: boolean;
   prefersNative: boolean;
+  pip: boolean;
 }
 
 export interface TVCapabilities {
@@ -110,8 +111,10 @@ export interface PlatformMedia {
   getCapabilities(): MediaCapabilities;
   prefersNative(): boolean;
   supportsLiveTV(): boolean;
+  supportsPiP(): boolean;
   playContent(data: NativePlayerData): void;
   playLive(channel: LiveChannelInfo): boolean;
+  enterPiP(): void;
   onFinished(callback: (() => void) | null): void;
 }
 

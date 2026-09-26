@@ -64,6 +64,7 @@ function createV0Media(): PlatformMedia {
       nativePlayer: typeof native.prefersNative === 'function',
       liveTV: typeof native.supportsLiveTV === 'function' && (native.supportsLiveTV?.() ?? false),
       prefersNative: typeof native.prefersNative === 'function' && (native.prefersNative?.() ?? false),
+      pip: false,
     }),
     prefersNative: (): boolean =>
       (typeof window !== 'undefined'
@@ -73,6 +74,7 @@ function createV0Media(): PlatformMedia {
       (typeof window !== 'undefined'
         ? window.CinelarNative?.supportsLiveTV?.()
         : undefined) ?? false,
+    supportsPiP: (): boolean => false,
     playContent: (data: NativePlayerData): void => {
       window.CinelarNative?.launchNativePlayer?.(JSON.stringify(data));
     },
@@ -80,6 +82,7 @@ function createV0Media(): PlatformMedia {
       (typeof window !== 'undefined'
         ? window.CinelarNative?.playLiveChannel?.(JSON.stringify(channel))
         : undefined) ?? false,
+    enterPiP: (): void => {},
     onFinished: (callback: (() => void) | null): void => {
       nativePlayerFinishedCallback = callback;
       if (typeof window !== 'undefined' && window.CinelarNative) {
