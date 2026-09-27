@@ -2,101 +2,149 @@ import type { VastAd, VastMediaFile } from '@/types/vast';
 import { getCachedIp } from '@/services/ip-info';
 
 const MAX_WRAPPER_DEPTH = 5;
-
-// ─── Placeholder registry ─────────────────────────────────────────────────────
+const MAX_RETRIES = 2;
 
 type PlaceholderFn = () => string;
+type VastAdInternal = VastAd & { _wrapperUrl?: string };
 
-const PLACEHOLDERS: Record<string, PlaceholderFn> = {
-  // Cache busting (multiple variants used by different ad networks)
-  CACHEBUSTER:     () => String(Math.floor(Math.random() * 1e10)),
-  CACHE_BUSTER:    () => String(Math.floor(Math.random() * 1e10)),
-  cb:              () => String(Math.floor(Math.random() * 1e10)),
-  // Timestamps
-  TIMESTAMP:       () => String(Date.now()),
-  timestamp:       () => String(Date.now()),
-  // Page context
-  DESCRIPTION_URL: () => encodeURIComponent(window.location.href),
-  PAGE_URL:        () => encodeURIComponent(window.location.href),
-  DOMAIN:          () => encodeURIComponent(window.location.hostname),
-  REFERRER:        () => encodeURIComponent(document.referrer || ''),
-  APP_NAME:        () => encodeURIComponent('CineLar'),
-  // Player dimensions
-  PLAYER_WIDTH:    () => String(window.innerWidth || 1280),
-  PLAYER_HEIGHT:   () => String(window.innerHeight || 720),
-  WIDTH:           () => String(window.innerWidth || 1280),
-  HEIGHT:          () => String(window.innerHeight || 720),
-  // Device / User (client-side)
-  USER_AGENT:      () => encodeURIComponent(navigator.userAgent),
-  DEVICEUA:        () => encodeURIComponent(navigator.userAgent),
-  UA:              () => encodeURIComponent(navigator.userAgent),
-  LANGUAGE:        () => encodeURIComponent(navigator.language || 'es'),
-  // IP — from shared ip-info cache (geoblocking)
-  IP:              () => encodeURIComponent(getCachedIp()),
-  DEVICEIP:        () => encodeURIComponent(getCachedIp()),
-  CLIENT_IP:       () => encodeURIComponent(getCachedIp()),
+// ─── Safe env ────────────────────────────────────────────────────────────────
+const safeWin = () => {
+  try { return typeof window !== 'undefined' ? window : undefined; } catch { return undefined; }
+};
+const safeDoc = () => {
+  try { return typeof document !== 'undefined' ? document : undefined; } catch { return undefined; }
+};
+const safeNav = () => {
+  try { return typeof navigator !== 'undefined' ? navigator : undefined; } catch { return undefined; }
 };
 
-/** Allow runtime registration (e.g. from NativeBridge) */
-export function registerPlaceholder(key: string, fn: PlaceholderFn): void {
-  PLACEHOLDERS[key] = fn;
+function getCachedIpSafe(): string {
+  try {
+    const ip = getCachedIp?.();
+    if (!ip || ip === 'undefined' || ip === 'null') return '';
+    return encodeURIComponent(String(ip));
+  } catch { return ''; }
 }
 
-/** Resolve all [MACRO] placeholders in a single regex pass */
-function resolveTagUrl(url: string): string {
-  return url.replace(/\[([A-Za-z_][A-Za-z0-9_]*)\]/g, (match, key) => {
-    const fn = PLACEHOLDERS[key];
-    return fn ? fn() : match; // preserve unknown macros
+// ─── Placeholder registry ────────────────────────────────────────────────────
+const PLACEHOLDERS: Record<string, PlaceholderFn> = {
+  DESCRIPTION_URL: () => { try { return encodeURIComponent(safeWin()?.location.href ?? ''); } catch { return ''; } },
+  PAGE_URL: () => { try { return encodeURIComponent(safeWin()?.location.href ?? ''); } catch { return ''; } },
+  DOMAIN: () => { try { return encodeURIComponent(safeWin()?.location.hostname ?? ''); } catch { return ''; } },
+  REFERRER: () => { try { return encodeURIComponent(safeDoc()?.referrer ?? ''); } catch { return ''; } },
+  APP_NAME: () => encodeURIComponent('CineLar'),
+  PLAYER_WIDTH: () => String(safeWin()?.innerWidth || 1280),
+  PLAYER_HEIGHT: () => String(safeWin()?.innerHeight || 720),
+  WIDTH: () => String(safeWin()?.innerWidth || 1280),
+  HEIGHT: () => String(safeWin()?.innerHeight || 720),
+  USER_AGENT: () => { try { return encodeURIComponent(safeNav()?.userAgent ?? ''); } catch { return ''; } },
+  DEVICEUA: () => { try { return encodeURIComponent(safeNav()?.userAgent ?? ''); } catch { return ''; } },
+  UA: () => { try { return encodeURIComponent(safeNav()?.userAgent ?? ''); } catch { return ''; } },
+  LANGUAGE: () => { try { return encodeURIComponent(safeNav()?.language || 'es'); } catch { return 'es'; } },
+  IP: () => getCachedIpSafe(),
+  DEVICEIP: () => getCachedIpSafe(),
+  CLIENT_IP: () => getCachedIpSafe(),
+};
+
+export function registerPlaceholder(key: string, fn: PlaceholderFn): void {
+  PLACEHOLDERS[key.toUpperCase()] = fn;
+}
+
+/** Unificado: 1 cachebuster por request, maneja ERRORCODE */
+function resolveUrl(rawUrl: string, errorCode?: string): string {
+  if (!rawUrl) return rawUrl;
+  const cacheBuster = String(Math.floor(Math.random() * 1e10));
+  const ts = String(Date.now());
+
+  return rawUrl.replace(/\[([A-Za-z_][A-Za-z0-9_]*)\]/g, (match, key: string) => {
+    const upper = key.toUpperCase();
+    if (['CACHEBUSTER', 'CACHE_BUSTER', 'CB'].includes(upper)) return cacheBuster;
+    if (['TIMESTAMP', 'TIMESTAMP_ISO'].includes(upper)) return ts;
+    if (upper === 'ERRORCODE') return errorCode != null ? String(errorCode) : '';
+    if (upper === 'TIMESTAMP' || key === 'timestamp') return ts; // compat
+
+    const fn = PLACEHOLDERS[upper] ?? PLACEHOLDERS[key];
+    if (fn) {
+      try {
+        const v = fn();
+        if (v == null || v === 'undefined' || v === 'null') return '';
+        return v;
+      } catch { return ''; }
+    }
+    return match; // macro desconocida se preserva
   });
 }
 
-// ─── XML parsing helpers ──────────────────────────────────────────────────────
+// Mantener compatibilidad con nombre viejo
+export const resolveTagUrl = resolveUrl;
 
+// ─── XML helpers ─────────────────────────────────────────────────────────────
 function parseDuration(dur: string): number {
-  const parts = dur.split(':').map(Number);
+  if (!dur) return 0;
+  const clean = dur.trim();
+  if (!clean || clean.endsWith('%')) return 0;
+  const parts = clean.split(':').map(p => parseFloat(p));
+  if (parts.some(isNaN)) return parseFloat(clean) || 0;
   if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
   if (parts.length === 2) return parts[0] * 60 + parts[1];
-  return Number(dur) || 0;
+  return parts[0] || 0;
+}
+
+function parseSkipOffset(raw: string | null, duration: number): number {
+  if (!raw) return -1;
+  const s = raw.trim();
+  if (!s) return -1;
+  if (s.endsWith('%')) {
+    const p = parseFloat(s);
+    if (isNaN(p) || duration <= 0) return -1;
+    return (p / 100) * duration;
+  }
+  const sec = parseDuration(s);
+  return sec > 0 ? sec : -1;
 }
 
 function getAttr(node: Element | null, name: string): string {
   return node?.getAttribute(name) ?? '';
 }
 
-function textContent(node: Element | null, tag: string): string {
-  return node?.getElementsByTagName(tag)[0]?.textContent?.trim() ?? '';
+function getFirstText(parent: Element | null, tag: string): string {
+  if (!parent) return '';
+  const el = parent.getElementsByTagName(tag)[0];
+  return el?.textContent?.trim() ?? '';
 }
 
-function parseMediaFiles(creativesEl: Element): VastMediaFile[] {
+function getAllTexts(parent: Element | null, tag: string): string[] {
+  if (!parent) return [];
+  return Array.from(parent.getElementsByTagName(tag))
+    .map(n => n.textContent?.trim())
+    .filter((v): v is string => Boolean(v));
+}
+
+function parseMediaFiles(linearEl: Element): VastMediaFile[] {
   const files: VastMediaFile[] = [];
-  const linear = creativesEl.querySelector('Linear');
-  if (!linear) return files;
-
-  const mediaFiles = linear.getElementsByTagName('MediaFile');
-  for (let i = 0; i < mediaFiles.length; i++) {
-    const mf = mediaFiles[i];
+  const nodes = linearEl.getElementsByTagName('MediaFile');
+  for (let i = 0; i < nodes.length; i++) {
+    const mf = nodes[i];
     const type = getAttr(mf, 'type');
-    if (!type.startsWith('video/')) continue;
-
+    if (!type.startsWith('video/')) continue; // ignora VPAID
     const url = mf.textContent?.trim();
     if (!url) continue;
-
     files.push({
       url,
       type,
-      width: parseInt(getAttr(mf, 'width') || '0', 10),
-      height: parseInt(getAttr(mf, 'height') || '0', 10),
-      bitrate: parseInt(getAttr(mf, 'bitrate') || '0', 10),
+      width: parseInt(getAttr(mf, 'width') || '0', 10) || 0,
+      height: parseInt(getAttr(mf, 'height') || '0', 10) || 0,
+      bitrate: parseInt(getAttr(mf, 'bitrate') || '0', 10) || 0,
     });
   }
   return files;
 }
 
-function parseTrackingEvents(doc: Element): { event: string; url: string }[] {
+function parseTrackingEvents(scope: Element): { event: string; url: string }[] {
   const events: { event: string; url: string }[] = [];
-  const trackingNodes = doc.getElementsByTagName('Tracking');
-  for (let i = 0; i < trackingNodes.length; i++) {
-    const node = trackingNodes[i];
+  const nodes = scope.getElementsByTagName('Tracking');
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
     const event = getAttr(node, 'event');
     const url = node.textContent?.trim();
     if (event && url) events.push({ event, url });
@@ -104,253 +152,233 @@ function parseTrackingEvents(doc: Element): { event: string; url: string }[] {
   return events;
 }
 
-function pickBestMediaFile(files: VastMediaFile[]): VastMediaFile | null {
-  if (files.length === 0) return null;
+function pickBestMediaFile(files: VastMediaFile[], playerW = 1280, playerH = 720): VastMediaFile | null {
+  if (!files.length) return null;
+  // Ordena por cercanía al player, prefiriendo no bajar mucho la calidad
   const sorted = [...files].sort((a, b) => {
-    const aScore = (a.width * a.height) + a.bitrate;
-    const bScore = (b.width * b.height) + b.bitrate;
-    return aScore - bScore;
+    const aDiff = Math.abs(a.width - playerW) + Math.abs(a.height - playerH) * 0.5;
+    const bDiff = Math.abs(b.width - playerW) + Math.abs(b.height - playerH) * 0.5;
+    if (aDiff !== bDiff) return aDiff - bDiff;
+    return a.bitrate - b.bitrate; // desempate: menor bitrate
   });
-  const vw = window.innerWidth || 1280;
-  const vh = window.innerHeight || 720;
-  const match = sorted.find((f) => f.width >= vw || f.height >= vh);
-  return match ?? sorted[sorted.length - 1];
+  // Prefiere el más chico que cubra el 80% del player
+  return sorted.find(f => f.width >= playerW * 0.8 && f.height >= playerH * 0.8) ?? sorted[0];
 }
 
-function parseVastXml(xmlText: string): { ads: VastAd[]; errorUrls: string[] } {
+function parseVastXml(xmlText: string): { ads: VastAdInternal[]; topErrorUrls: string[] } {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlText, 'text/xml');
-  const ads: VastAd[] = [];
-  const errorUrls: string[] = [];
 
-  const errorNodes = doc.getElementsByTagName('Error');
-  for (let i = 0; i < errorNodes.length; i++) {
-    const url = errorNodes[i].textContent?.trim();
-    if (url) errorUrls.push(url);
+  if (doc.querySelector('parsererror')) {
+    return { ads: [], topErrorUrls: [] };
   }
 
-  const adNodes = doc.getElementsByTagName('Ad');
-  for (let i = 0; i < adNodes.length; i++) {
-    const adNode = adNodes[i];
+  const topErrorUrls = Array.from(doc.querySelectorAll('VAST > Error'))
+    .map(n => n.textContent?.trim())
+    .filter((v): v is string => Boolean(v));
+
+  const adNodes = Array.from(doc.getElementsByTagName('Ad'));
+  const ads: VastAdInternal[] = [];
+
+  for (const adNode of adNodes) {
     const id = getAttr(adNode, 'id');
-
     const inline = adNode.querySelector('InLine');
+    const wrapper = adNode.querySelector('Wrapper');
+
+    const perAdErrors = getAllTexts(adNode, 'Error');
+
     if (inline) {
-      const creatives = inline.querySelector('Creatives');
-      const mediaFiles = creatives ? parseMediaFiles(creatives) : [];
+      const system = getFirstText(inline, 'AdSystem');
+      const title = getFirstText(inline, 'AdTitle');
+      const impressionUrls = Array.from(inline.getElementsByTagName('Impression'))
+        .map(n => n.textContent?.trim())
+        .filter((v): v is string => Boolean(v));
 
-      const impressionNodes = inline.getElementsByTagName('Impression');
-      const impressionUrls: string[] = [];
-      for (let j = 0; j < impressionNodes.length; j++) {
-        const url = impressionNodes[j].textContent?.trim();
-        if (url) impressionUrls.push(url);
-      }
+      let mediaFiles: VastMediaFile[] = [];
+      let duration = 0;
+      let skipOffset = -1;
+      let clickThroughUrl: string | undefined;
+      let clickTrackingUrls: string[] = [];
+      let trackingEvents: { event: string; url: string }[] = [];
 
-      const linearEl = inline.querySelector('Creatives')?.querySelector('Linear');
+      const creatives = inline.getElementsByTagName('Creative');
+      for (let c = 0; c < creatives.length; c++) {
+        const linear = creatives[c].querySelector('Linear');
+        if (!linear) continue;
 
-      const clickThrough = textContent(linearEl, 'VideoClickThrough');
-
-      // Parse ClickTracking URLs
-      const clickTrackingUrls: string[] = [];
-      const ctNodes = linearEl?.getElementsByTagName('ClickTracking');
-      if (ctNodes) {
-        for (let j = 0; j < ctNodes.length; j++) {
-          const url = ctNodes[j].textContent?.trim();
-          if (url) clickTrackingUrls.push(url);
+        if (mediaFiles.length === 0) {
+          const durStr = getFirstText(linear, 'Duration');
+          duration = parseDuration(durStr);
+          skipOffset = parseSkipOffset(linear.getAttribute('skipOffset'), duration);
+          mediaFiles = parseMediaFiles(linear);
+          const ct = getFirstText(linear, 'VideoClickThrough');
+          if (ct) clickThroughUrl = ct;
+          clickTrackingUrls = getAllTexts(linear, 'ClickTracking');
         }
+        trackingEvents.push(...parseTrackingEvents(linear));
       }
-
-      const durationStr = textContent(linearEl, 'Duration');
-      const duration = parseDuration(durationStr);
-
-      const skipOffsetAttr = linearEl?.getAttribute('skipOffset');
-      const skipOffset = skipOffsetAttr ? parseDuration(skipOffsetAttr) : -1;
-
-      const trackingEvents = parseTrackingEvents(inline);
 
       ads.push({
         id,
-        system: textContent(inline, 'AdSystem'),
-        title: textContent(inline, 'AdTitle'),
+        system,
+        title,
         impressionUrls,
-        clickThroughUrl: clickThrough || undefined,
+        clickThroughUrl,
         clickTrackingUrls,
         mediaFiles,
         duration,
         skipOffset,
-        errorUrls,
+        errorUrls: perAdErrors.length ? perAdErrors : topErrorUrls,
         trackingEvents,
       });
-    }
+    } else if (wrapper) {
+      const wrapperAdTagUri = getFirstText(wrapper, 'VASTAdTagURI');
+      if (!wrapperAdTagUri) continue;
 
-    const wrapper = adNode.querySelector('Wrapper');
-    if (wrapper) {
-      const wrapperAdTagUri = textContent(wrapper, 'VASTAdTagURI');
-      if (wrapperAdTagUri) {
-        // Parse wrapper-level impressions
-        const wrapperImpressions: string[] = [];
-        const impNodes = wrapper.getElementsByTagName('Impression');
-        for (let j = 0; j < impNodes.length; j++) {
-          const url = impNodes[j].textContent?.trim();
-          if (url) wrapperImpressions.push(url);
-        }
+      const wrapperImpressions = getAllTexts(wrapper, 'Impression');
+      const wrapperTracking = parseTrackingEvents(wrapper);
+      const wrapperClickTracking = getAllTexts(wrapper, 'ClickTracking');
 
-        // Parse wrapper-level tracking events
-        const wrapperTracking = parseTrackingEvents(wrapper);
-
-        // Parse wrapper-level ClickTracking
-        const wrapperClickTracking: string[] = [];
-        const wrapperCtNodes = wrapper.getElementsByTagName('ClickTracking');
-        if (wrapperCtNodes) {
-          for (let j = 0; j < wrapperCtNodes.length; j++) {
-            const url = wrapperCtNodes[j].textContent?.trim();
-            if (url) wrapperClickTracking.push(url);
-          }
-        }
-
-        ads.push({
-          id,
-          system: textContent(wrapper, 'AdSystem'),
-          mediaFiles: [],
-          duration: 0,
-          skipOffset: -1,
-          impressionUrls: wrapperImpressions,
-          clickTrackingUrls: wrapperClickTracking,
-          errorUrls: [...errorUrls],
-          trackingEvents: wrapperTracking,
-        });
-        (ads[ads.length - 1] as any)._wrapperUrl = wrapperAdTagUri;
-      }
+      ads.push({
+        id,
+        system: getFirstText(wrapper, 'AdSystem'),
+        title: '',
+        impressionUrls: wrapperImpressions,
+        clickTrackingUrls: wrapperClickTracking,
+        mediaFiles: [],
+        duration: 0,
+        skipOffset: -1,
+        errorUrls: perAdErrors.length ? perAdErrors : topErrorUrls,
+        trackingEvents: wrapperTracking,
+        _wrapperUrl: wrapperAdTagUri,
+      } as VastAdInternal);
     }
   }
 
-  return { ads, errorUrls };
+  return { ads, topErrorUrls };
 }
 
-const _trackingRetryQueue: string[] = [];
-const MAX_RETRIES = 2;
+// ─── Tracking ────────────────────────────────────────────────────────────────
+const activePixels = new Set<HTMLImageElement>();
 
-function resolveTrackingUrl(rawUrl: string, errorCode?: string): string {
-  let url = rawUrl
-    .replace(/\[CACHEBUSTER\]/gi, String(Date.now()))
-    .replace(/\[CACHE_BUSTER\]/gi, String(Date.now()))
-    .replace(/\[cb\]/gi, String(Date.now()))
-    .replace(/\[TIMESTAMP\]/gi, new Date().toISOString())
-    .replace(/\[timestamp\]/gi, new Date().toISOString());
-  if (errorCode !== undefined) {
-    url = url.replace(/\[ERRORCODE\]/gi, String(errorCode));
-  }
-  return url;
-}
+function fireSingleUrl(rawUrl: string, retriesLeft = MAX_RETRIES, errorCode?: string): void {
+  if (!rawUrl) return;
+  const resolved = resolveUrl(rawUrl, errorCode);
+  if (!resolved) return;
 
-function fireSingleUrl(url: string, retriesLeft = MAX_RETRIES, errorCode?: string): void {
-  const resolved = resolveTrackingUrl(url, errorCode);
-  
-  // Strategy 1: sendBeacon (best for analytics/tracking pixels, handles long URLs)
-  if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
-    try {
-      if (navigator.sendBeacon(resolved)) return;
-    } catch {
-      // fallback
-    }
-  }
-
-  // Strategy 2: Image element (most reliable across TV WebViews for GET tracking)
   try {
     const img = new Image();
-    img.src = resolved;
-    return;
-  } catch {
-    // fallback
-  }
-
-  // Strategy 3: fetch with no-cors
-  fetch(resolved, { method: 'GET', credentials: 'omit', mode: 'no-cors' })
-    .catch(() => {
+    activePixels.add(img);
+    const cleanup = () => activePixels.delete(img);
+    img.onload = cleanup;
+    img.onerror = () => {
+      cleanup();
       if (retriesLeft > 0) {
-        _trackingRetryQueue.push(url);
-        setTimeout(() => {
-          const retry = _trackingRetryQueue.shift();
-          if (retry) fireSingleUrl(retry, retriesLeft - 1, errorCode);
-        }, 2000);
+        const delay = 1000 * (MAX_RETRIES - retriesLeft + 1);
+        setTimeout(() => fireSingleUrl(rawUrl, retriesLeft - 1, errorCode), delay);
       }
-    });
+    };
+    img.src = resolved;
+    setTimeout(cleanup, 6000); // TV WebViews a veces no disparan onload
+    return;
+  } catch { }
+
+  // Fallback final
+  try {
+    fetch(resolved, { method: 'GET', mode: 'no-cors', credentials: 'omit', keepalive: true } as any)
+      .catch(() => {
+        if (retriesLeft > 0) setTimeout(() => fireSingleUrl(rawUrl, retriesLeft - 1, errorCode), 2000);
+      });
+  } catch { }
 }
 
 function fireUrls(urls: string[], errorCode?: string): void {
-  for (const url of urls) {
-    if (url) fireSingleUrl(url, MAX_RETRIES, errorCode);
-  }
+  for (const u of urls) if (u) fireSingleUrl(u, MAX_RETRIES, errorCode);
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// ─── Public API ──────────────────────────────────────────────────────────────
 
 export async function fetchVast(
   tagUrl: string,
   depth = 0,
   timeoutMs = 7000,
+  visited = new Set<string>(),
 ): Promise<VastAd | null> {
   if (depth >= MAX_WRAPPER_DEPTH) return null;
 
-  const url = resolveTagUrl(tagUrl);
-  const fetchStart = Date.now();
+  const url = resolveUrl(tagUrl);
+  if (visited.has(url)) {
+    fireUrls([], '303'); // loop detectado
+    return null;
+  }
+  visited.add(url);
 
+  const fetchStart = Date.now();
   let xmlText: string;
+
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const resp = await fetch(url, { signal: controller.signal });
-      if (!resp.ok) return null;
+      const resp = await fetch(url, { signal: controller.signal, credentials: 'omit' });
+      if (!resp.ok) {
+        fireUrls([], '502');
+        return null;
+      }
       xmlText = await resp.text();
     } finally {
       clearTimeout(timer);
     }
   } catch {
-    return null;
+    return null; // timeout -> el caller intentará siguiente Ad
   }
 
-  const { ads, errorUrls } = parseVastXml(xmlText);
+  const { ads, topErrorUrls } = parseVastXml(xmlText);
   if (ads.length === 0) {
-    fireUrls(errorUrls);
+    fireUrls(topErrorUrls, '100');
     return null;
   }
 
-  const ad = ads[0];
-
-  const wrapperUrl = (ad as any)._wrapperUrl;
-  if (wrapperUrl && (!ad.mediaFiles || ad.mediaFiles.length === 0)) {
-    const elapsed = Date.now() - fetchStart;
-    const remaining = timeoutMs - elapsed;
-    if (remaining <= 500) return null;
-
-    const innerAd = await fetchVast(wrapperUrl, depth + 1, remaining);
-    if (innerAd) {
-      // IAB spec: merge wrapper-level tracking into the resolved ad
-      innerAd.impressionUrls = [...ad.impressionUrls, ...innerAd.impressionUrls];
-      innerAd.trackingEvents = [...ad.trackingEvents, ...innerAd.trackingEvents];
-      innerAd.errorUrls = [...ad.errorUrls, ...innerAd.errorUrls];
-      innerAd.clickTrackingUrls = [
-        ...(ad.clickTrackingUrls ?? []),
-        ...(innerAd.clickTrackingUrls ?? []),
-      ];
-      if (ad.clickThroughUrl && !innerAd.clickThroughUrl) {
-        innerAd.clickThroughUrl = ad.clickThroughUrl;
+  // IAB: probar Ads en orden
+  for (const ad of ads) {
+    if (ad._wrapperUrl) {
+      const elapsed = Date.now() - fetchStart;
+      const remaining = timeoutMs - elapsed;
+      if (remaining <= 500) {
+        fireUrls(ad.errorUrls, '301');
+        continue;
       }
+      const innerAd = await fetchVast(ad._wrapperUrl, depth + 1, remaining, visited);
+      if (innerAd) {
+        // Merge según spec: wrapper primero
+        innerAd.impressionUrls = [...ad.impressionUrls, ...innerAd.impressionUrls];
+        innerAd.trackingEvents = [...ad.trackingEvents, ...innerAd.trackingEvents];
+        innerAd.errorUrls = [...ad.errorUrls, ...innerAd.errorUrls];
+        innerAd.clickTrackingUrls = [...(ad.clickTrackingUrls ?? []), ...(innerAd.clickTrackingUrls ?? [])];
+        if (ad.clickThroughUrl && !innerAd.clickThroughUrl) {
+          innerAd.clickThroughUrl = ad.clickThroughUrl;
+        }
+        return innerAd;
+      }
+      // wrapper falló, sigue al siguiente Ad hermano
+      continue;
     }
-    return innerAd;
+
+    if (ad.mediaFiles && ad.mediaFiles.length > 0) {
+      return ad;
+    }
   }
 
-  if (!ad.mediaFiles || ad.mediaFiles.length === 0) {
-    fireUrls(errorUrls);
-    return null;
-  }
-
-  return ad;
+  // Ningún Ad válido
+  const allErrors = ads.flatMap(a => a.errorUrls);
+  fireUrls(allErrors.length ? allErrors : topErrorUrls, '405');
+  return null;
 }
 
-export function selectMediaFile(ad: VastAd): VastMediaFile | null {
-  return pickBestMediaFile(ad.mediaFiles);
+export function selectMediaFile(ad: VastAd, playerWidth?: number, playerHeight?: number): VastMediaFile | null {
+  const w = playerWidth ?? safeWin()?.innerWidth ?? 1280;
+  const h = playerHeight ?? safeWin()?.innerHeight ?? 720;
+  return pickBestMediaFile(ad.mediaFiles, w, h);
 }
 
 export function trackImpression(ad: VastAd): void {
@@ -358,24 +386,13 @@ export function trackImpression(ad: VastAd): void {
 }
 
 export function trackEvent(ad: VastAd, eventName: string): void {
-  let urls = ad.trackingEvents
-    .filter((t) => t.event === eventName)
-    .map((t) => t.url);
-
-  // Fallback: If VAST tag omits quartile/complete events (common in HilltopAds etc.),
-  // fallback to 'start' tracking URLs or impression URLs so tracking gets counted.
-  if (urls.length === 0 && ['firstQuartile', 'midpoint', 'thirdQuartile', 'complete'].includes(eventName)) {
-    const startUrls = ad.trackingEvents
-      .filter((t) => t.event === 'start')
-      .map((t) => t.url);
-    urls = startUrls.length > 0 ? startUrls : ad.impressionUrls;
-  }
-
+  const urls = ad.trackingEvents.filter(t => t.event === eventName).map(t => t.url);
+  // NO fallback fraudulento. Si no hay cuartiles, no se dispara nada.
   fireUrls(urls);
 }
 
 export function trackClick(ad: VastAd): void {
-  fireUrls(ad.clickTrackingUrls);
+  fireUrls(ad.clickTrackingUrls ?? []);
 }
 
 export function trackError(ad: VastAd, errorCode = '405'): void {
