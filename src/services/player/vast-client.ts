@@ -245,6 +245,26 @@ function resolveTrackingUrl(rawUrl: string, errorCode?: string): string {
 
 function fireSingleUrl(url: string, retriesLeft = MAX_RETRIES, errorCode?: string): void {
   const resolved = resolveTrackingUrl(url, errorCode);
+  
+  // Strategy 1: sendBeacon (best for analytics/tracking pixels, handles long URLs)
+  if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+    try {
+      if (navigator.sendBeacon(resolved)) return;
+    } catch {
+      // fallback
+    }
+  }
+
+  // Strategy 2: Image element (most reliable across TV WebViews for GET tracking)
+  try {
+    const img = new Image();
+    img.src = resolved;
+    return;
+  } catch {
+    // fallback
+  }
+
+  // Strategy 3: fetch with no-cors
   fetch(resolved, { method: 'GET', credentials: 'omit', mode: 'no-cors' })
     .catch(() => {
       if (retriesLeft > 0) {
@@ -338,9 +358,19 @@ export function trackImpression(ad: VastAd): void {
 }
 
 export function trackEvent(ad: VastAd, eventName: string): void {
-  const urls = ad.trackingEvents
+  let urls = ad.trackingEvents
     .filter((t) => t.event === eventName)
     .map((t) => t.url);
+
+  // Fallback: If VAST tag omits quartile/complete events (common in HilltopAds etc.),
+  // fallback to 'start' tracking URLs or impression URLs so tracking gets counted.
+  if (urls.length === 0 && ['firstQuartile', 'midpoint', 'thirdQuartile', 'complete'].includes(eventName)) {
+    const startUrls = ad.trackingEvents
+      .filter((t) => t.event === 'start')
+      .map((t) => t.url);
+    urls = startUrls.length > 0 ? startUrls : ad.impressionUrls;
+  }
+
   fireUrls(urls);
 }
 
