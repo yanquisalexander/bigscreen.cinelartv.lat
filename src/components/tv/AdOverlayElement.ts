@@ -203,7 +203,7 @@ class AdOverlayElement extends HTMLElement {
   private onAdError() {
     const code = this._video?.error?.code ?? 'unknown';
     pdbg('ad-overlay.error', `media error code=${code}`);
-    if (this._ad) trackError(this._ad);
+    if (this._ad) trackError(this._ad, String(code));
     this.finishAd();
   }
 

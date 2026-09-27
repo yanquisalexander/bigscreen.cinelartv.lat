@@ -227,14 +227,39 @@ function parseVastXml(xmlText: string): { ads: VastAd[]; errorUrls: string[] } {
   return { ads, errorUrls };
 }
 
-function fireUrls(urls: string[]): void {
+const _trackingRetryQueue: string[] = [];
+const MAX_RETRIES = 2;
+
+function resolveTrackingUrl(rawUrl: string, errorCode?: string): string {
+  let url = rawUrl
+    .replace(/\[CACHEBUSTER\]/gi, String(Date.now()))
+    .replace(/\[CACHE_BUSTER\]/gi, String(Date.now()))
+    .replace(/\[cb\]/gi, String(Date.now()))
+    .replace(/\[TIMESTAMP\]/gi, new Date().toISOString())
+    .replace(/\[timestamp\]/gi, new Date().toISOString());
+  if (errorCode !== undefined) {
+    url = url.replace(/\[ERRORCODE\]/gi, String(errorCode));
+  }
+  return url;
+}
+
+function fireSingleUrl(url: string, retriesLeft = MAX_RETRIES, errorCode?: string): void {
+  const resolved = resolveTrackingUrl(url, errorCode);
+  fetch(resolved, { method: 'GET', credentials: 'omit', mode: 'no-cors' })
+    .catch(() => {
+      if (retriesLeft > 0) {
+        _trackingRetryQueue.push(url);
+        setTimeout(() => {
+          const retry = _trackingRetryQueue.shift();
+          if (retry) fireSingleUrl(retry, retriesLeft - 1, errorCode);
+        }, 2000);
+      }
+    });
+}
+
+function fireUrls(urls: string[], errorCode?: string): void {
   for (const url of urls) {
-    try {
-      const img = new Image();
-      img.src = url;
-    } catch {
-      // ignore tracking errors
-    }
+    if (url) fireSingleUrl(url, MAX_RETRIES, errorCode);
   }
 }
 
@@ -323,6 +348,6 @@ export function trackClick(ad: VastAd): void {
   fireUrls(ad.clickTrackingUrls);
 }
 
-export function trackError(ad: VastAd): void {
-  fireUrls(ad.errorUrls);
+export function trackError(ad: VastAd, errorCode = '405'): void {
+  fireUrls(ad.errorUrls, errorCode);
 }
