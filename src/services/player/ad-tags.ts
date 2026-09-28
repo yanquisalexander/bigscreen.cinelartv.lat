@@ -10,6 +10,10 @@ const PREROLL_TAGS = [
     label: 'adp3-rtb',
   },
   {
+    url: 'https://youradexchange.com/video/select.php?r=12237946',
+    label: 'adcash'
+  },
+  {
     url: 'https://expensive-pollution.com/damcF.zhdxGRNjvHZpGkUU/-ermf9EuUZ/UqljkuPIT/cSx/OLD/IZwbNGDiUUtzNkzsEj4yMOjSAP0QO/SvZFsmaKWg1RpAdiDh0cxd',
     label: 'hilltopads',
   },
