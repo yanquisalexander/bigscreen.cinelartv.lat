@@ -9,12 +9,12 @@ const PREROLL_TAGS = [
     url: 'https://16793.rtb.adp3.net/pre-roll-rp?pubid=1023743&siteid=408378&ip=[IP]&ua=[USER_AGENT]',
     label: 'adp3-rtb',
   },
+  /*  {
+     url: 'https://youradexchange.com/video/select.php?r=12237946',
+     label: 'adcash'
+   }, */
   {
-    url: 'https://youradexchange.com/video/select.php?r=12237946',
-    label: 'adcash'
-  },
-  {
-    url: 'https://expensive-pollution.com/damcF.zhdxGRNjvHZpGkUU/-ermf9EuUZ/UqljkuPIT/cSx/OLD/IZwbNGDiUUtzNkzsEj4yMOjSAP0QO/SvZFsmaKWg1RpAdiDh0cxd',
+    url: 'https://expensive-pollution.com/dzmgF/z.deGaNyvYZWG/Ua/me/mL9/uBZ/UDlEk/PGT/cX0JNmjok/2/NnzKMqtjNEzkQ/2lO_TWYB3XNDyNZqsnaFWr1/pUd/DE0Uxz',
     label: 'hilltopads',
   },
   {
@@ -38,7 +38,7 @@ const POSTROLL_TAGS = [
     label: 'google-ad-manager',
   },
   {
-    url: 'https://expensive-pollution.com/damcF.zhdxGRNjvHZpGkUU/-ermf9EuUZ/UqljkuPIT/cSx/OLD/IZwbNGDiUUtzNkzsEj4yMOjSAP0QO/SvZFsmaKWg1RpAdiDh0cxd',
+    url: 'https://expensive-pollution.com/dzmgF/z.deGaNyvYZWG/Ua/me/mL9/uBZ/UDlEk/PGT/cX0JNmjok/2/NnzKMqtjNEzkQ/2lO_TWYB3XNDyNZqsnaFWr1/pUd/DE0Uxz',
     label: 'hilltopads',
   }
 ];
