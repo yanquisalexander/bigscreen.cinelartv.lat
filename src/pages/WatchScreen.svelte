@@ -657,6 +657,7 @@
     const handleEpisodeSelect = (e: CustomEvent<{ episodeId: string | number }>) => {
       const selectedEpisodeId = e.detail.episodeId;
       if (String(selectedEpisodeId) !== String(episodeId)) {
+        videoEl?.pause();
         replace(`/watch/${contentId}/${selectedEpisodeId}`);
       }
     };
