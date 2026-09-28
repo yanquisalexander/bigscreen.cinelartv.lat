@@ -32,6 +32,7 @@
   const prefersModernPlayback = $derived($svelteSettingsStore.prefersModernPlayback);
   const navigationSoundEnabled = $derived($svelteSettingsStore.navigationSoundEnabled);
   const debugMode = $derived($svelteSettingsStore.debugMode);
+  const forceShowAds = $derived($svelteSettingsStore.forceShowAds);
   const runtimeConfig = $derived(getRuntimeConfig());
 
   let deviceInfo = $state<Partial<DeviceInfo>>({});
@@ -298,7 +299,7 @@
                 return false;
               }
               if (direction === 'down') {
-                setFocus('settings-toggle-debug');
+                setFocus('settings-toggle-force-ads');
                 return false;
               }
               return true;
@@ -329,6 +330,51 @@
 
           <div class="h-px bg-white/5 ml-[clamp(3rem,5.5vw,4.5rem)]"></div>
 
+          <!-- Force Show Ads -->
+          <Focusable
+            focusKey="settings-toggle-force-ads"
+            onEnterPress={() => settingsStore.getState().setForceShowAds(!forceShowAds)}
+            onArrowPress={(direction) => {
+              if (direction === 'left') {
+                setFocus('settings-nav-reproduccion');
+                return false;
+              }
+              if (direction === 'up') {
+                setFocus('settings-toggle-modern');
+                return false;
+              }
+              if (direction === 'down') {
+                setFocus('settings-toggle-debug');
+                return false;
+              }
+              return true;
+            }}
+            focusedClass="!bg-white/5"
+            class="flex items-center justify-between px-[clamp(1.25rem,2.5vw,2rem)] py-[clamp(0.875rem,1.5vh,1.125rem)] cursor-pointer"
+            playSound={true}
+          >
+            {#snippet children()}
+              <div class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] flex-1 min-w-0">
+                <Tv class="w-[clamp(1.1rem,1.6vw,1.35rem)] h-[clamp(1.1rem,1.6vw,1.35rem)] text-text-secondary" />
+                <div class="flex flex-col flex-1 min-w-0">
+                  <span class="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">
+                    Forzar mostrar anuncios
+                  </span>
+                  <span class="text-text-secondary text-[clamp(0.75rem,1vw,0.85rem)] mt-0.5">
+                    Muestra anuncios publicitarios en el reproductor para pruebas y verificación.
+                  </span>
+                </div>
+              </div>
+              <div class="relative inline-flex items-center w-[clamp(2.75rem,4.5vw,3.25rem)] h-[clamp(1.5rem,2.5vw,1.75rem)] rounded-full flex-shrink-0 {forceShowAds ? 'bg-accent-light' : 'bg-white/20'}">
+                <div
+                  class="absolute top-1/2 -translate-y-1/2 w-[clamp(1.1rem,1.8vw,1.3rem)] h-[clamp(1.1rem,1.8vw,1.3rem)] rounded-full bg-white transition-all duration-200 shadow-md {forceShowAds ? 'left-[clamp(1.4rem,2.3vw,1.7rem)]' : 'left-[clamp(0.2rem,0.35vw,0.3rem)]'}"
+                ></div>
+              </div>
+            {/snippet}
+          </Focusable>
+
+          <div class="h-px bg-white/5 ml-[clamp(3rem,5.5vw,4.5rem)]"></div>
+
           <!-- Debug Mode -->
           <Focusable
             focusKey="settings-toggle-debug"
@@ -339,7 +385,7 @@
                 return false;
               }
               if (direction === 'up') {
-                setFocus('settings-toggle-modern');
+                setFocus('settings-toggle-force-ads');
                 return false;
               }
               return true;

@@ -90,7 +90,7 @@ function parseDuration(dur: string): number {
   return parts[0] || 0;
 }
 
-function parseSkipOffset(raw: string | null, duration: number): number {
+function parseSkipOffset(raw: string | null | undefined, duration: number): number {
   if (!raw) return -1;
   const s = raw.trim();
   if (!s) return -1;
@@ -98,6 +98,10 @@ function parseSkipOffset(raw: string | null, duration: number): number {
     const p = parseFloat(s);
     if (isNaN(p) || duration <= 0) return -1;
     return (p / 100) * duration;
+  }
+  if (s.toLowerCase().endsWith('s')) {
+    const sec = parseFloat(s);
+    return !isNaN(sec) && sec > 0 ? sec : -1;
   }
   const sec = parseDuration(s);
   return sec > 0 ? sec : -1;
@@ -120,13 +124,23 @@ function getAllTexts(parent: Element | null, tag: string): string[] {
     .filter((v): v is string => Boolean(v));
 }
 
+function parseIconUrl(scope: Element): string | undefined {
+  const iconNodes = scope.getElementsByTagName('Icon');
+  for (let i = 0; i < iconNodes.length; i++) {
+    const staticRes = iconNodes[i].getElementsByTagName('StaticResource')[0];
+    const url = staticRes?.textContent?.trim();
+    if (url) return url;
+  }
+  return undefined;
+}
+
 function parseMediaFiles(linearEl: Element): VastMediaFile[] {
   const files: VastMediaFile[] = [];
   const nodes = linearEl.getElementsByTagName('MediaFile');
   for (let i = 0; i < nodes.length; i++) {
     const mf = nodes[i];
-    const type = getAttr(mf, 'type');
-    if (!type.startsWith('video/')) continue; // ignora VPAID
+    const type = getAttr(mf, 'type').toLowerCase();
+    if (!type.startsWith('video/')) continue; // ignora VPAID no-video
     const url = mf.textContent?.trim();
     if (!url) continue;
     files.push({
@@ -154,15 +168,18 @@ function parseTrackingEvents(scope: Element): { event: string; url: string }[] {
 
 function pickBestMediaFile(files: VastMediaFile[], playerW = 1280, playerH = 720): VastMediaFile | null {
   if (!files.length) return null;
-  // Ordena por cercanía al player, prefiriendo no bajar mucho la calidad
-  const sorted = [...files].sort((a, b) => {
-    const aDiff = Math.abs(a.width - playerW) + Math.abs(a.height - playerH) * 0.5;
-    const bDiff = Math.abs(b.width - playerW) + Math.abs(b.height - playerH) * 0.5;
+  // Filtrar videos compatibles con CTV (MP4 y WebM)
+  const compatible = files.filter(f => f.type.includes('mp4') || f.type.includes('webm'));
+  const candidates = compatible.length > 0 ? compatible : files;
+
+  // Ordena por cercanía al tamaño deseado, prefiriendo calidad balanceada sin sobrepasar decodificación de TV
+  const sorted = [...candidates].sort((a, b) => {
+    const aDiff = Math.abs(a.width - playerW) + Math.abs(a.height - playerH);
+    const bDiff = Math.abs(b.width - playerW) + Math.abs(b.height - playerH);
     if (aDiff !== bDiff) return aDiff - bDiff;
-    return a.bitrate - b.bitrate; // desempate: menor bitrate
+    return (b.bitrate || 0) - (a.bitrate || 0);
   });
-  // Prefiere el más chico que cubra el 80% del player
-  return sorted.find(f => f.width >= playerW * 0.8 && f.height >= playerH * 0.8) ?? sorted[0];
+  return sorted[0] ?? files[0];
 }
 
 function parseVastXml(xmlText: string): { ads: VastAdInternal[]; topErrorUrls: string[] } {
@@ -190,6 +207,9 @@ function parseVastXml(xmlText: string): { ads: VastAdInternal[]; topErrorUrls: s
     if (inline) {
       const system = getFirstText(inline, 'AdSystem');
       const title = getFirstText(inline, 'AdTitle');
+      const advertiser = getFirstText(inline, 'Advertiser');
+      const description = getFirstText(inline, 'Description');
+      const iconUrl = parseIconUrl(inline);
       const impressionUrls = Array.from(inline.getElementsByTagName('Impression'))
         .map(n => n.textContent?.trim())
         .filter((v): v is string => Boolean(v));
@@ -209,7 +229,8 @@ function parseVastXml(xmlText: string): { ads: VastAdInternal[]; topErrorUrls: s
         if (mediaFiles.length === 0) {
           const durStr = getFirstText(linear, 'Duration');
           duration = parseDuration(durStr);
-          skipOffset = parseSkipOffset(linear.getAttribute('skipOffset'), duration);
+          const rawSkip = linear.getAttribute('skipoffset') || linear.getAttribute('skipOffset') || linear.getAttribute('skip-offset');
+          skipOffset = parseSkipOffset(rawSkip, duration);
           mediaFiles = parseMediaFiles(linear);
           const ct = getFirstText(linear, 'VideoClickThrough');
           if (ct) clickThroughUrl = ct;
@@ -222,6 +243,9 @@ function parseVastXml(xmlText: string): { ads: VastAdInternal[]; topErrorUrls: s
         id,
         system,
         title,
+        advertiser,
+        description,
+        iconUrl,
         impressionUrls,
         clickThroughUrl,
         clickTrackingUrls,
@@ -238,11 +262,17 @@ function parseVastXml(xmlText: string): { ads: VastAdInternal[]; topErrorUrls: s
       const wrapperImpressions = getAllTexts(wrapper, 'Impression');
       const wrapperTracking = parseTrackingEvents(wrapper);
       const wrapperClickTracking = getAllTexts(wrapper, 'ClickTracking');
+      const advertiser = getFirstText(wrapper, 'Advertiser');
+      const description = getFirstText(wrapper, 'Description');
+      const iconUrl = parseIconUrl(wrapper);
 
       ads.push({
         id,
         system: getFirstText(wrapper, 'AdSystem'),
         title: '',
+        advertiser,
+        description,
+        iconUrl,
         impressionUrls: wrapperImpressions,
         clickTrackingUrls: wrapperClickTracking,
         mediaFiles: [],
@@ -358,6 +388,11 @@ export async function fetchVast(
         if (ad.clickThroughUrl && !innerAd.clickThroughUrl) {
           innerAd.clickThroughUrl = ad.clickThroughUrl;
         }
+        if (!innerAd.title && ad.title) innerAd.title = ad.title;
+        if (!innerAd.advertiser && ad.advertiser) innerAd.advertiser = ad.advertiser;
+        if (!innerAd.description && ad.description) innerAd.description = ad.description;
+        if (!innerAd.iconUrl && ad.iconUrl) innerAd.iconUrl = ad.iconUrl;
+        if (innerAd.skipOffset <= 0 && ad.skipOffset > 0) innerAd.skipOffset = ad.skipOffset;
         return innerAd;
       }
       // wrapper falló, sigue al siguiente Ad hermano

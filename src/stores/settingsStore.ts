@@ -4,6 +4,7 @@ import { zustandToSvelte } from '@/lib/zustandToSvelte';
 const MODERN_PLAYBACK_KEY = 'cinelar_prefers_modern_playback';
 const NAV_SOUND_KEY = 'cinelar_navigation_sound';
 const DEBUG_MODE_KEY = 'cinelar_debug_mode';
+const FORCE_SHOW_ADS_KEY = 'cinelar_force_show_ads';
 
 function loadPrefersModern(): boolean {
   try {
@@ -54,6 +55,22 @@ function saveDebugMode(value: boolean) {
   }
 }
 
+function loadForceShowAds(): boolean {
+  try {
+    return localStorage.getItem(FORCE_SHOW_ADS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveForceShowAds(value: boolean) {
+  try {
+    localStorage.setItem(FORCE_SHOW_ADS_KEY, value ? '1' : '0');
+  } catch {
+    // ignore storage errors
+  }
+}
+
 interface SettingsState {
   prefersModernPlayback: boolean;
   setPrefersModernPlayback: (value: boolean) => void;
@@ -61,6 +78,8 @@ interface SettingsState {
   setNavigationSoundEnabled: (value: boolean) => void;
   debugMode: boolean;
   setDebugMode: (value: boolean) => void;
+  forceShowAds: boolean;
+  setForceShowAds: (value: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -78,6 +97,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setDebugMode: (value: boolean) => {
     saveDebugMode(value);
     set({ debugMode: value });
+  },
+  forceShowAds: loadForceShowAds(),
+  setForceShowAds: (value: boolean) => {
+    saveForceShowAds(value);
+    set({ forceShowAds: value });
   },
 }));
 

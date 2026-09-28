@@ -15,7 +15,7 @@ const CLIENT_HINTS_HINTS = [
 ];
 
 function ensureClientHints(domains: string[]): void {
-  if (document.querySelector(`meta[${CLIENT_HINTS_ATTR}]`)) return;
+  if (typeof document === 'undefined' || document.querySelector(`meta[${CLIENT_HINTS_ATTR}]`)) return;
 
   const content = CLIENT_HINTS_HINTS.map(
     (h) => domains.map((d) => `${h} ${d}`).join('; '),
@@ -49,7 +49,9 @@ export interface VastTag {
 export class VastRotation {
   private tags: VastTag[];
   private domains: string[];
-  private currentIndex = 0;
+  private roundRobinStart = 0;
+  private lastResolvedIndex = -1;
+  private tagCooldowns = new Map<string, number>();
 
   constructor(tags: (string | VastTag)[]) {
     this.tags = tags.map((t) =>
@@ -66,39 +68,68 @@ export class VastRotation {
     }
 
     const start = Date.now();
-    const startIdx = this.currentIndex;
+    const tagCount = this.tags.length;
+    
+    // Round-robin: avance circular del tag inicial por cada solicitud
+    const initialIndex = this.roundRobinStart;
+    this.roundRobinStart = (this.roundRobinStart + 1) % tagCount;
 
-    for (let i = 0; i < this.tags.length; i++) {
+    const now = Date.now();
+
+    // Ordenar los índices según round-robin a partir de initialIndex
+    const indices: number[] = [];
+    for (let i = 0; i < tagCount; i++) {
+      indices.push((initialIndex + i) % tagCount);
+    }
+
+    // Filtrar o retrasar tags con fallos persistentes (cooldown de 45s)
+    const activeIndices = indices.filter(idx => {
+      const cd = this.tagCooldowns.get(this.tags[idx].url) ?? 0;
+      return now >= cd;
+    });
+
+    // Si todos están en cooldown, intentar con todos en orden round-robin
+    const orderToTry = activeIndices.length > 0 ? activeIndices : indices;
+
+    for (let i = 0; i < orderToTry.length; i++) {
+      const idx = orderToTry[i];
       const elapsed = Date.now() - start;
-      if (elapsed >= timeoutMs) return null;
-
-      const idx = (startIdx + i) % this.tags.length;
-      this.currentIndex = (idx + 1) % this.tags.length;
+      if (elapsed >= timeoutMs) break;
 
       const remaining = timeoutMs - elapsed;
-      const perTag = Math.min(remaining, Math.max(2000, remaining / (this.tags.length - i)));
+      const tagsLeft = orderToTry.length - i;
+      const perTag = Math.min(remaining, Math.max(1800, remaining / tagsLeft));
 
-      // Try with fast retry on transient failure
-      let ad = await fetchVast(this.tags[idx].url, 0, perTag * 0.65);
-      if (ad) return ad;
+      this.lastResolvedIndex = idx;
 
-      const retryBudget = Math.min(2000, timeoutMs - (Date.now() - start));
-      if (retryBudget > 500) {
-        ad = await fetchVast(this.tags[idx].url, 0, retryBudget);
-        if (ad) return ad;
+      try {
+        const ad = await fetchVast(this.tags[idx].url, 0, perTag);
+        if (ad) {
+          // Éxito: limpiar cooldown
+          this.tagCooldowns.delete(this.tags[idx].url);
+          return ad;
+        }
+      } catch {
+        // Tag falló o timeout
       }
+
+      // Marcar cooldown temporal de 30s al fallar
+      this.tagCooldowns.set(this.tags[idx].url, Date.now() + 30000);
     }
 
     return null;
   }
 
   get currentLabel(): string | undefined {
-    const prev =
-      (this.currentIndex - 1 + this.tags.length) % this.tags.length;
-    return this.tags[prev]?.label;
+    if (this.lastResolvedIndex >= 0 && this.lastResolvedIndex < this.tags.length) {
+      return this.tags[this.lastResolvedIndex]?.label;
+    }
+    return undefined;
   }
 
   reset(): void {
-    this.currentIndex = 0;
+    this.roundRobinStart = 0;
+    this.lastResolvedIndex = -1;
+    this.tagCooldowns.clear();
   }
 }

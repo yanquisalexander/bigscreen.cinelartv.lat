@@ -81,10 +81,12 @@
   let debugVisible = $state(false);
   $effect(() => { debugVisible = $svelteSettingsStore.debugMode; });
 
-  const forceShowAds = (() => {
-    if (typeof window === "undefined") return false;
-    return new URLSearchParams(window.location.search).get("_force_show_ads") === "true";
-  })();
+  const forceShowAds = $derived(
+    Boolean(
+      $svelteSettingsStore.forceShowAds ||
+      (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("_force_show_ads") === "true")
+    )
+  );
 
   let controlsEl = $state<any>(null);
   const supportsPip = supportsPiP();

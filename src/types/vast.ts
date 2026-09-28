@@ -10,6 +10,9 @@ export interface VastAd {
   id?: string;
   system?: string;
   title?: string;
+  advertiser?: string;
+  description?: string;
+  iconUrl?: string;
   impressionUrls: string[];
   clickThroughUrl?: string;
   clickTrackingUrls: string[];
