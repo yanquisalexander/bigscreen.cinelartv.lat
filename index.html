@@ -242,6 +242,7 @@
       function showStaticAndDispatch() {
         el("animation").style.display = "none";
         el("loading-screen").style.opacity = "1";
+        window.removeEventListener("resize", scaleRoot);
         restoreRoot();
         document.dispatchEvent(new CustomEvent("splash:ended"));
       }
