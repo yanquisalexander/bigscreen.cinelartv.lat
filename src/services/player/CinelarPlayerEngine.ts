@@ -355,6 +355,20 @@ export class CinelarPlayerEngine {
     if (!this.player || !this.profile) return;
     const currentCap = this.profile.performanceCap?.maxHeight ?? 2160;
     if (currentCap <= newMaxHeight) return;
+
+    // 🛡️ GUARD: Si hay ≤1 variante disponible, no reducir maxHeight por debajo de la variante existente
+    try {
+      const variants = this.player.getVariantTracks?.() ?? [];
+      const uniqueHeights = variants.filter((v: any) => v.height).map((v: any) => v.height as number);
+      if (uniqueHeights.length <= 1 && uniqueHeights.length > 0) {
+        const onlyHeight = uniqueHeights[0];
+        if (newMaxHeight < onlyHeight) {
+          pdbg('engine.cap', `Skipping cap to ${newMaxHeight}p: single variant at ${onlyHeight}p would be excluded`);
+          return;
+        }
+      }
+    } catch { }
+
     pdbg('engine.cap', `Rendimiento ajustado a ${newMaxHeight}p. Razón: ${reason}`);
     this.profile.performanceCap = { maxHeight: newMaxHeight, reason };
     this.saveStoredPerformance({ performanceCapHeight: newMaxHeight, performanceCapReason: reason, stabilityStreakMs: 0 });
@@ -588,16 +602,23 @@ export class CinelarPlayerEngine {
 
         // Stability streak for quality upgrade testing
         if (dropRatio < 0.02 && this.profile?.performanceCap) {
-          const stored = this.getStoredPerformance() || {};
-          const newStreak = (stored.stabilityStreakMs || 0) + 5000;
-          this.saveStoredPerformance({ stabilityStreakMs: newStreak });
-          if (newStreak > 300000) {
-            const nextTestCap = this.profile.performanceCap.maxHeight >= 1080 ? 2160 : 1080;
-            pdbg('engine.cap', `Probando resolución superior: ${nextTestCap}p tras estabilidad`);
-            this.noteQualityChange(this.profile.performanceCap.maxHeight, nextTestCap);
-            this.profile.performanceCap = { maxHeight: nextTestCap, reason: 'stability_recovery_test' };
-            this.saveStoredPerformance({ performanceCapHeight: nextTestCap, performanceCapReason: 'stability_recovery_test', stabilityStreakMs: 0 });
-            this.player?.configure({ abr: { restrictions: { maxHeight: nextTestCap } } });
+          // 🛡️ GUARD: No intentar upgrade si solo hay 1 variante disponible
+          const variants = this.player?.getVariantTracks?.() ?? [];
+          const uniqueHeights = new Set(variants.filter((v: any) => v.height).map((v: any) => v.height));
+          if (uniqueHeights.size <= 1) {
+            pdbg('engine.cap', 'Skipping stability upgrade: single variant available');
+          } else {
+            const stored = this.getStoredPerformance() || {};
+            const newStreak = (stored.stabilityStreakMs || 0) + 5000;
+            this.saveStoredPerformance({ stabilityStreakMs: newStreak });
+            if (newStreak > 300000) {
+              const nextTestCap = this.profile.performanceCap.maxHeight >= 1080 ? 2160 : 1080;
+              pdbg('engine.cap', `Probando resolución superior: ${nextTestCap}p tras estabilidad`);
+              this.noteQualityChange(this.profile.performanceCap.maxHeight, nextTestCap);
+              this.profile.performanceCap = { maxHeight: nextTestCap, reason: 'stability_recovery_test' };
+              this.saveStoredPerformance({ performanceCapHeight: nextTestCap, performanceCapReason: 'stability_recovery_test', stabilityStreakMs: 0 });
+              this.player?.configure({ abr: { restrictions: { maxHeight: nextTestCap } } });
+            }
           }
         }
       }
@@ -1011,7 +1032,18 @@ export class CinelarPlayerEngine {
 
           this.emit('error', error);
         });
-        this.player.addEventListener('trackschanged', () => this.emit('trackschanged'));
+        this.player.addEventListener('trackschanged', () => {
+          // 🛡️ GUARD: Si hay ≤1 variante de video, deshabilitar ABR (no hay nada que adaptar)
+          try {
+            const variants = this.player?.getVariantTracks?.() ?? [];
+            const uniqueHeights = new Set(variants.filter((v: any) => v.height).map((v: any) => v.height));
+            if (uniqueHeights.size <= 1) {
+              this.player?.configure?.({ abr: { enabled: false } });
+              pdbg('engine.trackschanged', `Single variant detected (${uniqueHeights.size} height(s)), ABR disabled`);
+            }
+          } catch { }
+          this.emit('trackschanged');
+        });
 
         // Initialize backpressure monitoring
         this.initBackpressure();
@@ -1227,6 +1259,12 @@ export class CinelarPlayerEngine {
     // 🛡️ SINCRONIZACIÓN DE AUDIO: Elegir variante que coincida con el idioma de audio activo
     const matchingLang = activeAudio ? candidates.find((v: any) => v.language === activeAudio.language) : null;
     const targetVariant = matchingLang || candidates[0];
+
+    // 🛡️ GUARD: Si la variante seleccionada ya está activa, NO llamar selectVariantTrack (evita seek innecesario)
+    if (targetVariant.active) {
+      pdbg('engine.quality', `Variant ${option}p already active, skipping selectVariantTrack`);
+      return;
+    }
 
     // Seleccionar variante limpiamente UNA SOLA VEZ sin segunda llamada destructiva a selectAudioTrack
     this.player.selectVariantTrack(targetVariant, !hasSafeBuffer);
