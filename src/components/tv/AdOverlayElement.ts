@@ -15,364 +15,169 @@ const PARENT_FOCUS_KEY = 'watch-root';
 export class AdOverlayElement extends LitElement {
   static styles = css`
     :host {
-      position: fixed;
-      inset: 0;
-      z-index: 50;
-      background: #000000;
-      display: block;
-      overflow: hidden;
-      contain: layout style;
-      user-select: none;
-      -webkit-user-select: none;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
+  --gutter: clamp(32px, 3.5vw, 64px);
+  --gap: clamp(20px, 2.8vw, 56px);
+  --panel-w: clamp(300px, 23vw, 420px);
+  /* ancho seguro = viewport - panel - 2 gutters - gap */
+  --video-safe-w: calc(100vw - var(--panel-w) - (var(--gutter) * 2) - var(--gap));
+  
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #000000;
+  display: block;
+  overflow: hidden;
+  contain: layout style;
+  user-select: none;
+}
 
-    /* ── Contenedor principal de video con animación de encogimiento (PiP) ── */
-    .video-stage {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      background: #000000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: width 550ms cubic-bezier(0.16, 1, 0.3, 1),
-                  height 550ms cubic-bezier(0.16, 1, 0.3, 1),
-                  left 550ms cubic-bezier(0.16, 1, 0.3, 1),
-                  top 550ms cubic-bezier(0.16, 1, 0.3, 1),
-                  transform 550ms cubic-bezier(0.16, 1, 0.3, 1),
-                  border-radius 550ms cubic-bezier(0.16, 1, 0.3, 1),
-                  box-shadow 550ms cubic-bezier(0.16, 1, 0.3, 1);
-      transform: translateZ(0);
-      will-change: width, height, transform;
-    }
+/* ── Video Stage ── */
+.video-stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: width 550ms cubic-bezier(0.16, 1, 0.3, 1),
+              height 550ms cubic-bezier(0.16, 1, 0.3, 1),
+              left 550ms cubic-bezier(0.16, 1, 0.3, 1),
+              top 550ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 550ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-radius 550ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateZ(0);
+  will-change: width, height, transform;
+}
 
-    .video-stage.shrunk {
-      width: clamp(52vw, 62vw, 65vw);
-      height: calc(clamp(52vw, 62vw, 65vw) * 9 / 16);
-      max-height: 82vh;
-      left: clamp(2rem, 3.5vw, 4rem);
-      top: 50%;
-      transform: translateY(-50%) translateZ(0);
-      border-radius: 1.25rem;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.95);
-    }
+.video-stage.shrunk {
+  /* CLAVE: el video nunca invade el espacio del panel */
+  width: clamp(560px, var(--video-safe-w), 66vw);
+  height: auto;
+  aspect-ratio: 16 / 9;
+  max-height: clamp(360px, 78vh, 820px);
+  left: var(--gutter);
+  top: 50%;
+  transform: translateY(-50%) translateZ(0);
+  border-radius: clamp(12px, 1.2vw, 20px);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.95);
+}
 
-    .video-stage video {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      object-position: center;
-      display: block;
-      background: #000000;
-    }
+.video-stage video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
 
-    /* ── Ambient Backdrop cuando está reducido (sin blur, degradado radial oscuro) ── */
-    .shrunk-ambient-bg {
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(circle at 30% 50%, rgba(25, 25, 30, 0.9) 0%, #000000 75%);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 500ms ease;
-    }
+/* ── Ambient ── */
+.shrunk-ambient-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 50%, rgba(25,25,30,0.9) 0%, #000 75%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 500ms ease;
+}
+.shrunk-ambient-bg.visible { opacity: 1; }
 
-    .shrunk-ambient-bg.visible {
-      opacity: 1;
-    }
+/* ── Scrim ── */
+.wR7gVc { background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.6) 33.36%, #000 100%); }
+.gkU4db { height: clamp(120px, 14vh, 160px); }
+.o5D4td {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 var(--gutter) clamp(20px, 3vh, 36px);
+  z-index: 5;
+  transition: opacity 400ms ease;
+}
+.o5D4td.hidden { opacity: 0; pointer-events: none; }
 
-    /* ── Scrim inferior exacto YouTube TV (Cero Blur) ── */
-    .wR7gVc {
-      background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.6) 33.36%, #000000 100%);
-    }
+/* ── Progress ── */
+.ad-progress-track {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: clamp(3px, 0.35vw, 4px);
+  background: rgba(255,255,255,0.2);
+  z-index: 10;
+}
+.ad-progress-fill { height: 100%; background: #fabb05; width: 0%; transition: width 200ms linear; }
 
-    .gkU4db {
-      height: 10rem;
-    }
+/* ── Lockup ── */
+.ytlr-ad-avatar-lockup { display: flex; align-items: center; gap: clamp(12px, 1vw, 16px); max-width: 55vw; }
+.ad-avatar {
+  width: clamp(36px, 2.8vw, 44px); height: clamp(36px, 2.8vw, 44px);
+  border-radius: 50%; background-size: cover; background-position: center;
+  background-color: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.2);
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: clamp(14px, 1.1vw, 18px); font-weight: 700;
+}
+.ad-info-texts { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ad-domain { color: #fff; font-size: clamp(14px, 1vw, 16px); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ad-meta-row { display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,0.7); font-size: clamp(11px, 0.85vw, 13px); }
+.yt-badge { background: rgba(255,255,255,0.2); color: #fff; border-radius: 4px; padding: 2px 6px; font-size: clamp(10px, 0.75vw, 12px); font-weight: 600; }
 
-    .o5D4td {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      padding: 0 clamp(2rem, 4vw, 3.5rem) clamp(1.5rem, 3vh, 2.25rem);
-      box-sizing: border-box;
-      pointer-events: none;
-      z-index: 5;
-      transition: opacity 400ms ease;
-    }
+/* ── Actions ── */
+.ytlr-actions-row { display: flex; align-items: center; gap: clamp(10px, 0.8vw, 12px); }
+.circle-btn {
+  width: clamp(40px, 3.2vw, 48px); height: clamp(40px, 3.2vw, 48px);
+  border-radius: 50%; background: rgba(20,20,20,0.85);
+  border: 1px solid rgba(255,255,255,0.15); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: transform 150ms ease, background-color 150ms ease;
+}
+.circle-btn[data-focused="true"] { background: #f1f1f1 !important; color: #0f0f0f !important; transform: scale(1.08); outline: 3px solid #fff; }
+.ytlr-skip-ad-timer { padding: clamp(8px, 0.7vw, 10px) clamp(16px, 1.2vw, 20px); border-radius: 9999px; background: rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.18); color: #fff; font-size: clamp(13px, 0.9vw, 15px); font-weight: 500; font-variant-numeric: tabular-nums; }
+.ytlr-skip-button { padding: clamp(8px, 0.7vw, 10px) clamp(18px, 1.5vw, 24px); border-radius: 9999px; background: rgba(255,255,255,0.18); color: #fff; border: none; font-size: clamp(13px, 0.9vw, 15px); font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+.ytlr-skip-button[data-focused="true"] { background: #f1f1f1 !important; color: #0f0f0f !important; transform: scale(1.04); outline: 3px solid #fff; }
+.skip-icon { width: clamp(16px, 1.2vw, 18px); height: clamp(16px, 1.2vw, 18px); }
 
-    .o5D4td.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
+/* ── PANEL LATERAL - FIX ANTI-SOLAPAMIENTO ── */
+.companion-side-panel {
+  position: absolute;
+  right: var(--gutter);
+  top: 50%;
+  transform: translateY(-50%) translateX(32px);
+  width: var(--panel-w);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 1.5vh, 20px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 10;
+  max-height: calc(100vh - var(--gutter) * 2);
+  transition: opacity 450ms cubic-bezier(0.16, 1, 0.3, 1), transform 450ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.companion-side-panel.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) translateX(0);
+}
 
-    /* ── Barra de Progreso Amarilla YouTube ── */
-    .ad-progress-track {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background-color: rgba(255, 255, 255, 0.2);
-      z-index: 10;
-    }
+.qr-card-container {
+  background: #fff; border-radius: clamp(12px, 1vw, 16px);
+  padding: clamp(12px, 1vw, 16px);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.85);
+  display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%;
+}
+.qr-svg-wrapper { display: flex; align-items: center; justify-content: center; width: 100%; }
+.qr-svg-wrapper svg { width: clamp(120px, 11vw, 160px) !important; height: clamp(120px, 11vw, 160px) !important; }
+.qr-hint-row { display: flex; align-items: center; gap: 8px; color: #202020; font-size: clamp(11px, 0.8vw, 13px); font-weight: 600; text-align: center; }
 
-    .ad-progress-fill {
-      height: 100%;
-      background-color: #fabb05; /* Amarillo característico YouTube/Google TV */
-      width: 0%;
-      transition: width 200ms linear;
-    }
+.ad-spinner { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 20; pointer-events: none; }
+.ad-spinner-dot { width: clamp(32px, 2.8vw, 44px); height: clamp(32px, 2.8vw, 44px); border: 3px solid rgba(255,255,255,0.25); border-top-color: #fabb05; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Lockup del Anunciante (Avatar + Dominio + Badge + Título) ── */
-    .ytlr-ad-avatar-lockup {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      pointer-events: auto;
-      max-width: 55vw;
-    }
-
-    .ad-avatar {
-      width: 2.75rem;
-      height: 2.75rem;
-      border-radius: 50%;
-      background-size: cover;
-      background-position: center;
-      background-color: rgba(255, 255, 255, 0.15);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #ffffff;
-      font-size: 1.1rem;
-      font-weight: 700;
-    }
-
-    .ad-avatar.default-icon {
-      background-color: rgba(255, 255, 255, 0.1);
-    }
-
-    .ad-info-texts {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-      min-width: 0;
-    }
-
-    .ad-domain {
-      color: #ffffff;
-      font-size: 1rem;
-      font-weight: 600;
-      line-height: 1.2;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .ad-meta-row {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.8125rem;
-      line-height: 1.2;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .yt-badge {
-      background-color: rgba(255, 255, 255, 0.2);
-      color: #ffffff;
-      border-radius: 4px;
-      padding: 2px 6px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-      flex-shrink: 0;
-    }
-
-    .dot-separator {
-      color: rgba(255, 255, 255, 0.4);
-      flex-shrink: 0;
-    }
-
-    .ad-title {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      color: rgba(255, 255, 255, 0.85);
-    }
-
-    /* ── Controles de Acción (Mute, Countdown, Saltar) ── */
-    .ytlr-actions-row {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      pointer-events: auto;
-    }
-
-    .circle-btn {
-      width: 3rem;
-      height: 3rem;
-      border-radius: 50%;
-      background: rgba(20, 20, 20, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      color: #ffffff;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      outline: none;
-      transition: transform 150ms ease, background-color 150ms ease, color 150ms ease;
-    }
-
-    .circle-btn[data-focused="true"] {
-      background: #f1f1f1 !important;
-      color: #0f0f0f !important;
-      transform: scale(1.08);
-      outline: 3px solid #ffffff;
-    }
-
-    /* Timer de cuenta regresiva previa al salto */
-    .ytlr-skip-ad-timer {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.625rem 1.25rem;
-      border-radius: 9999px;
-      background-color: rgba(0, 0, 0, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      color: #ffffff;
-      font-size: 0.9375rem;
-      font-weight: 500;
-      font-variant-numeric: tabular-nums;
-    }
-
-    /* Botón Saltar estilo YouTube TV */
-    .ytlr-skip-button {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.625rem 1.5rem; /* .WqNcAe */
-      border-radius: 9999px;
-      background-color: rgba(255, 255, 255, 0.18);
-      color: #ffffff;
-      border: none;
-      font-size: 0.9375rem;
-      font-weight: 600;
-      cursor: pointer;
-      outline: none;
-      pointer-events: auto;
-      transition: transform 150ms ease, background-color 150ms ease, color 150ms ease;
-    }
-
-    .ytlr-skip-button[data-focused="true"] {
-      background-color: #f1f1f1 !important; /* .BZ345e */
-      color: #0f0f0f !important;
-      transform: scale(1.04);
-      outline: 3px solid #ffffff;
-    }
-
-    .skip-icon {
-      width: 1.15rem;
-      height: 1.15rem;
-    }
-
-    /* ── Panel Lateral Acompañante con Código QR (YouTube TV Companion) ── */
-    .companion-side-panel {
-      position: absolute;
-      right: clamp(2rem, 4vw, 4rem);
-      top: 50%;
-      transform: translateY(-50%) translateX(30px);
-      width: clamp(22rem, 26vw, 30rem);
-      display: flex;
-      flex-direction: column;
-      gap: clamp(1rem, 2vh, 1.5rem);
-      opacity: 0;
-      pointer-events: none;
-      z-index: 10;
-      transition: opacity 450ms cubic-bezier(0.16, 1, 0.3, 1),
-                  transform 450ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .companion-side-panel.visible {
-      opacity: 1;
-      pointer-events: auto;
-      transform: translateY(-50%) translateX(0);
-    }
-
-    /* Tarjeta Blanca con Código QR */
-    .qr-card-container {
-      background: #ffffff;
-      border-radius: 1rem;
-      padding: 1rem;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.75rem;
-      box-sizing: border-box;
-      width: 100%;
-      cursor: pointer;
-    }
-
-    .qr-svg-wrapper {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-    }
-
-    .qr-hint-row {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      color: #202020;
-      font-size: 0.8125rem;
-      font-weight: 600;
-      text-align: center;
-    }
-
-    .qr-hint-row svg {
-      width: 1.1rem;
-      height: 1.1rem;
-      flex-shrink: 0;
-      color: #0f0f0f;
-    }
-
-    /* Spinner */
-    .ad-spinner {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      z-index: 20;
-    }
-
-    .ad-spinner-dot {
-      width: 2.75rem;
-      height: 2.75rem;
-      border: 3px solid rgba(255, 255, 255, 0.25);
-      border-top-color: #fabb05;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+/* 1280x720 - asegurar respiración */
+@media (max-width: 1366px) {
+  :host { --panel-w: clamp(280px, 25vw, 340px); --gap: 24px; }
+}
   `;
 
   protected createRenderRoot(): Element | ShadowRoot {
