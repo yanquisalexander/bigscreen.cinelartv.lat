@@ -37,7 +37,7 @@
   import type { WatchData } from "@/types/content";
   import type { FlatEpisode } from "@/components/tv/RailEpisodeItem.svelte";
   import type { VastAd } from "@/types/vast";
-  import { MonitorPlay, AlertTriangle } from "@lucide/svelte";
+  import CinelarLogo from "@/components/ui/CinelarLogo.svelte";
   import PlayerSettingsPanel from "@/components/player/PlayerSettingsPanel.svelte";
   import PlayerStage from "@/components/player/PlayerStage.svelte";
   import DebugStatsPanel from "@/components/player/DebugStatsPanel.svelte";
@@ -824,22 +824,27 @@
     preferredChildFocusKey="stream-limit-home"
     trackChildren={true}
     saveLastFocusedChild={true}
-    class="fixed inset-0 w-screen h-screen bg-[#0f0f0f] flex flex-col items-center justify-center select-none"
+    class="fixed inset-0 w-screen h-screen bg-[#050505] flex flex-col justify-center px-[clamp(2.5rem,6vw,6rem)] select-none z-[9999]"
   >
-    <div class="flex flex-col items-center text-center max-w-lg px-8">
-      <MonitorPlay class="text-[#3ea6ff] mb-6 w-16 h-16" />
-      <h1 class="text-white text-3xl font-semibold mb-4">Límite de transmisiones alcanzado</h1>
-      <p class="text-white/70 text-base leading-relaxed mb-10">
-        Ya hay demasiados dispositivos reproduciendo contenido en esta cuenta.
-        Detén la transmisión en otro dispositivo para continuar viendo.
+    <div class="fixed top-[clamp(2.5rem,6vh,4rem)] left-[clamp(2.5rem,6vw,6rem)]">
+      <CinelarLogo class="h-[clamp(1.75rem,3.5vh,2.25rem)] w-auto text-white" />
+    </div>
+
+    <div class="flex flex-col items-start text-left max-w-3xl">
+      <h1 class="text-white text-[clamp(2rem,3.5vw,3rem)] font-bold mb-4 leading-tight">
+        Límite de transmisiones alcanzado
+      </h1>
+      <p class="text-white/75 text-[clamp(0.95rem,1.4vw,1.15rem)] leading-relaxed mb-8 max-w-2xl">
+        Ya hay demasiados dispositivos reproduciendo contenido en esta cuenta. Detén la transmisión en otro dispositivo para continuar viendo.
       </p>
-      <div class="flex gap-4">
+
+      <div class="flex items-center gap-4 mb-6">
         <Focusable
           focusKey="stream-limit-home"
           onEnterPress={() => replace("/home")}
           autoFocus={true}
-          focusedClass="!bg-white !text-black"
-          class="px-8 py-3 bg-white/10 text-white font-medium rounded-full text-base cursor-pointer"
+          focusedClass="!bg-white !text-black shadow-lg"
+          class="px-8 py-3.5 bg-white/15 text-white font-semibold rounded-lg text-base cursor-pointer"
           playSound={true}
         >
           {#snippet children()}Volver al inicio{/snippet}
@@ -851,13 +856,17 @@
             streamLimitSessions = [];
             fetchData();
           }}
-          focusedClass="!bg-white !text-black"
-          class="px-8 py-3 bg-white/10 text-white font-medium rounded-full text-base cursor-pointer"
+          focusedClass="!bg-white !text-black shadow-lg"
+          class="px-8 py-3.5 bg-white/15 text-white font-semibold rounded-lg text-base cursor-pointer"
           playSound={true}
         >
           {#snippet children()}Reintentar{/snippet}
         </Focusable>
       </div>
+
+      <p class="text-white/35 text-xs font-mono tracking-wide mt-2">
+        Código: CTV-LIMIT-409
+      </p>
     </div>
   </FocusContainer>
 {:else if playerError}
@@ -867,31 +876,21 @@
     preferredChildFocusKey="player-error-retry"
     trackChildren={true}
     saveLastFocusedChild={true}
-    class="fixed inset-0 w-screen h-screen bg-[#0f0f0f] flex flex-col items-center justify-center select-none"
+    class="fixed inset-0 w-screen h-screen bg-[#050505] flex flex-col justify-center px-[clamp(2.5rem,6vw,6rem)] select-none z-[9999]"
   >
-    <div class="flex flex-col items-center text-center max-w-lg px-8">
-      <AlertTriangle class="text-red-400 mb-6 w-16 h-16" />
-      <h1 class="text-white text-3xl font-semibold mb-4">Error de reproducción</h1>
-      <p class="text-white/70 text-base leading-relaxed mb-4">
-        Ocurrió un error al intentar reproducir el contenido. Por favor, intenta de nuevo.
+    <div class="fixed top-[clamp(2.5rem,6vh,4rem)] left-[clamp(2.5rem,6vw,6rem)]">
+      <CinelarLogo class="h-[clamp(1.75rem,3.5vh,2.25rem)] w-auto text-white" />
+    </div>
+
+    <div class="flex flex-col items-start text-left max-w-3xl">
+      <h1 class="text-white text-[clamp(2rem,3.5vw,3rem)] font-bold mb-4 leading-tight">
+        Ha ocurrido un error
+      </h1>
+      <p class="text-white/75 text-[clamp(0.95rem,1.4vw,1.15rem)] leading-relaxed mb-8 max-w-2xl">
+        No podemos reproducir este título en este momento. Inténtalo de nuevo más tarde o selecciona otro título.
       </p>
-      {#if playerError.code != null || playerError.message}
-        <p class="text-white/40 text-sm font-mono mb-8">
-          {playerError.code != null ? playerError.code : ""}
-          {playerError.message ? `: ${playerError.message}` : ""}
-        </p>
-      {/if}
-      <div class="flex gap-4">
-        <Focusable
-          focusKey="player-error-back"
-          onEnterPress={() => replace("/home")}
-          autoFocus={true}
-          focusedClass="!bg-white !text-black"
-          class="px-8 py-3 bg-white/10 text-white font-medium rounded-full text-base cursor-pointer"
-          playSound={true}
-        >
-          {#snippet children()}Volver{/snippet}
-        </Focusable>
+
+      <div class="flex items-center gap-4 mb-6">
         <Focusable
           focusKey="player-error-retry"
           onEnterPress={() => {
@@ -907,13 +906,27 @@
                 });
             }
           }}
-          focusedClass="!bg-white !text-black"
-          class="px-8 py-3 bg-white/10 text-white font-medium rounded-full text-base cursor-pointer"
+          autoFocus={true}
+          focusedClass="!bg-white !text-black shadow-lg"
+          class="px-8 py-3.5 bg-white/15 text-white font-semibold rounded-lg text-base cursor-pointer"
           playSound={true}
         >
           {#snippet children()}Reintentar{/snippet}
         </Focusable>
+        <Focusable
+          focusKey="player-error-back"
+          onEnterPress={() => replace("/home")}
+          focusedClass="!bg-white !text-black shadow-lg"
+          class="px-8 py-3.5 bg-white/15 text-white font-semibold rounded-lg text-base cursor-pointer"
+          playSound={true}
+        >
+          {#snippet children()}Volver al inicio{/snippet}
+        </Focusable>
       </div>
+
+      <p class="text-white/35 text-xs font-mono tracking-wide mt-2">
+        Código: {playerError.code != null ? playerError.code : "SHAKA-ERR-500"} {playerError.message ? `(${playerError.message})` : ""}
+      </p>
     </div>
   </FocusContainer>
 {:else}
