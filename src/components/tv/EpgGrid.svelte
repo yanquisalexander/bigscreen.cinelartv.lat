@@ -1,10 +1,8 @@
-
 <script lang="ts">
   import Focusable from '@/components/tv/Focusable.svelte';
   import { getChannelGuide, type LiveTvChannel, type LiveTvProgram } from '@/api/live';
-  import { getRuntimeConfig } from '@/runtime';
-  import { Tv } from '@lucide/svelte';
-  import { setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
+  import { Tv, SlidersHorizontal } from '@lucide/svelte';
+  import { setFocus, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
   import { tick } from 'svelte';
 
   interface Props {
@@ -23,12 +21,11 @@
 
   interface EpgBlock {
     program: LiveTvProgram;
-    left: number;
-    width: number;
+    leftPx: number;
+    widthPx: number;
     isLive: boolean;
     isCurrent: boolean;
     isPast: boolean;
-    category: string | null;
   }
 
   let {
@@ -39,94 +36,77 @@
     onReady,
   }: Props = $props();
 
-  const PX_PER_MIN = 4.0;
+  // ── Metrics optimized for 1280x720 / 1920x1080 Smart TV ──
+  const ROW_H = 48; // px
+  const ROW_GAP = 6; // px
+  const ROW_STEP = 54; // 48px + 6px
+  const STATION_W = 80; // px
+  const SLOT_MINUTES = 30;
+  const SLOT_W = 180; // px per 30 minutes
+  const PX_PER_MIN = SLOT_W / SLOT_MINUTES; // 6px / min
   const WINDOW_HOURS = 6;
-  const ROW_H = 70;
-  const CHANNEL_COL_W = 110;
-  const ROW_OVERSCAN = 3;
-  const BLOCK_OVERSCAN_PX = 200;
+  const VISIBLE_ROW_COUNT = 6;
 
+  let nowMinute = $state(Date.now());
   let guides = $state<Record<string, PrecomputedProgram[]>>({});
   let guideState = $state<Record<string, 'loading' | 'ready' | 'error'>>({});
-  let scrollEl = $state<HTMLDivElement | null>(null);
-  let scrollTop = $state(0);
-  let scrollLeft = $state(0);
-  let viewportH = $state(0);
+
   let focusedProgram = $state<LiveTvProgram | null>(null);
   let focusedChannel = $state<LiveTvChannel | null>(null);
 
-  let focusRafId = 0;
-  let scrollRafId = 0;
-  let _scrollQueued = false;
-  let _scrollSource: 'user' | 'programmatic' = 'user';
+  // Top-anchored scroll state
+  let selectedRowIdx = $state(0);
+  let topRowIdx = $state(0);
+  let horizontalOffsetPx = $state(0);
 
-  const { appQuality } = getRuntimeConfig();
-
-  function clamp(v: number, min: number, max: number) {
-    return Math.max(min, Math.min(max, v));
-  }
-
-  let nowMinute = $state(Date.now());
-
+  // Update time every 30 seconds for clock & progress bar (lightweight, zero 60fps RAF loop)
   $effect(() => {
-    const id = setInterval(() => { nowMinute = Date.now(); }, 60_000);
-    nowMinute = Date.now();
+    const id = setInterval(() => { nowMinute = Date.now(); }, 30_000);
     return () => clearInterval(id);
   });
 
-  // ── RAF loop: direct DOM updates for now-line and header scroll sync ──
-  // No Svelte $state reads inside the callback — pure DOM manipulation.
-  $effect(() => {
-    let rafId = 0;
-    const tick = () => {
-      const wStart = windowStartMs;
-      const tW = trackWidth;
-      if (tW > 0) {
-        const px = clamp(Math.round(((Date.now() - wStart) / 60000) * PX_PER_MIN), 0, tW);
-        const headerNow = document.querySelector<HTMLElement>('[data-now-line-header]');
-        const gridNow = document.querySelector<HTMLElement>('[data-now-line-grid]');
-        if (headerNow) headerNow.style.transform = `translateX(${px}px)`;
-        if (gridNow) gridNow.style.transform = `translateX(${CHANNEL_COL_W + px}px)`;
-      }
-      // Sync header scroll offset (avoids reactive scrollLeft re-renders)
-      const scrollContent = document.querySelector<HTMLElement>('[data-scroll-content]');
-      const scroll = document.querySelector<HTMLElement>('[data-scroll-container]');
-      if (scrollContent && scroll) {
-        scrollContent.style.transform = `translateX(${-scroll.scrollLeft}px)`;
-      }
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  });
-
-  const anchorMinute = $derived.by(() => {
+  // Calculate anchor: start at the nearest 30-minute interval before current time
+  const anchorTime = $derived.by(() => {
     const d = new Date(nowMinute);
-    d.setMinutes(0, 0, 0);
+    const mins = d.getMinutes();
+    d.setMinutes(mins < 30 ? 0 : 30, 0, 0);
     return d;
   });
 
-  const windowStartMs = $derived(anchorMinute.getTime());
+  const windowStartMs = $derived(anchorTime.getTime());
   const windowEndMs = $derived(windowStartMs + WINDOW_HOURS * 3600_000);
-  const totalMin = WINDOW_HOURS * 60;
-  const trackWidth = totalMin * PX_PER_MIN;
+  const totalSlots = WINDOW_HOURS * 2; // 12 slots for 6 hours
+  const totalTrackWidthPx = $derived(totalSlots * SLOT_W);
 
-  const hourTicks = $derived.by(() => {
-    const nowHourStart = new Date(nowMinute);
-    nowHourStart.setMinutes(0, 0, 0);
-    const nowHour = nowHourStart.getTime();
-    const ticks: { label: string; left: number; isNow: boolean }[] = [];
-    for (let h = 0; h <= WINDOW_HOURS; h++) {
-      const d = new Date(windowStartMs + h * 3600_000);
-      ticks.push({
-        label: d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }),
-        left: h * 60 * PX_PER_MIN,
-        isNow: d.getTime() === nowHour,
-      });
-    }
-    return ticks;
+  // "Now" red marker offset in px
+  const nowOffsetPx = $derived.by(() => {
+    const diffMin = Math.max(0, (nowMinute - windowStartMs) / 60000);
+    return Math.min(totalTrackWidthPx, Math.round(diffMin * PX_PER_MIN));
   });
 
+  // 30-minute timeslot markers
+  const timeSlots = $derived.by(() => {
+    const slots: { label: string; leftPx: number }[] = [];
+    for (let i = 0; i < totalSlots; i++) {
+      const slotTime = new Date(windowStartMs + i * 30 * 60000);
+      slots.push({
+        label: slotTime.toLocaleTimeString('es', { hour: 'numeric', minute: '2-digit', hour12: true }),
+        leftPx: i * SLOT_W,
+      });
+    }
+    return slots;
+  });
+
+  // Formatted clock for top-right (e.g. "10:14 a. m.")
+  const currentClockText = $derived.by(() => {
+    return new Date(nowMinute).toLocaleTimeString('es', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  });
+
+  // ── Guide Batch Fetching & Caching ──
   let _loaded = new Set<string>();
   let _pendingGuides = new Map<string, PrecomputedProgram[]>();
   let _pendingStates = new Map<string, 'loading' | 'ready' | 'error'>();
@@ -135,15 +115,11 @@
   function flushGuideUpdates() {
     _guideFlushQueued = false;
     if (_pendingGuides.size > 0) {
-      const newGuides = { ...guides };
-      for (const [id, progs] of _pendingGuides) newGuides[id] = progs;
-      guides = newGuides;
+      guides = { ...guides, ...Object.fromEntries(_pendingGuides) };
       _pendingGuides.clear();
     }
     if (_pendingStates.size > 0) {
-      const newStates = { ...guideState };
-      for (const [id, st] of _pendingStates) newStates[id] = st;
-      guideState = newStates;
+      guideState = { ...guideState, ...Object.fromEntries(_pendingStates) };
       _pendingStates.clear();
     }
   }
@@ -167,7 +143,6 @@
 
     for (const ch of toLoad) {
       queueGuideUpdate(ch.id, [], 'loading');
-
       getChannelGuide(ch.id, startIso, endIso, accessToken)
         .then((res) => {
           const precomputed: PrecomputedProgram[] = res.programs.map((p) => ({
@@ -186,6 +161,10 @@
   $effect(() => {
     if (channels.length) loadGuides(channels);
   });
+
+  // ── Compute Program Blocks per Channel ──
+  let _blocksCache = new Map<string, EpgBlock[]>();
+  let _blocksCacheTime = 0;
 
   function computeBlocks(ch: LiveTvChannel, now: number): EpgBlock[] {
     const precomputed = guides[ch.id];
@@ -210,184 +189,204 @@
       const e = Math.min(pp.endMs, windowEndMs);
       const durMin = (e - s) / 60000;
       if (durMin <= 0 || e <= s) continue;
-      const left = Math.round(((s - windowStartMs) / 60000) * PX_PER_MIN);
-      const width = Math.max(Math.round(durMin * PX_PER_MIN), 2);
-      if (width < 20) continue;
+
+      const leftPx = Math.round(((s - windowStartMs) / 60000) * PX_PER_MIN);
+      const widthPx = Math.max(Math.round(durMin * PX_PER_MIN) - 4, 36);
+
       blocks.push({
         program: pp.program,
-        left,
-        width,
-        isLive: Boolean(pp.program.currently_playing),
-        isCurrent: now >= s && now <= e,
-        isPast: e < now,
-        category: pp.category,
+        leftPx,
+        widthPx,
+        isLive: Boolean(pp.program.currently_playing) || (now >= pp.startMs && now <= pp.endMs),
+        isCurrent: now >= pp.startMs && now <= pp.endMs,
+        isPast: pp.endMs < now,
       });
     }
     return blocks;
   }
 
-  const channelRows = $derived(
-    channels.map((ch) => ({
-      channel: ch,
-      state: guideState[ch.id] as 'loading' | 'ready' | 'error' | undefined,
-    })),
-  );
-
-  let _blocksCache = new Map<string, EpgBlock[]>();
-  let _blocksCacheTime = 0;
-
   function getBlocksForRow(ch: LiveTvChannel): EpgBlock[] {
     const minuteKey = Math.floor(nowMinute / 60000);
-    const cacheKey = ch.id;
-    if (minuteKey === _blocksCacheTime && _blocksCache.has(cacheKey)) {
-      return _blocksCache.get(cacheKey)!;
-    }
     if (minuteKey !== _blocksCacheTime) {
       _blocksCache.clear();
       _blocksCacheTime = minuteKey;
     }
+    if (_blocksCache.has(ch.id)) {
+      return _blocksCache.get(ch.id)!;
+    }
     const blocks = computeBlocks(ch, nowMinute);
-    _blocksCache.set(cacheKey, blocks);
+    _blocksCache.set(ch.id, blocks);
     return blocks;
   }
 
-  const blockKey = (channelId: string, program: LiveTvProgram, left: number) =>
-    `epg-${channelId}-${program.id}-${left}`;
+  // Focus key generator
+  const getBlockFocusKey = (channelId: string, programId: string, leftPx: number) =>
+    `epg-${channelId}-${programId}-${leftPx}`;
 
-  const entryKeyOfChannel = (channel: LiveTvChannel, blocks: EpgBlock[]) => {
-    if (blocks.length === 0) return `epg-${channel.id}-noprogram`;
-    const current = blocks.find((b) => b.isCurrent || b.isLive) ?? blocks[0];
-    return blockKey(channel.id, current.program, current.left);
-  };
+  // Find the primary focusable key for a channel (matching time slot of currently focused program if possible)
+  function getTargetFocusKeyForRow(targetChannel: LiveTvChannel, currentProg: LiveTvProgram | null): string {
+    const blocks = getBlocksForRow(targetChannel);
+    if (blocks.length === 0) return `epg-${targetChannel.id}-noprogram`;
 
-  const firstFocusKey = $derived.by(() => {
-    for (const { channel, state } of channelRows) {
-      if (state !== 'loading') {
-        const blocks = getBlocksForRow(channel);
-        return entryKeyOfChannel(channel, blocks);
+    if (currentProg) {
+      const curStart = new Date(currentProg.start_time).getTime();
+      const curEnd = new Date(currentProg.end_time).getTime();
+      const curMid = curStart + (curEnd - curStart) / 2;
+
+      // Find block in target channel that covers the midpoint time
+      const match = blocks.find((b) => {
+        const bStart = new Date(b.program.start_time).getTime();
+        const bEnd = new Date(b.program.end_time).getTime();
+        return curMid >= bStart && curMid < bEnd;
+      });
+
+      if (match) {
+        return getBlockFocusKey(targetChannel.id, match.program.id, match.leftPx);
       }
+    }
+
+    // Default to current live program or first available
+    const cur = blocks.find((b) => b.isCurrent || b.isLive) ?? blocks[0];
+    return getBlockFocusKey(targetChannel.id, cur.program.id, cur.leftPx);
+  }
+
+  // Initial focus key
+  const firstFocusKey = $derived.by(() => {
+    if (channels.length > 0) {
+      return getTargetFocusKeyForRow(channels[0], null);
     }
     return null;
   });
 
-  $effect(() => { onReady?.(firstFocusKey); });
-
-  const totalContentH = $derived(channelRows.length * ROW_H);
-  const maxScroll = $derived(Math.max(0, totalContentH - viewportH));
-
-  const visibleRowRange = $derived.by(() => {
-    const startRow = Math.max(0, Math.floor(scrollTop / ROW_H) - ROW_OVERSCAN);
-    const visibleCount = Math.ceil(viewportH / ROW_H) + 2;
-    const endRow = Math.min(channelRows.length, startRow + visibleCount + ROW_OVERSCAN * 2);
-    return { startRow, endRow };
+  $effect(() => {
+    if (firstFocusKey) {
+      onReady?.(firstFocusKey);
+    }
   });
 
-  function computeVisibleBlockRange(blocks: EpgBlock[], sl: number, vpW: number): { start: number; end: number } {
-    if (blocks.length === 0) return { start: 0, end: 0 };
-    const vpStart = sl - BLOCK_OVERSCAN_PX;
-    const vpEnd = sl + vpW + BLOCK_OVERSCAN_PX;
-    let lo = 0;
-    let hi = blocks.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (blocks[mid].left + blocks[mid].width < vpStart) lo = mid + 1;
-      else hi = mid;
+  // Default initial focused program / channel if none selected yet
+  $effect(() => {
+    if (!focusedChannel && channels.length > 0) {
+      focusedChannel = channels[0];
+      const blocks = getBlocksForRow(channels[0]);
+      if (blocks.length > 0) {
+        const cur = blocks.find((b) => b.isCurrent || b.isLive) ?? blocks[0];
+        focusedProgram = cur.program;
+      } else {
+        focusedProgram = channels[0].current_program ?? null;
+      }
     }
-    const start = lo;
-    let end = start;
-    while (end < blocks.length && blocks[end].left <= vpEnd) end++;
-    return { start, end };
+  });
+
+  // ── Top-Anchored Virtualization ──
+  const maxTopRowIdx = $derived(Math.max(0, channels.length - VISIBLE_ROW_COUNT));
+
+  function updateTopAnchoredScroll(targetRowIdx: number) {
+    selectedRowIdx = targetRowIdx;
+    topRowIdx = Math.min(targetRowIdx, maxTopRowIdx);
   }
 
-  function scrollToFocused() {
-    const container = scrollEl;
-    if (!container) return;
-    const focused = container.querySelector<HTMLElement>('[data-focused="true"]');
-    if (!focused) return;
-    const rowEl = focused.closest<HTMLElement>('[data-row-idx]');
-    if (!rowEl) return;
-    const rowIdx = Number(rowEl.dataset.rowIdx);
-    if (isNaN(rowIdx)) return;
-    const focusedCenter = focused.offsetTop + focused.clientHeight / 2;
-    const rowContentY = rowIdx * ROW_H + focusedCenter;
-    const target = clamp(rowContentY - viewportH / 2, 0, maxScroll);
-    _scrollSource = 'programmatic';
-    container.scrollTop = target;
+  // Visible window of rows in DOM: topRowIdx - 1 (overscan) up to topRowIdx + VISIBLE_ROW_COUNT + 1
+  const visibleRows = $derived.by(() => {
+    const start = Math.max(0, topRowIdx - 1);
+    const end = Math.min(channels.length, topRowIdx + VISIBLE_ROW_COUNT + 2);
+    const rows = [];
+    for (let idx = start; idx < end; idx++) {
+      rows.push({
+        channel: channels[idx],
+        rowIdx: idx,
+        translateYPx: idx * ROW_STEP,
+      });
+    }
+    return rows;
+  });
+
+  // Ensure active block is visible horizontally
+  function ensureHorizontalInView(leftPx: number, widthPx: number) {
+    const viewportWidthPx = 960;
+    const rightPx = leftPx + widthPx;
+
+    if (leftPx < horizontalOffsetPx) {
+      horizontalOffsetPx = Math.max(0, leftPx - 20);
+    } else if (rightPx > horizontalOffsetPx + viewportWidthPx) {
+      horizontalOffsetPx = Math.max(0, rightPx - viewportWidthPx + 40);
+    }
   }
 
-  function handleFocusScroll() {
-    if (_scrollQueued) return;
-    _scrollQueued = true;
-    cancelAnimationFrame(focusRafId);
-    focusRafId = requestAnimationFrame(() => {
-      _scrollQueued = false;
-      scrollToFocused();
-    });
-  }
-
-  function updateFocusedProgram(ch: LiveTvChannel, blocks: EpgBlock[], focusKey: string) {
-    const match = blocks.find((b) => {
-      const key = `epg-${ch.id}-${b.program.id}-${b.left}`;
-      return key === focusKey;
-    });
-    focusedProgram = match ? match.program : (blocks[0]?.program ?? null);
-    focusedChannel = ch;
-  }
-
-  function focusNextChannel(rowIdx: number): boolean {
-    const next = channelRows[rowIdx + 1];
-    if (!next) return true;
-    const blocks = getBlocksForRow(next.channel);
-    const key = entryKeyOfChannel(next.channel, blocks);
-    if (!key) return true;
-
-    const targetRowTop = (rowIdx + 1) * ROW_H;
-    const targetRowBottom = targetRowTop + ROW_H;
-    const currentTop = scrollTop;
-    const currentBottom = scrollTop + viewportH;
-
-    if (targetRowTop < currentTop || targetRowBottom > currentBottom) {
-      const target = clamp(targetRowBottom - viewportH / 2, 0, maxScroll);
-      _scrollSource = 'programmatic';
-      if (scrollEl) scrollEl.scrollTop = target;
+  // ── Navigation Handlers ──
+  function handleArrowPress(direction: string, rowIdx: number, blockIdx: number, blocks: EpgBlock[]): boolean {
+    if (direction === 'up') {
+      if (rowIdx === 0) {
+        if (onArrowUp) return onArrowUp();
+        return true;
+      }
+      const prevRowIdx = rowIdx - 1;
+      updateTopAnchoredScroll(prevRowIdx);
+      const prevChannel = channels[prevRowIdx];
+      const targetKey = getTargetFocusKeyForRow(prevChannel, focusedProgram);
+      requestAnimationFrame(() => {
+        tick().then(() => {
+          if (doesFocusableExist(targetKey)) setFocus(targetKey);
+        });
+      });
+      return false;
     }
 
-    requestAnimationFrame(() => {
-      tick().then(() => setFocus(key));
-    });
-    return false;
-  }
-
-  function onScroll() {
-    if (_scrollSource === 'programmatic') {
-      _scrollSource = 'user';
-      return;
+    if (direction === 'down') {
+      if (rowIdx < channels.length - 1) {
+        const nextRowIdx = rowIdx + 1;
+        updateTopAnchoredScroll(nextRowIdx);
+        const nextChannel = channels[nextRowIdx];
+        const targetKey = getTargetFocusKeyForRow(nextChannel, focusedProgram);
+        requestAnimationFrame(() => {
+          tick().then(() => {
+            if (doesFocusableExist(targetKey)) setFocus(targetKey);
+          });
+        });
+        return false;
+      }
+      return false;
     }
-    cancelAnimationFrame(scrollRafId);
-    scrollRafId = requestAnimationFrame(() => {
-      if (!scrollEl) return;
-      scrollTop = scrollEl.scrollTop;
-      scrollLeft = scrollEl.scrollLeft;
-    });
-  }
 
-  function preventUserScroll(e: WheelEvent) {
-    e.preventDefault();
-  }
+    if (direction === 'left') {
+      if (blockIdx > 0) {
+        const prevBlock = blocks[blockIdx - 1];
+        const prevKey = getBlockFocusKey(channels[rowIdx].id, prevBlock.program.id, prevBlock.leftPx);
+        setFocus(prevKey);
+        return false;
+      }
+      return false;
+    }
 
-  function handleRowEnter(ch: LiveTvChannel) {
-    onPlay(ch);
-  }
+    if (direction === 'right') {
+      if (blockIdx < blocks.length - 1) {
+        const nextBlock = blocks[blockIdx + 1];
+        const nextKey = getBlockFocusKey(channels[rowIdx].id, nextBlock.program.id, nextBlock.leftPx);
+        setFocus(nextKey);
+        return false;
+      }
+      return false;
+    }
 
-  function handleRowArrow(direction: string, rowIdx: number): boolean {
-    if (direction === 'up' && rowIdx === 0 && onArrowUp) return onArrowUp();
-    if (direction === 'down') return focusNextChannel(rowIdx);
     return true;
   }
 
-  function formatTime(iso?: string): string {
+  function handleProgramFocus(ch: LiveTvChannel, program: LiveTvProgram, leftPx: number, widthPx: number, rowIdx: number) {
+    focusedChannel = ch;
+    focusedProgram = program;
+    selectedRowIdx = rowIdx;
+    ensureHorizontalInView(leftPx, widthPx);
+  }
+
+  // ── Formatters & Helpers ──
+  function formatProgramTime(iso?: string): string {
     if (!iso) return '';
-    return new Date(iso).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString('es', { hour: 'numeric', minute: '2-digit', hour12: true });
+  }
+
+  function formatProgramDate(iso?: string): string {
+    if (!iso) return '';
+    return new Date(iso).toLocaleDateString('es', { day: 'numeric', month: 'short' });
   }
 
   function getProgramProgress(program: LiveTvProgram): number {
@@ -409,201 +408,286 @@
   }
 </script>
 
-<div
-  class="h-full w-full overflow-hidden flex flex-col bg-[#0e0e10]"
-  style="--row-h: {ROW_H}px; --col-w: {CHANNEL_COL_W}px;"
->
-  <!-- ── Info Panel (YouTube TV style) ── -->
-  {#if focusedProgram}
-    {@const progress = getProgramProgress(focusedProgram)}
-    <div class="shrink-0 px-6 py-3 bg-[#121214] border-b border-white/5 flex gap-5 min-h-[5rem]">
-      <div class="flex-1 min-w-0">
-        <div class="text-white font-semibold text-[clamp(1rem,1.5vw,1.25rem)] truncate">
-          {focusedProgram.title}
-        </div>
-        <div class="text-white/50 text-[clamp(0.7rem,0.9vw,0.8rem)] mt-0.5 tabular-nums">
-          {formatTime(focusedProgram.start_time)} — {formatTime(focusedProgram.end_time)}
-          {#if focusedProgram.category}
-            <span class="text-white/30 ml-2">• {focusedProgram.category}</span>
-          {/if}
-          <span class="text-white/30 ml-2">• {getRemainingText(focusedProgram)}</span>
-        </div>
-        {#if focusedProgram.description}
-          <p class="text-white/40 text-[clamp(0.65rem,0.8vw,0.75rem)] mt-1.5 line-clamp-2 leading-relaxed">
-            {focusedProgram.description}
-          </p>
-        {/if}
-        <div class="flex items-center gap-2 mt-2">
-          <div class="flex-1 h-[3px] rounded-full bg-white/10 overflow-hidden max-w-[20rem]">
-            <div
-              class="h-full rounded-full bg-[#f03]"
-              style="width: {progress}%; transition: width 1s linear;"
-            ></div>
-          </div>
-        </div>
-      </div>
-      {#if focusedProgram.icon_url}
-        <div class="w-[clamp(8rem,15vw,14rem)] h-[clamp(4rem,8vh,7rem)] rounded-lg overflow-hidden bg-white/5 shrink-0">
-          <img
-            src={focusedProgram.icon_url}
-            alt={focusedProgram.title}
-            class="w-full h-full object-cover"
-            loading="lazy"
-          />
-        </div>
-      {/if}
+<!-- ── YouTube TV EPG Container (ytvlr-epg-page) ── -->
+<div class="h-full w-full flex flex-col bg-[#0f0f0f] overflow-hidden select-none">
+  
+  <!-- ── Top Header / Clock (ytvlr-clock) ── -->
+  <div class="shrink-0 flex items-center justify-between px-8 pt-2 pb-1">
+    <div class="flex items-center gap-2">
+      <span class="text-white/40 text-[11px] font-semibold tracking-wider uppercase">Guía en vivo</span>
     </div>
-  {/if}
-
-  <!-- ── Sticky Time Header ── -->
-  <div
-    class="flex shrink-0 bg-bg border-b border-white/10 relative z-20"
-    style="height: var(--row-h); position: sticky; top: 0;"
-  >
-    <div
-      class="w-[var(--col-w)] shrink-0 flex items-center justify-center bg-bg border-r border-white/10 text-text-secondary"
-    >
-      <span class="text-[10px] font-black uppercase tracking-widest text-white/50">
-        Canales
-      </span>
-    </div>
-    <div class="relative flex-1 overflow-hidden">
-      <div
-        data-scroll-content
-        class="relative h-full"
-        style="width: {trackWidth}px;"
-      >
-        {#each hourTicks as tick (tick.left)}
-          <div
-            class="absolute top-0 h-full border-l border-white/10 flex items-start justify-center px-2 tabular-nums {tick.isNow
-              ? 'text-white font-bold'
-              : 'text-text-secondary'} text-[clamp(0.6rem,0.75vw,0.7rem)]"
-            style="left: {tick.left}px; margin-left: -0.5px;"
-          >
-            <span class="mt-6">{tick.label}</span>
-          </div>
-        {/each}
-        <div
-          data-now-line-header
-          class="absolute top-0 bottom-0 z-10 pointer-events-none"
-          style="left: 0; will-change: transform;"
-        >
-          <div class="h-full w-[2px] bg-[#f03]/80"></div>
-        </div>
-      </div>
+    <div class="flex items-center gap-2 text-white/70 font-medium text-xs tabular-nums">
+      <span>{currentClockText}</span>
     </div>
   </div>
 
-  <!-- ── Virtual Scroll Grid ── -->
-  <div
-    bind:this={scrollEl}
-    bind:clientHeight={viewportH}
-    onscroll={onScroll}
-    onwheel={preventUserScroll}
-    data-scroll-container
-    class="flex-1 overflow-y-auto overflow-x-auto hide-scrollbar bg-bg"
-  >
-    <div
-      class="relative"
-      style="width: {CHANNEL_COL_W + trackWidth}px; height: {totalContentH}px;"
-    >
-      <div
-        data-now-line-grid
-        class="absolute top-0 bottom-0 z-10 pointer-events-none"
-        style="left: 0; will-change: transform;"
-      >
-        <div class="h-full w-[2px] bg-[#f03]/80"></div>
+  <!-- ── YouTube TV Info Panel (ytvlr-epg-info-panel-renderer) ── -->
+  <div class="shrink-0 px-8 pb-3 flex items-start justify-between gap-6 h-[8.5rem] relative">
+    {#if focusedChannel}
+      {@const progress = focusedProgram ? getProgramProgress(focusedProgram) : null}
+      <div class="flex-1 min-w-0 max-w-[48rem] flex flex-col justify-start">
+        
+        <!-- Title: compact TV size (approx 20px - 24px) -->
+        <h1 class="text-[#f1f1f1] font-bold text-[clamp(1.15rem,1.7vw,1.45rem)] leading-snug truncate">
+          {focusedProgram?.title || focusedChannel.name}
+        </h1>
+
+        <!-- Details / Progress Container -->
+        {#if focusedProgram && progress !== null}
+          <div class="flex items-center gap-3 mt-1.5">
+            <div class="w-36 h-1 rounded-full bg-white/20 overflow-hidden shrink-0">
+              <div
+                class="h-full rounded-full bg-[#ff0033]"
+                style="width: {progress}%; transition: width 1s linear;"
+              ></div>
+            </div>
+            <span class="text-[#f1f1f1]/80 text-xs font-medium tabular-nums">
+              {getRemainingText(focusedProgram)}
+            </span>
+            <span class="text-white/40 text-xs tabular-nums">
+              • {formatProgramTime(focusedProgram.start_time)} – {formatProgramTime(focusedProgram.end_time)}
+            </span>
+          </div>
+        {:else}
+          <div class="flex items-center gap-2.5 mt-1.5">
+            <span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#ff0033] uppercase tracking-wider bg-[#ff0033]/15 px-2 py-0.5 rounded">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#ff0033] animate-pulse"></span>
+              En vivo
+            </span>
+            <span class="text-white/40 text-xs">
+              • Transmisión en directo
+            </span>
+          </div>
+        {/if}
+
+        <!-- Badged Text (ytvlr-badged-text-renderer) -->
+        <div class="flex items-center gap-2 mt-1.5 text-xs text-white/60 font-medium truncate">
+          <span class="text-[#f1f1f1] font-semibold">{focusedChannel.name}</span>
+          <span>•</span>
+          <span class="text-[#ff0033] font-bold uppercase tracking-wider text-[10px] bg-[#ff0033]/15 px-1.5 py-0.5 rounded">
+            {focusedProgram?.currently_playing ? 'EN VIVO' : focusedProgram ? 'PROGRAMADO' : 'EN VIVO'}
+          </span>
+          {#if focusedProgram?.start_time}
+            <span>•</span>
+            <span>{formatProgramDate(focusedProgram.start_time)}</span>
+          {/if}
+          {#if focusedProgram?.category || (focusedChannel as any)?.category}
+            <span>•</span>
+            <span class="text-white/70">
+              {focusedProgram?.category || (focusedChannel as any)?.category}
+            </span>
+          {/if}
+        </div>
+
+        <!-- Description: 2 lines clamp -->
+        <p class="text-white/70 text-xs mt-1.5 line-clamp-2 leading-relaxed">
+          {focusedProgram?.description || focusedChannel.description || 'Disfruta de la mejor programación en directo con CinelarTV.'}
+        </p>
       </div>
 
-      {#if visibleRowRange.startRow > 0}
-        <div style="height: {visibleRowRange.startRow * ROW_H}px;"></div>
-      {/if}
+      <!-- Thumbnail Preview: 16:9 proportioned for 720p/1080p (~160px × 90px) -->
+      <div class="w-[clamp(140px,14vw,176px)] aspect-video rounded-lg overflow-hidden shadow-xl relative bg-[#18181b] border border-white/10 shrink-0">
+        {#if focusedProgram?.icon_url || focusedChannel.logo_url}
+          <img
+            src={focusedProgram?.icon_url || focusedChannel.logo_url}
+            alt={focusedProgram?.title || focusedChannel.name}
+            class="w-full h-full object-cover"
+            loading="lazy"
+          />
+        {:else}
+          <div class="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-[#1c1c1e]">
+            <Tv class="w-7 h-7 text-white/30" />
+            <span class="text-white/40 text-[10px] font-medium">{focusedChannel.name}</span>
+          </div>
+        {/if}
 
-      {#each channelRows.slice(visibleRowRange.startRow, visibleRowRange.endRow) as row, virtualIdx (row.channel.id)}
-        {@const rowIdx = visibleRowRange.startRow + virtualIdx}
-        {@const blocks = getBlocksForRow(row.channel)}
+        <!-- Mini Progress Bar at bottom of thumbnail -->
+        {#if progress !== null}
+          <div class="absolute bottom-0 left-0 right-0 h-1 bg-black/60">
+            <div
+              class="h-full bg-[#ff0033]"
+              style="width: {progress}%; transition: width 1s linear;"
+            ></div>
+          </div>
+        {/if}
+      </div>
+    {:else}
+      <div class="flex-1 flex items-center justify-center text-white/30 text-xs">
+        No hay canales disponibles
+      </div>
+    {/if}
+  </div>
+
+  <!-- ── YouTube TV Compact Grid (ytvlr-epg-compact-grid) ── -->
+  <div class="flex-1 min-h-0 flex flex-col px-8 overflow-hidden relative">
+    
+    <!-- ── Header Row (ytvlr-epg-compact-grid-header-row) ── -->
+    <div class="shrink-0 flex items-center mb-1.5 z-20">
+      
+      <!-- Sort / Filter Button (YtvlrEpgSortButton) -->
+      <div
+        class="shrink-0 flex items-center justify-center rounded-lg bg-white/10 text-white/80 border border-white/10"
+        style="width: {STATION_W}px; height: 30px;"
+      >
+        <SlidersHorizontal class="w-3.5 h-3.5" />
+      </div>
+
+      <!-- Timeslots track (shifted in sync with airings) -->
+      <div class="flex-1 overflow-hidden relative" style="margin-left: {ROW_GAP}px; height: 30px;">
         <div
-          class="flex border-b border-white/5"
-          style="height: {ROW_H}px;"
-          data-row-idx={rowIdx}
+          class="absolute top-0 bottom-0 flex items-center"
+          style="width: {totalTrackWidthPx}px; transform: translateX(-{horizontalOffsetPx}px); transition: transform 180ms cubic-bezier(0.25, 1, 0.5, 1); will-change: transform;"
         >
+          {#each timeSlots as slot (slot.leftPx)}
+            <div
+              class="absolute top-0 bottom-0 flex items-center pl-3 text-[11px] font-semibold tracking-wider text-white/60 border-l border-white/10 uppercase tabular-nums"
+              style="left: {slot.leftPx}px; width: {SLOT_W}px;"
+            >
+              {slot.label}
+            </div>
+          {/each}
+
+          <!-- Header "Now" indicator line -->
           <div
-            class="sticky left-0 !z-30 shrink-0 flex items-center justify-center bg-bg border-r border-white/10"
-            style="width: var(--col-w); height: var(--row-h);"
+            class="absolute top-0 bottom-0 z-30 pointer-events-none"
+            style="left: {nowOffsetPx}px; width: 2px;"
           >
-            <div class="w-12 h-12 rounded-xl bg-surface/50 border border-white/5 flex items-center justify-center shrink-0 overflow-hidden">
-              {#if row.channel.logo_url}
+            <div class="h-full w-[2px] bg-[#ff0033]"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Virtualized Grid Rows (yt-virtual-list) ── -->
+    <div class="flex-1 relative overflow-hidden">
+      
+      <!-- List Container: smoothly shifts via translateY to keep focused row top-anchored -->
+      <div
+        class="absolute inset-0"
+        style="transform: translateY(-{topRowIdx * ROW_STEP}px); transition: transform 180ms cubic-bezier(0.25, 1, 0.5, 1); will-change: transform;"
+      >
+        {#each visibleRows as { channel, rowIdx, translateYPx } (channel.id)}
+          {@const blocks = getBlocksForRow(channel)}
+          {@const isCurrentRow = selectedRowIdx === rowIdx}
+
+          <!-- Virtual Row (ytvlr-epg-row-compact-renderer) -->
+          <div
+            class="absolute left-0 right-0 flex items-center"
+            style="height: {ROW_H}px; transform: translateY({translateYPx}px);"
+          >
+            
+            <!-- Station Card (ytvlr-epg-station-renderer) -->
+            <div
+              class="shrink-0 flex items-center justify-center rounded-lg {isCurrentRow
+                ? 'bg-white/30 border border-white/40 shadow-sm'
+                : 'bg-white/10 border border-white/5'}"
+              style="width: {STATION_W}px; height: {ROW_H}px;"
+            >
+              {#if channel.logo_url}
                 <img
-                  src={row.channel.logo_url}
-                  alt={row.channel.name}
-                  class="w-10 h-10 object-contain"
+                  src={channel.logo_url}
+                  alt={channel.name}
+                  class="max-w-[50px] max-h-[28px] object-contain"
                   loading="lazy"
                 />
               {:else}
-                <Tv class="w-5 h-5 text-text-secondary" />
+                <div class="flex flex-col items-center gap-0.5">
+                  <Tv class="w-4 h-4 text-white/40" />
+                  <span class="text-[9px] text-white/50 font-bold truncate max-w-[68px] text-center leading-none">
+                    {channel.name}
+                  </span>
+                </div>
               {/if}
             </div>
-          </div>
 
-          <div class="relative" style="width: {trackWidth}px; height: var(--row-h);">
-            {#if blocks.length === 0 && row.state !== 'loading'}
-              <Focusable
-                focusKey="epg-{row.channel.id}-noprogram"
-                onEnterPress={() => handleRowEnter(row.channel)}
-                onArrowPress={(direction) => handleRowArrow(direction, rowIdx)}
-                onFocus={() => { focusedProgram = null; focusedChannel = row.channel; }}
-                focusedClass="!z-20"
-                class="absolute inset-y-1.5 left-2 right-2 rounded-lg cursor-pointer"
-                playSound={true}
+            <!-- Airings Container (yt-focus-container) -->
+            <div
+              class="flex-1 relative overflow-hidden"
+              style="margin-left: {ROW_GAP}px; height: {ROW_H}px;"
+            >
+              <!-- Airings Track (shifted horizontally in sync with header) -->
+              <div
+                class="absolute top-0 bottom-0"
+                style="width: {totalTrackWidthPx}px; transform: translateX(-{horizontalOffsetPx}px); transition: transform 180ms cubic-bezier(0.25, 1, 0.5, 1); will-change: transform;"
               >
-                {#snippet children({ focused })}
-                  <div
-                    class="w-full h-full rounded-lg border flex items-center px-4 {focused
-                      ? 'border-white bg-white text-black shadow-lg shadow-black/30'
-                      : 'border-white/5 bg-[#1d1d1f]/40 text-white/30 border-dashed'}"
-                  >
-                    <p class="truncate font-semibold text-[clamp(0.75rem,0.9vw,0.85rem)] leading-none">
-                      Sin programación disponible
-                    </p>
-                  </div>
-                {/snippet}
-              </Focusable>
-            {:else}
-              {@const { start, end } = computeVisibleBlockRange(blocks, scrollLeft, scrollEl?.clientWidth ?? 1920)}
-              {#each blocks.slice(start, end) as block (block.program.id + block.left)}
-                <Focusable
-                  focusKey="epg-{row.channel.id}-{block.program.id}-{block.left}"
-                  onEnterPress={() => handleRowEnter(row.channel)}
-                  onArrowPress={(direction) => handleRowArrow(direction, rowIdx)}
-                  onFocus={() => { handleFocusScroll(); updateFocusedProgram(row.channel, blocks, `epg-${row.channel.id}-${block.program.id}-${block.left}`); }}
-                  focusedClass="!z-20"
-                  class="absolute top-1.5 bottom-1.5 px-1 cursor-pointer"
-                  style="left: {block.left}px; width: {block.width}px;"
-                  playSound={true}
+                <!-- Grid "Now" indicator line -->
+                <div
+                  class="absolute top-0 bottom-0 z-10 pointer-events-none"
+                  style="left: {nowOffsetPx}px; width: 2px;"
                 >
-                  {#snippet children({ focused })}
-                    <div
-                      class="w-full h-full rounded-lg border flex items-center px-4 {focused
-                        ? 'border-white bg-white text-black shadow-lg shadow-black/30'
-                        : block.isLive
-                          ? 'border-[#f03]/30 bg-[#1d1d1f] text-white/90'
-                          : 'border-white/5 bg-[#1d1d1f] text-white/90 hover:bg-[#232326]'}"
-                    >
-                      <p class="truncate font-semibold text-[clamp(0.75rem,0.9vw,0.85rem)] leading-none">
-                        {block.program.title}
-                      </p>
-                    </div>
-                  {/snippet}
-                </Focusable>
-              {/each}
-            {/if}
-          </div>
-        </div>
-      {/each}
+                  <div class="h-full w-[2px] bg-[#ff0033]/60"></div>
+                </div>
 
-      {#if visibleRowRange.endRow < channelRows.length}
-        <div style="height: {(channelRows.length - visibleRowRange.endRow) * ROW_H}px;"></div>
-      {/if}
+                {#if blocks.length === 0}
+                  <!-- Fallback block when channel has no scheduled guide -->
+                  <Focusable
+                    focusKey="epg-{channel.id}-noprogram"
+                    onEnterPress={() => onPlay(channel)}
+                    onArrowPress={(direction) => handleArrowPress(direction, rowIdx, 0, [])}
+                    onFocus={() => {
+                      focusedChannel = channel;
+                      focusedProgram = channel.current_program ?? null;
+                      selectedRowIdx = rowIdx;
+                    }}
+                    class="absolute inset-y-0 left-0 right-0 rounded-lg cursor-pointer"
+                    playSound={true}
+                  >
+                    {#snippet children({ focused })}
+                      <div
+                        class="w-full h-full rounded-lg flex items-center px-4 border {focused
+                          ? 'bg-[#f1f1f1] text-[#0f0f0f] font-semibold border-white shadow-md z-20'
+                          : isCurrentRow
+                            ? 'bg-white/30 text-[#f1f1f1] border-white/20'
+                            : 'bg-white/10 text-white/70 border-white/5'}"
+                      >
+                        <span class="text-xs">Sin programación disponible</span>
+                      </div>
+                    {/snippet}
+                  </Focusable>
+                {:else}
+                  <!-- Program Airing Blocks (ytvlr-epg-airing-compact-renderer) - NO SCALE, NO TRANSITION -->
+                  {#each blocks as block, bIdx (block.program.id + block.leftPx)}
+                    <Focusable
+                      focusKey={getBlockFocusKey(channel.id, block.program.id, block.leftPx)}
+                      onEnterPress={() => onPlay(channel)}
+                      onArrowPress={(direction) => handleArrowPress(direction, rowIdx, bIdx, blocks)}
+                      onFocus={() => handleProgramFocus(channel, block.program, block.leftPx, block.widthPx, rowIdx)}
+                      class="absolute top-0 bottom-0 cursor-pointer rounded-lg"
+                      style="left: {block.leftPx}px; width: {block.widthPx}px; height: {ROW_H}px;"
+                      playSound={true}
+                    >
+                      {#snippet children({ focused })}
+                        <div
+                          class="w-full h-full rounded-lg px-3 flex flex-col justify-center border {focused
+                            ? 'bg-[#f1f1f1] text-[#0f0f0f] font-semibold border-white shadow-lg z-20'
+                            : isCurrentRow
+                              ? 'bg-white/30 text-[#f1f1f1] border-white/20 hover:bg-white/35'
+                              : 'bg-white/10 text-white/70 border-white/5 hover:bg-white/15'}"
+                        >
+                          <div class="flex items-center gap-1.5">
+                            {#if block.isLive && !focused}
+                              <span class="w-1.5 h-1.5 rounded-full bg-[#ff0033] shrink-0 animate-pulse"></span>
+                            {/if}
+                            <span class="text-xs font-semibold truncate leading-tight">
+                              {block.program.title}
+                            </span>
+                          </div>
+
+                          <div class="flex items-center gap-1.5 text-[10px] opacity-75 mt-0.5 tabular-nums">
+                            <span>{formatProgramTime(block.program.start_time)}</span>
+                            <span>–</span>
+                            <span>{formatProgramTime(block.program.end_time)}</span>
+                          </div>
+                        </div>
+                      {/snippet}
+                    </Focusable>
+                  {/each}
+                {/if}
+              </div>
+            </div>
+          </div>
+        {/each}
+      </div>
     </div>
   </div>
 </div>

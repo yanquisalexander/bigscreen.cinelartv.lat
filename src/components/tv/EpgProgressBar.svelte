@@ -18,8 +18,7 @@
   );
 
   $effect(() => {
-    let rafId = 0;
-    const tick = () => {
+    const update = () => {
       const now = Date.now();
       const start = new Date(program.start_time).getTime();
       const end = new Date(program.end_time).getTime();
@@ -30,10 +29,10 @@
         const mins = Math.round(diff / 60000);
         labelEl.textContent = mins <= 0 ? 'Terminando' : mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)}h`;
       }
-      rafId = requestAnimationFrame(tick);
     };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
+    update();
+    const timer = setInterval(update, 30_000);
+    return () => clearInterval(timer);
   });
 </script>
 
