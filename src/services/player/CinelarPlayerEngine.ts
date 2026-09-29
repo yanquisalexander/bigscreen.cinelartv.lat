@@ -467,7 +467,9 @@ export class CinelarPlayerEngine {
     this.lastMediaTime = currentTime;
     this.lastWallClock = now;
 
-    // 2. Buffer Skew Check vía Shaka getBufferedInfo()
+    // 2. Buffer Skew Tracking (solo telemetría — NO activar recuperación automática)
+    //    Buffer skew es normal: audio se descarga más rápido que video por ser segmentos más pequeños.
+    //    Una diferencia de 5-15s entre audio/video buffered es esperable y NO causa desync perceptible.
     try {
       const bufInfo = this.player.getBufferedInfo?.();
       if (bufInfo && Array.isArray(bufInfo.audio) && Array.isArray(bufInfo.video) && bufInfo.audio.length > 0 && bufInfo.video.length > 0) {
@@ -477,20 +479,7 @@ export class CinelarPlayerEngine {
         if (audioRange && videoRange) {
           const audioAhead = Math.max(0, audioRange.end - currentTime);
           const videoAhead = Math.max(0, videoRange.end - currentTime);
-          const skew = audioAhead - videoAhead; // Positivo: audio adelantado con más buffer, video rezagado
-          this.lastMeasuredSkew = skew;
-
-          if (Math.abs(skew) > 0.35) {
-            this.consecutiveSkewWarnings++;
-            pdbg('engine.sync', `Buffer skew detectado: ${skew.toFixed(3)}s (audioAhead=${audioAhead.toFixed(2)}s, videoAhead=${videoAhead.toFixed(2)}s, warnCount=${this.consecutiveSkewWarnings})`);
-            this.emit('avdesync', { skew, audioAhead, videoAhead });
-
-            if (this.consecutiveSkewWarnings >= 2) {
-              this.recoverFromDesync(skew, 'buffer_skew');
-            }
-          } else {
-            this.consecutiveSkewWarnings = Math.max(0, this.consecutiveSkewWarnings - 1);
-          }
+          this.lastMeasuredSkew = audioAhead - videoAhead;
         }
       }
     } catch { }
