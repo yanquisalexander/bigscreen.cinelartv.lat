@@ -279,17 +279,10 @@
   });
 
   // ── Top-Anchored Virtualization ──
-  const maxTopRowIdx = $derived(Math.max(0, channels.length - VISIBLE_ROW_COUNT));
-
-  function updateTopAnchoredScroll(targetRowIdx: number) {
-    selectedRowIdx = targetRowIdx;
-    topRowIdx = Math.min(targetRowIdx, maxTopRowIdx);
-  }
-
-  // Visible window of rows in DOM: topRowIdx - 1 (overscan) up to topRowIdx + VISIBLE_ROW_COUNT + 1
+  // Visible window of rows in DOM: topRowIdx - 2 (overscan) up to topRowIdx + VISIBLE_ROW_COUNT + 4 (generous buffer)
   const visibleRows = $derived.by(() => {
-    const start = Math.max(0, topRowIdx - 1);
-    const end = Math.min(channels.length, topRowIdx + VISIBLE_ROW_COUNT + 2);
+    const start = Math.max(0, topRowIdx - 2);
+    const end = Math.min(channels.length, topRowIdx + VISIBLE_ROW_COUNT + 4);
     const rows = [];
     for (let idx = start; idx < end; idx++) {
       rows.push({
@@ -313,6 +306,32 @@
     }
   }
 
+  // ── Guaranteed Focus Switching & Scrolling ──
+  function focusRowChannel(targetRowIdx: number) {
+    if (targetRowIdx < 0 || targetRowIdx >= channels.length) return;
+    selectedRowIdx = targetRowIdx;
+    topRowIdx = targetRowIdx; // Anchor target row to the top slot of the viewport
+
+    const targetChannel = channels[targetRowIdx];
+    const targetKey = getTargetFocusKeyForRow(targetChannel, focusedProgram);
+
+    const tryFocus = () => {
+      if (doesFocusableExist(targetKey)) {
+        setFocus(targetKey);
+        return true;
+      }
+      return false;
+    };
+
+    if (!tryFocus()) {
+      requestAnimationFrame(() => {
+        if (!tryFocus()) {
+          setTimeout(tryFocus, 16);
+        }
+      });
+    }
+  }
+
   // ── Navigation Handlers ──
   function handleArrowPress(direction: string, rowIdx: number, blockIdx: number, blocks: EpgBlock[]): boolean {
     if (direction === 'up') {
@@ -320,29 +339,13 @@
         if (onArrowUp) return onArrowUp();
         return true;
       }
-      const prevRowIdx = rowIdx - 1;
-      updateTopAnchoredScroll(prevRowIdx);
-      const prevChannel = channels[prevRowIdx];
-      const targetKey = getTargetFocusKeyForRow(prevChannel, focusedProgram);
-      requestAnimationFrame(() => {
-        tick().then(() => {
-          if (doesFocusableExist(targetKey)) setFocus(targetKey);
-        });
-      });
+      focusRowChannel(rowIdx - 1);
       return false;
     }
 
     if (direction === 'down') {
       if (rowIdx < channels.length - 1) {
-        const nextRowIdx = rowIdx + 1;
-        updateTopAnchoredScroll(nextRowIdx);
-        const nextChannel = channels[nextRowIdx];
-        const targetKey = getTargetFocusKeyForRow(nextChannel, focusedProgram);
-        requestAnimationFrame(() => {
-          tick().then(() => {
-            if (doesFocusableExist(targetKey)) setFocus(targetKey);
-          });
-        });
+        focusRowChannel(rowIdx + 1);
         return false;
       }
       return false;
@@ -352,7 +355,7 @@
       if (blockIdx > 0) {
         const prevBlock = blocks[blockIdx - 1];
         const prevKey = getBlockFocusKey(channels[rowIdx].id, prevBlock.program.id, prevBlock.leftPx);
-        setFocus(prevKey);
+        if (doesFocusableExist(prevKey)) setFocus(prevKey);
         return false;
       }
       return false;
@@ -362,7 +365,7 @@
       if (blockIdx < blocks.length - 1) {
         const nextBlock = blocks[blockIdx + 1];
         const nextKey = getBlockFocusKey(channels[rowIdx].id, nextBlock.program.id, nextBlock.leftPx);
-        setFocus(nextKey);
+        if (doesFocusableExist(nextKey)) setFocus(nextKey);
         return false;
       }
       return false;
