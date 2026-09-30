@@ -8,7 +8,9 @@ import {
   loadTokenExpiry,
   persistTokenExpiry,
   clearTokenExpiry,
+  isTokenExpiringSoon,
 } from '@/features/auth/tokenScheduler';
+import { getCurrentSession } from '@/features/auth/session';
 
 const TOKEN_KEY = 'cinelar_access_token';
 const REFRESH_KEY = 'cinelar_refresh_token';
@@ -110,18 +112,44 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isGuest: false,
   isReady: false,
 
-  initialize: () => {
+  initialize: async () => {
     const tokens = loadTokens();
-    const session = loadSession();
-    const profileId = loadProfileId();
     const isGuest = localStorage.getItem(GUEST_KEY) === '1';
 
     if (tokens) {
+      let session = loadSession();
+      let accessToken = tokens.accessToken;
+
+      if (isTokenExpiringSoon(tokens.expiresAt) && tokens.refreshToken) {
+        const result = await get().refreshNow();
+        if (result.ok) {
+          accessToken = result.accessToken;
+        } else if (result.tokenInvalid) {
+          get().logout();
+          set({ isReady: true });
+          return;
+        }
+      }
+
+      try {
+        const freshSession = await getCurrentSession(accessToken);
+        saveSession(freshSession);
+        session = freshSession;
+      } catch {
+        // Fallback to cached session if offline
+      }
+
+      const profileId = loadProfileId();
       const profiles = session?.current_user?.profiles ?? [];
-      const profile =
+      let profile =
         profiles.find((p) => p.id === profileId) ??
         session?.current_user?.current_profile ??
         null;
+      if (profileId && !profiles.find((p) => p.id === profileId)) {
+        localStorage.removeItem(PROFILE_KEY);
+        profile = null;
+      }
+
       set({
         tokens,
         session,

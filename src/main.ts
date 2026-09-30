@@ -8,15 +8,13 @@ import { $body } from './lib/dom-selector';
 import { authStore, useAuthStore } from '@/stores/authStore';
 import { configStore } from '@/stores/configStore';
 import { startTokenScheduler } from '@/features/auth/tokenScheduler';
-import { recoverAuthSession } from '@/features/auth/recoverSession';
 import { initAnalytics, trackAppLaunch, trackAppError } from '@/lib/analytics';
 import { initAppNavigation } from '@/services/appNavigation';
 
 // ── Initialize stores immediately ───────────────────────────────────────────
-authStore.getState().initialize();
+void authStore.getState().initialize();
 configStore.getState().loadConfig();
 startTokenScheduler(useAuthStore);
-void recoverAuthSession();
 
 // ── Runtime & CTV tools ──────────────────────────────────────────────────────
 initRuntime();
