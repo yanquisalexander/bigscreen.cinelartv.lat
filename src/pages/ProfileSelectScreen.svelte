@@ -12,57 +12,61 @@
   import CinelarLogo from '@/components/ui/CinelarLogo.svelte';
 
   const ROTATION_INTERVAL = 8000;
-  const CROSSFADE_MS = 900;
+  const FADE_MS = 800;
 
   let selecting = $state<string | null>(null);
   let banners = $state<ContentItem[]>([]);
   let bannerIndex = $state(0);
-  let prevBannerUrl = $state<string | null>(null);
-  let timerId: ReturnType<typeof setTimeout> | null = null;
-  let clearPrevTimerId: ReturnType<typeof setTimeout> | null = null;
+  let currentUrl = $state<string | null>(null);
+  let blackOverlayOpacity = $state(0);
+  let panDirection = $state<'left' | 'right'>('right');
+  let panKey = $state(0); // Force re-render to restart animation
+
+  let rotationTimer: ReturnType<typeof setInterval> | null = null;
 
   const tokens = $derived($svelteAuthStore.tokens);
   const session = $derived($svelteAuthStore.session);
   const clientEndpoint = $derived($svelteConfigStore.config.CLIENT_ENDPOINT);
+  const accessToken = $derived(tokens?.accessToken ?? null);
+
+  function resolveBannerUrl(item: ContentItem | undefined | null): string | null {
+    if (!item) return null;
+    return resolveBackdrop(
+      item.images,
+      item.banner_resized ?? item.banner ?? item.cover_resized ?? item.cover,
+      clientEndpoint,
+      'xlarge',
+    );
+  }
+
+  let exploreRequested = false;
 
   $effect(() => {
-    if (!tokens?.accessToken) return;
-    getExplore(tokens.accessToken, { img_variants: ['xlarge', 'large'] })
+    if (!accessToken || exploreRequested) return;
+    exploreRequested = true;
+    let cancelled = false;
+    getExplore(accessToken, { img_variants: ['xlarge', 'large'] })
       .then((res) => {
+        if (cancelled) return;
         const items = res.banner_content;
-        if (items?.length) banners = items;
+        if (items?.length) {
+          banners = items;
+          const firstUrl = resolveBannerUrl(items[0]);
+          if (firstUrl) {
+            currentUrl = firstUrl;
+            panDirection = 'right';
+          }
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        exploreRequested = false;
+      });
+    return () => {
+      cancelled = true;
+    };
   });
 
   const featuredItem = $derived(banners[bannerIndex] ?? null);
-
-  const backdropUrl = $derived.by(() => {
-    if (!featuredItem) return null;
-    return resolveBackdrop(
-      featuredItem.images,
-      featuredItem.banner_resized ?? featuredItem.banner ?? featuredItem.cover_resized ?? featuredItem.cover,
-      clientEndpoint,
-      'xlarge'
-    );
-  });
-
-  $effect(() => {
-    if (banners.length <= 1) return;
-    timerId = setTimeout(() => {
-      prevBannerUrl = backdropUrl;
-      bannerIndex = (bannerIndex + 1) % banners.length;
-      if (clearPrevTimerId) clearTimeout(clearPrevTimerId);
-      clearPrevTimerId = setTimeout(() => {
-        prevBannerUrl = null;
-      }, CROSSFADE_MS);
-    }, ROTATION_INTERVAL);
-
-    return () => {
-      if (timerId) clearTimeout(timerId);
-      if (clearPrevTimerId) clearTimeout(clearPrevTimerId);
-    };
-  });
 
   const logoUrl = $derived.by(() => {
     if (!featuredItem) return null;
@@ -78,13 +82,50 @@
     return [];
   });
 
+  // Rotación con fade-to-black y black-to-fade
   $effect(() => {
-    if (!tokens) {
+    const count = banners.length;
+    if (count <= 1) return;
+
+    rotationTimer = setInterval(() => {
+      const nextIndex = (bannerIndex + 1) % count;
+      const nextUrl = resolveBannerUrl(banners[nextIndex]);
+
+      if (!nextUrl) {
+        bannerIndex = nextIndex;
+        return;
+      }
+
+      // 1. Fade to black
+      blackOverlayOpacity = 1;
+
+      // 2. Después del fade out, cambiar imagen
+      setTimeout(() => {
+        currentUrl = nextUrl;
+        panDirection = nextIndex % 2 === 0 ? 'right' : 'left';
+        panKey++; // Reiniciar animación del pan
+        bannerIndex = nextIndex;
+
+        // 3. Fade from black
+        setTimeout(() => {
+          blackOverlayOpacity = 0;
+        }, 100);
+      }, FADE_MS);
+    }, ROTATION_INTERVAL);
+
+    return () => {
+      if (rotationTimer) clearInterval(rotationTimer);
+      rotationTimer = null;
+    };
+  });
+
+  $effect(() => {
+    if (!accessToken) {
       replace('/auth');
       return;
     }
     if (!session) {
-      getCurrentSession(tokens.accessToken)
+      getCurrentSession(accessToken)
         .then((s) => authStore.getState().setSession(s))
         .catch(() => replace('/auth'));
     }
@@ -111,28 +152,34 @@
 </script>
 
 <div class="relative w-screen h-screen overflow-hidden bg-black flex items-center">
-<CinelarLogo class="fixed top-[clamp(1rem,3vh,1.5rem)] right-[clamp(1.5rem,4vw,2rem)] text-white h-[clamp(1.5rem,2vw,2rem)] z-[999]" />
-  <!-- Layer 1: Cinematic Backdrop -->
-  <div class="absolute inset-0 z-0">
-    {#if prevBannerUrl}
-      <img
-        src={prevBannerUrl}
-        alt=""
-        aria-hidden="true"
-        class="absolute inset-0 w-full h-full object-cover animate-backdrop-out"
-      />
+  <CinelarLogo class="fixed top-[clamp(1rem,3vh,1.5rem)] right-[clamp(1.5rem,4vw,2rem)] text-white h-[clamp(1.5rem,2vw,2rem)] z-[999]" />
+
+  <!-- Capa de imagen con pan -->
+  <div class="absolute inset-0 z-0 overflow-hidden bg-black">
+    {#if currentUrl}
+      <div
+        key={panKey}
+        class="absolute inset-0 {panDirection === 'right' ? 'pan-right' : 'pan-left'}"
+      >
+        <img
+          src={currentUrl}
+          alt=""
+          aria-hidden="true"
+          class="absolute inset-0 w-full h-full object-cover"
+        />
+      </div>
     {/if}
-    {#if backdropUrl}
-      <img
-        src={backdropUrl}
-        alt=""
-        aria-hidden="true"
-        class="absolute inset-0 w-full h-full object-cover opacity-50 animate-backdrop"
-      />
-    {/if}
-    <div class="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent z-10"></div>
-    <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/30 z-10"></div>
   </div>
+
+  <!-- Overlay negro para fade-to-black y black-to-fade -->
+  <div
+    class="absolute inset-0 z-[1] bg-black transition-opacity duration-[800ms] ease-in-out pointer-events-none"
+    style="opacity: {blackOverlayOpacity}"
+  ></div>
+
+  <!-- Gradientes encima del overlay -->
+  <div class="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent z-10"></div>
+  <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/30 z-10"></div>
 
   <!-- Layer 2: Left column profiles -->
   <div class="relative z-20 pl-[clamp(3rem,6vw,6rem)] flex flex-col justify-center gap-5 max-h-screen py-10">
@@ -198,40 +245,44 @@
   <!-- Layer 3: Cinematic metadata (right) -->
   {#if featuredItem}
     <div class="absolute right-[clamp(3rem,6vw,6rem)] bottom-[clamp(4rem,10vh,8rem)] z-20 max-w-[clamp(20rem,30vw,32rem)] text-right">
-      {#if logoUrl}
-        <img
-          src={logoUrl}
-          alt={featuredItem.title}
-          class="h-[clamp(2.5rem,5vh,4rem)] max-w-[100%] object-contain object-right ml-auto mb-3 drop-shadow-2xl"
-        />
-      {:else}
-        <h2 class="text-[clamp(1.5rem,2.5vw,2.2rem)] font-black text-white leading-tight mb-3 drop-shadow-lg tracking-tight">
-          {featuredItem.title}
-        </h2>
-      {/if}
+      {#key featuredItem.id}
+        <div class="animate-fade-in">
+          {#if logoUrl}
+            <img
+              src={logoUrl}
+              alt={featuredItem.title}
+              class="h-[clamp(2.5rem,5vh,4rem)] max-w-[100%] object-contain object-right ml-auto mb-3 drop-shadow-2xl"
+            />
+          {:else}
+            <h2 class="text-[clamp(1.5rem,2.5vw,2.2rem)] font-black text-white leading-tight mb-3 drop-shadow-lg tracking-tight">
+              {featuredItem.title}
+            </h2>
+          {/if}
 
-      <div class="flex items-center justify-end gap-2 mb-2 text-xs">
-        {#if featuredItem.year}
-          <span class="px-2 py-0.5 rounded bg-white/10 text-white/90 backdrop-blur-sm font-semibold">
-            {featuredItem.year}
-          </span>
-        {/if}
-        {#if featuredItem.duration}
-          <span class="text-white/60">{featuredItem.duration} min</span>
-        {/if}
-      </div>
+          <div class="flex items-center justify-end gap-2 mb-2 text-xs">
+            {#if featuredItem.year}
+              <span class="px-2 py-0.5 rounded bg-white/10 text-white/90 backdrop-blur-sm font-semibold">
+                {featuredItem.year}
+              </span>
+            {/if}
+            {#if featuredItem.duration}
+              <span class="text-white/60">{featuredItem.duration} min</span>
+            {/if}
+          </div>
 
-      {#if genreTags.length > 0}
-        <p class="text-[clamp(0.75rem,1vw,0.875rem)] text-white/50 font-medium tracking-wide">
-          {genreTags.join(' · ')}
-        </p>
-      {/if}
+          {#if genreTags.length > 0}
+            <p class="text-[clamp(0.75rem,1vw,0.875rem)] text-white/50 font-medium tracking-wide">
+              {genreTags.join(' · ')}
+            </p>
+          {/if}
 
-      {#if featuredItem.description}
-        <p class="text-[clamp(0.8rem,1vw,0.9rem)] text-white/40 mt-2 line-clamp-2 leading-relaxed">
-          {featuredItem.description}
-        </p>
-      {/if}
+          {#if featuredItem.description}
+            <p class="text-[clamp(0.8rem,1vw,0.9rem)] text-white/40 mt-2 line-clamp-2 leading-relaxed">
+              {featuredItem.description}
+            </p>
+          {/if}
+        </div>
+      {/key}
     </div>
   {/if}
 </div>

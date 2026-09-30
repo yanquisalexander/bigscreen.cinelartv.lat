@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getApiConfig } from '@/api/client';
+import { getApiConfig } from '@/api/config';
 import { zustandToSvelte } from '@/lib/zustandToSvelte';
 
 export interface SiteSettings {

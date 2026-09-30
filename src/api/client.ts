@@ -1,22 +1,13 @@
-import type { RemoteConfig } from '@/types/config';
-import { DEFAULT_CONFIG } from '@/types/config';
+import { getApiConfig } from '@/api/config';
 import { useAuthStore } from '@/stores/authStore';
 
-let configRef: RemoteConfig = { ...DEFAULT_CONFIG };
+export { setApiConfig, getApiConfig } from '@/api/config';
 
 type RefreshResult =
   | { ok: true; token: string }
   | { ok: false; tokenInvalid: boolean };
 
 let pendingRefresh: Promise<RefreshResult> | null = null;
-
-export function setApiConfig(config: RemoteConfig) {
-  configRef = config;
-}
-
-export function getApiConfig(): RemoteConfig {
-  return configRef;
-}
 
 export class APIError extends Error {
   status: number;
@@ -39,41 +30,32 @@ async function parseResponse(response: Response): Promise<unknown> {
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function tryRefreshToken(): Promise<RefreshResult> {
-  const refreshToken = useAuthStore.getState().getRefreshToken();
-  if (!refreshToken) return { ok: false, tokenInvalid: false };
+  const state = useAuthStore.getState();
 
-  try {
-    const { CLIENT_ENDPOINT } = getApiConfig();
-    const response = await fetch(`${CLIENT_ENDPOINT}/api/v1/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-      signal: AbortSignal.timeout(15000),
-    });
+  // One retry on transient failures (network blip, timeout, 5xx).
+  const maxAttempts = 2;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const result = await state.refreshNow();
 
-    const data = (await parseResponse(response)) as {
-      access_token?: string;
-      refresh_token?: string;
-    };
-
-    if (!response.ok || !data.access_token) {
-      return {
-        ok: false,
-        tokenInvalid: response.status === 401 || response.status === 403,
-      };
+    if (result.ok) {
+      return { ok: true, token: result.accessToken };
     }
 
-    const current = useAuthStore.getState().tokens;
-    useAuthStore.getState().updateTokens({
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token ?? current?.refreshToken,
-    });
+    if (result.tokenInvalid) {
+      return { ok: false, tokenInvalid: true };
+    }
 
-    return { ok: true, token: data.access_token };
-  } catch {
-    return { ok: false, tokenInvalid: false };
+    if (attempt < maxAttempts - 1) {
+      await sleep(400 * (attempt + 1));
+    }
   }
+
+  return { ok: false, tokenInvalid: false };
 }
 
 function getRefreshedToken(): Promise<RefreshResult> {
@@ -86,10 +68,21 @@ function getRefreshedToken(): Promise<RefreshResult> {
   return pendingRefresh;
 }
 
+function extractErrorMessage(body: unknown, fallbackStatus: number): string {
+  const errorBody = body as Record<string, unknown> | null;
+  return (
+    (errorBody?.error_description as string) ??
+    (errorBody?.error as string) ??
+    (errorBody?.message as string) ??
+    `HTTP ${fallbackStatus}`
+  );
+}
+
 export async function apiRequest<T>(
   endpoint: string,
   init: RequestInit = {},
   accessToken?: string,
+  options: { skipRefresh?: boolean } = {},
 ): Promise<T> {
   const { CLIENT_ENDPOINT } = getApiConfig();
   const url = `${CLIENT_ENDPOINT}${endpoint}`;
@@ -111,7 +104,7 @@ export async function apiRequest<T>(
 
   const body = await parseResponse(response);
 
-  if (response.status === 401 && !(init as RequestInit & { _retry?: boolean })._retry) {
+  if (response.status === 401 && !options.skipRefresh) {
     const result = await getRefreshedToken();
 
     if (result.ok) {
@@ -120,19 +113,16 @@ export async function apiRequest<T>(
         ...init,
         headers,
         signal: init.signal ?? AbortSignal.timeout(15000),
-        _retry: true,
-      } as RequestInit & { _retry?: boolean });
+      });
 
       const retryBody = await parseResponse(retryResponse);
 
       if (!retryResponse.ok) {
-        const errorBody = retryBody as Record<string, unknown>;
-        const message =
-          (errorBody?.error_description as string) ??
-          (errorBody?.error as string) ??
-          (errorBody?.message as string) ??
-          `HTTP ${retryResponse.status}`;
-        throw new APIError(message, retryResponse.status, retryBody);
+        throw new APIError(
+          extractErrorMessage(retryBody, retryResponse.status),
+          retryResponse.status,
+          retryBody,
+        );
       }
 
       return retryBody as T;
@@ -143,23 +133,19 @@ export async function apiRequest<T>(
       throw new APIError('Sesión expirada', 401, { error: 'session_expired' });
     }
 
-    const errorBody = body as Record<string, unknown>;
-    const message =
-      (errorBody?.error_description as string) ??
-      (errorBody?.error as string) ??
-      (errorBody?.message as string) ??
-      `HTTP ${response.status}`;
-    throw new APIError(message, response.status, body);
+    throw new APIError(
+      extractErrorMessage(body, response.status),
+      response.status,
+      body,
+    );
   }
 
   if (!response.ok) {
-    const errorBody = body as Record<string, unknown>;
-    const message =
-      (errorBody?.error_description as string) ??
-      (errorBody?.error as string) ??
-      (errorBody?.message as string) ??
-      `HTTP ${response.status}`;
-    throw new APIError(message, response.status, body);
+    throw new APIError(
+      extractErrorMessage(body, response.status),
+      response.status,
+      body,
+    );
   }
 
   return body as T;

@@ -23,13 +23,4 @@ export async function deassignProfile(
   }, accessToken);
 }
 
-export async function refreshAccessToken(
-  refreshToken: string,
-): Promise<{ access_token: string; refresh_token?: string }> {
-  return apiRequest('/api/v1/auth/refresh', {
-    method: 'POST',
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
-}
-
 export type { Profile };

@@ -8,7 +8,7 @@
   import EpgGrid from '@/components/tv/EpgGrid.svelte';
   import { svelteAuthStore } from '@/stores/authStore';
   import { svelteLiveTvFavoritesStore, liveTvFavoritesStore } from '@/stores/liveTvFavoritesStore';
-  import { getApiConfig } from '@/api/client';
+  import { getApiConfig } from '@/api/config';
   import { supportsLiveTV, playLiveChannel, type LiveChannelInfo } from '@/services/NativeBridge';
   import { getLiveTvChannels, type LiveTvChannel } from '@/api/live';
   import { isBackKey } from '@/utils/helpers';

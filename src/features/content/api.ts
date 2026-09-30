@@ -1,5 +1,6 @@
 import type { ContentDetail, WatchData } from '@/types/content';
 import { apiRequest } from '@/api/client';
+import { getApiConfig } from '@/api/config';
 import { prebufferStream, cancelPrebuffer } from './prebuffer';
 
 // --- Prefetch cache for getWatchData ---
@@ -153,6 +154,27 @@ export async function sendStreamEnd(
     method: 'POST',
     body: JSON.stringify({ session_id: deviceSessionToken }),
   }, accessToken);
+}
+
+/**
+ * Fire-and-forget authenticated stream-end for pagehide/unload.
+ * Uses `keepalive` fetch (not sendBeacon) so the Authorization header
+ * is sent and the request can complete while the page is closing.
+ */
+export function sendStreamEndBeacon(
+  accessToken: string,
+  deviceSessionToken: string,
+): void {
+  const { CLIENT_ENDPOINT } = getApiConfig();
+  fetch(`${CLIENT_ENDPOINT}/stream/end`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ session_id: deviceSessionToken }),
+    keepalive: true,
+  }).catch(() => {});
 }
 
 // --- Device session token (persisted across navigations) ---

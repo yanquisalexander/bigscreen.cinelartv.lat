@@ -38,12 +38,15 @@
 
       polling = true;
       const interval = getPollInterval(response.interval);
+      let networkRetries = 0;
+      const MAX_NETWORK_RETRIES = 10;
 
       const poll = async () => {
         if (!polling) return;
         try {
           const tokenResponse = await pollDeviceToken(clientId, response.device_code);
           const status = classifyTokenResponse(tokenResponse);
+          networkRetries = 0;
 
           switch (status) {
             case 'success':
@@ -52,6 +55,9 @@
               authStore.getState().login({
                 accessToken: tokenResponse.access_token,
                 refreshToken: tokenResponse.refresh_token,
+                expiresAt: tokenResponse.expires_in
+                  ? Date.now() + tokenResponse.expires_in * 1000
+                  : undefined,
               });
               try {
                 const session = await getCurrentSession(tokenResponse.access_token);
@@ -77,9 +83,14 @@
               break;
           }
         } catch {
-          if (polling) {
-            setTimeout(poll, interval);
+          if (!polling) return;
+          networkRetries += 1;
+          if (networkRetries > MAX_NETWORK_RETRIES) {
+            polling = false;
+            error = 'No se pudo conectar con el servidor. Reintentá.';
+            return;
           }
+          setTimeout(poll, interval);
         }
       };
 

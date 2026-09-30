@@ -1,7 +1,14 @@
-import { create } from 'zustand';
 import type { TokenPair } from '@/types/auth';
+import { create } from 'zustand';
 import type { CurrentSessionResponse, Profile } from '@/types/api';
 import { zustandToSvelte } from '@/lib/zustandToSvelte';
+import { getApiConfig } from '@/api/config';
+import { requestTokenRefresh } from '@/features/auth/tokenRefresh';
+import {
+  loadTokenExpiry,
+  persistTokenExpiry,
+  clearTokenExpiry,
+} from '@/features/auth/tokenScheduler';
 
 const TOKEN_KEY = 'cinelar_access_token';
 const REFRESH_KEY = 'cinelar_refresh_token';
@@ -9,12 +16,25 @@ const SESSION_KEY = 'cinelar_session';
 const PROFILE_KEY = 'cinelar_profile_id';
 const GUEST_KEY = 'cinelar_guest';
 
+const REFRESH_COOLDOWN_MS = 30_000;
+
+let refreshInFlight: Promise<RefreshNowResult> | null = null;
+let lastRefreshAt = 0;
+
+export type RefreshNowResult =
+  | { ok: true; accessToken: string }
+  | { ok: false; tokenInvalid: boolean };
+
 function loadTokens(): TokenPair | null {
   try {
     const access = localStorage.getItem(TOKEN_KEY);
     const refresh = localStorage.getItem(REFRESH_KEY);
     if (!access) return null;
-    return { accessToken: access, refreshToken: refresh ?? undefined };
+    return {
+      accessToken: access,
+      refreshToken: refresh ?? undefined,
+      expiresAt: loadTokenExpiry(),
+    };
   } catch {
     return null;
   }
@@ -24,7 +44,10 @@ function saveTokens(tokens: TokenPair) {
   localStorage.setItem(TOKEN_KEY, tokens.accessToken);
   if (tokens.refreshToken) {
     localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
+  } else if (tokens.refreshToken === undefined) {
+    localStorage.removeItem(REFRESH_KEY);
   }
+  persistTokenExpiry(tokens.expiresAt);
 }
 
 function clearTokens() {
@@ -33,6 +56,7 @@ function clearTokens() {
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(PROFILE_KEY);
   localStorage.removeItem(GUEST_KEY);
+  clearTokenExpiry();
 }
 
 function loadSession(): CurrentSessionResponse | null {
@@ -74,6 +98,8 @@ interface AuthState {
   updateTokens: (tokens: TokenPair) => void;
   initialize: () => void;
   getRefreshToken: () => string | null;
+  getAccessToken: () => string | null;
+  refreshNow: () => Promise<RefreshNowResult>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -90,13 +116,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const profileId = loadProfileId();
     const isGuest = localStorage.getItem(GUEST_KEY) === '1';
 
-    if (tokens && session) {
-      const profiles = session.current_user?.profiles ?? [];
-      const profile = profiles.find((p) => p.id === profileId) ?? null;
+    if (tokens) {
+      const profiles = session?.current_user?.profiles ?? [];
+      const profile =
+        profiles.find((p) => p.id === profileId) ??
+        session?.current_user?.current_profile ??
+        null;
       set({
         tokens,
         session,
-        selectedProfile: profile ?? session.current_user?.current_profile ?? null,
+        selectedProfile: profile,
         isAuthenticated: true,
         isGuest: false,
         isReady: true,
@@ -108,13 +137,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: (tokens: TokenPair) => {
     localStorage.removeItem(GUEST_KEY);
-    const merged = {
+    saveTokens({
       accessToken: tokens.accessToken,
-      refreshToken:
-        tokens.refreshToken ?? localStorage.getItem(REFRESH_KEY) ?? undefined,
-    };
-    saveTokens(merged);
-    set({ tokens: merged, isAuthenticated: true, isGuest: false });
+      refreshToken: tokens.refreshToken,
+      expiresAt: tokens.expiresAt,
+    });
+    set({
+      tokens: {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresAt: tokens.expiresAt,
+      },
+      isAuthenticated: true,
+      isGuest: false,
+    });
   },
 
   logout: () => {
@@ -159,23 +195,86 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   updateTokens: (tokens: TokenPair) => {
-    const merged = {
+    const current = get().tokens;
+
+    // Evitar actualizaciones innecesarias que pueden disparar loops
+    if (
+      current &&
+      current.accessToken === tokens.accessToken &&
+      current.refreshToken === tokens.refreshToken &&
+      current.expiresAt === tokens.expiresAt
+    ) {
+      return;
+    }
+
+    const merged: TokenPair = {
       accessToken: tokens.accessToken,
       refreshToken:
         tokens.refreshToken ??
-        get().tokens?.refreshToken ??
+        current?.refreshToken ??
         localStorage.getItem(REFRESH_KEY) ??
         undefined,
+      expiresAt:
+        tokens.expiresAt ??
+        (current && tokens.accessToken === current.accessToken
+          ? current.expiresAt
+          : undefined),
     };
     saveTokens(merged);
     set({ tokens: merged });
   },
 
   getRefreshToken: () => get().tokens?.refreshToken ?? null,
+
+  getAccessToken: () => get().tokens?.accessToken ?? null,
+
+  refreshNow: async (): Promise<RefreshNowResult> => {
+    // Retornar inmediatamente si ya hay un refresh en vuelo
+    if (refreshInFlight) return refreshInFlight;
+
+    // Asignar la Promise inmediatamente para prevenir llamadas concurrentes
+    refreshInFlight = (async (): Promise<RefreshNowResult> => {
+      const state = get();
+      const refreshToken = state.tokens?.refreshToken;
+      const currentAccess = state.tokens?.accessToken;
+
+      if (!refreshToken) {
+        return { ok: false, tokenInvalid: state.isAuthenticated && !state.isGuest };
+      }
+
+      const expiresAt = state.tokens?.expiresAt;
+      if (
+        currentAccess &&
+        lastRefreshAt > 0 &&
+        Date.now() - lastRefreshAt < REFRESH_COOLDOWN_MS &&
+        expiresAt &&
+        expiresAt > Date.now()
+      ) {
+        return { ok: true, accessToken: currentAccess };
+      }
+
+      const { CLIENT_ENDPOINT } = getApiConfig();
+      const outcome = await requestTokenRefresh(CLIENT_ENDPOINT, refreshToken);
+
+      if (!outcome.ok) {
+        return { ok: false, tokenInvalid: outcome.tokenInvalid };
+      }
+
+      lastRefreshAt = Date.now();
+      get().updateTokens({
+        accessToken: outcome.accessToken,
+        refreshToken: outcome.refreshToken,
+        expiresAt: outcome.expiresAt,
+      });
+
+      return { ok: true, accessToken: outcome.accessToken };
+    })().finally(() => {
+      refreshInFlight = null;
+    });
+
+    return refreshInFlight;
+  },
 }));
 
-/** Zustand store — use `.getState()` / `.subscribe()` for Zustand/WC consumers */
 export const authStore = useAuthStore;
-
-/** Svelte-readable store — subscribe via `$authStore` in Svelte templates */
 export const svelteAuthStore = zustandToSvelte(useAuthStore);

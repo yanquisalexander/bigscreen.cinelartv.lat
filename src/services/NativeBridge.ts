@@ -53,6 +53,16 @@ export const prefersNative = (): boolean =>
 export const launchNativePlayer = (data: NativePlayerData): void =>
   getPlatformInstance().media.playContent(data);
 
+/**
+ * Best-effort push of a refreshed access token to a running native player.
+ * No-op on platforms that don't implement it.
+ */
+export const updateNativePlayerAccessToken = (data: {
+  accessToken: string;
+  refreshToken?: string;
+}): boolean =>
+  getPlatformInstance().media.updateAccessToken?.(data) ?? false;
+
 export const enterPiP = (): void =>
   getPlatformInstance().media.enterPiP();
 

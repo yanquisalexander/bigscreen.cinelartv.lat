@@ -39,5 +39,7 @@ export function classifyTokenResponse(response: TokenResponse): DeviceCodeStatus
   if (response.error === 'slow_down') return 'slow_down';
   if (response.error === 'expired_token') return 'expired';
   if (response.error) return 'error';
+  // A 200 without access_token is not a success — treat as error.
+  if (!response.access_token) return 'error';
   return 'success';
 }

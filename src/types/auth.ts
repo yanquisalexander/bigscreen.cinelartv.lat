@@ -20,4 +20,6 @@ export interface TokenResponse {
 export interface TokenPair {
   accessToken: string;
   refreshToken?: string;
+  /** Epoch ms when the access token expires. Derived from `expires_in`. */
+  expiresAt?: number;
 }

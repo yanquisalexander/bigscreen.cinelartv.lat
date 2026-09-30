@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { RemoteConfig } from '@/types/config';
 import { DEFAULT_CONFIG } from '@/types/config';
 import { remoteConfig } from '@/services/RemoteConfigService';
-import { setApiConfig } from '@/api/client';
+import { setApiConfig } from '@/api/config';
 import { zustandToSvelte } from '@/lib/zustandToSvelte';
 
 interface ConfigState {

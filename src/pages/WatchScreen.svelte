@@ -3,7 +3,7 @@
   import { navigateBack } from "@/services/appNavigation";
   import FocusContainer from "@/components/tv/FocusContainer.svelte";
   import Focusable from "@/components/tv/Focusable.svelte";
-  import { svelteAuthStore } from "@/stores/authStore";
+  import { svelteAuthStore, useAuthStore } from "@/stores/authStore";
   import { svelteConfigStore } from "@/stores/configStore";
   import { svelteSettingsStore } from "@/stores/settingsStore";
   import { svelteSiteSettingsStore } from "@/stores/siteSettingsStore";
@@ -12,7 +12,7 @@
     consumeWatchData,
     updateProgress,
     pingStream,
-    sendStreamEnd,
+    sendStreamEndBeacon,
     getStoredSessionToken,
     saveSessionToken,
     clearSessionToken,
@@ -23,10 +23,12 @@
     addContinueWatching,
     prefersNative as prefersNativePlayer,
     launchNativePlayer,
+    updateNativePlayerAccessToken,
     setOnNativePlayerFinished,
     supportsPiP,
     enterPiP,
   } from "@/services/NativeBridge";
+  import { untrack } from "svelte";
   import { prerollAds, postrollAds } from "@/services/player/ad-tags";
   import { pdbg } from "@/services/player/playerDebug";
   import { inputManager } from "@/services/InputManager";
@@ -125,6 +127,7 @@
   let streamLimitSessions = $state<any[]>([]);
   let playerError = $state<{ code?: number | string; message?: string } | null>(null);
   let streamPingToken: string | null = null;
+  let nativeLaunchAccessToken: string | null = null;
   let clientRequestId =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
@@ -149,6 +152,9 @@
   const streamUrl = $derived(watchData?.sources?.[0]?.url);
   const ready = $derived(Boolean(watchData && streamUrl));
   const useNative = $derived(!prefersModernPlayback && prefersNativePlayer());
+  // Reactive "has token" flag so the native launch effect runs once tokens
+  // are available, without re-running when the access token is refreshed.
+  const hasNativeToken = $derived(Boolean(tokens?.accessToken));
 
   const userLang = $derived.by(() => {
     const prefs = ($svelteAuthStore.selectedProfile?.preferences as Array<{ audio_language?: string; language?: string }> | undefined) ?? [];
@@ -228,8 +234,11 @@
     stopStreamPing();
     const intervalMs = (siteSettings.stream_ping_interval_seconds || 10) * 1000;
     pingIntervalId = setInterval(() => {
-      if (tokens?.accessToken) {
-        pingStream(tokens.accessToken, sessionId).catch(() => {});
+      // Always read the live store token — it may have been refreshed
+      // since this interval was created.
+      const accessToken = useAuthStore.getState().tokens?.accessToken;
+      if (accessToken) {
+        pingStream(accessToken, sessionId).catch(() => {});
       }
     }, intervalMs);
     streamPingToken = sessionId;
@@ -252,16 +261,35 @@
   });
 
   // Native player delegation
+  // Launch is keyed on content + token availability, NOT on the token value —
+  // a token refresh must not restart native playback.
   $effect(() => {
-    if (!useNative || !contentId || !tokens) return;
+    if (!useNative || !contentId || !hasNativeToken) return;
+    const launchToken = untrack(() => tokens);
+    if (!launchToken?.accessToken) return;
+
+    nativeLaunchAccessToken = launchToken.accessToken;
     launchNativePlayer({
       contentId,
       episodeId,
-      accessToken: tokens.accessToken,
+      accessToken: launchToken.accessToken,
+      refreshToken: launchToken.refreshToken,
       clientEndpoint,
     });
     setOnNativePlayerFinished(() => replace("/home"));
     return () => setOnNativePlayerFinished(null);
+  });
+
+  // Push refreshed tokens to the running native player without relaunching.
+  $effect(() => {
+    if (!useNative || !hasNativeToken) return;
+    const accessToken = tokens?.accessToken;
+    const refreshToken = tokens?.refreshToken;
+    if (!accessToken) return;
+
+    if (nativeLaunchAccessToken === accessToken) return;
+    nativeLaunchAccessToken = accessToken;
+    updateNativePlayerAccessToken?.({ accessToken, refreshToken });
   });
 
   // Heal ghost focus on unmount
@@ -274,15 +302,15 @@
     };
   });
 
-  // OPTIMIZACIÓN 2: Limpieza de slot y analytics usando sendBeacon (no bloquea el hilo al cerrar la TV)
+  // OPTIMIZACIÓN 2: Limpieza de slot y analytics al salir (keepalive fetch autenticado)
   $effect(() => {
     const handlePageHide = () => {
       const sessionId = streamPingToken || getStoredSessionToken();
-      
-      // 1. Liberar slot de transmisión de forma asíncrona
-      if (sessionId && tokens?.accessToken) {
-        const payload = JSON.stringify({ session_id: sessionId });
-        navigator.sendBeacon?.(`${window.location.origin}/stream/end`, new Blob([payload], { type: "application/json" }));
+      const accessToken = useAuthStore.getState().tokens?.accessToken;
+
+      // 1. Liberar slot de transmisión de forma asíncrona (con Authorization + CLIENT_ENDPOINT)
+      if (sessionId && accessToken) {
+        sendStreamEndBeacon(accessToken, sessionId);
       }
 
       // 2. Enviar métricas de salida de forma asíncrona
@@ -523,8 +551,10 @@
     const timer = setInterval(() => {
       const video = videoEl;
       if (video && video.duration && !video.paused) {
+        const accessToken = useAuthStore.getState().tokens?.accessToken;
+        if (!accessToken) return;
         const sessionToken = streamPingToken || getStoredSessionToken() || undefined;
-        updateProgress(tokens.accessToken, contentId, episodeId, video.currentTime, video.duration, sessionToken).catch(() => {});
+        updateProgress(accessToken, contentId, episodeId, video.currentTime, video.duration, sessionToken).catch(() => {});
         addContinueWatching({
           ...cwItemBase,
           progress: Math.round(video.currentTime * 1000),

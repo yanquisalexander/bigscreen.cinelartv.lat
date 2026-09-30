@@ -104,6 +104,8 @@ export interface NativePlayerData {
   contentId: string;
   episodeId?: string;
   accessToken: string;
+  /** Optional: lets the native player refresh the access token itself. */
+  refreshToken?: string;
   clientEndpoint: string;
 }
 
@@ -116,6 +118,8 @@ export interface PlatformMedia {
   playLive(channel: LiveChannelInfo): boolean;
   enterPiP(): void;
   onFinished(callback: (() => void) | null): void;
+  /** Optional: push a refreshed access token to a running native player. */
+  updateAccessToken?(data: { accessToken: string; refreshToken?: string }): boolean;
 }
 
 export interface PlatformTV {
