@@ -25,8 +25,6 @@ export async function recoverAuthSession(): Promise<void> {
     }
   }
 
-  if (useAuthStore.getState().session) return;
-
   try {
     const session = await getCurrentSession(accessToken);
     useAuthStore.getState().setSession(session);

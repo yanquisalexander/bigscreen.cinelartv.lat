@@ -184,7 +184,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       saveProfileId(session.current_user.current_profile.id);
     } else if (profile) {
       const updated = profiles.find((p) => p.id === profile!.id);
-      if (updated) profile = updated;
+      if (updated) {
+        profile = updated;
+      } else {
+        profile = null;
+        localStorage.removeItem(PROFILE_KEY);
+      }
     }
     set({ session, selectedProfile: profile });
   },
