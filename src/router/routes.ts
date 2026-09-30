@@ -2,6 +2,7 @@ import wrap from 'svelte-spa-router/wrap';
 
 import { authStore } from '@/stores/authStore';
 import type { RouteDetail } from 'svelte-spa-router';
+import { safeImport } from '@/utils/safeImport';
 
 // Eager: lightweight screens always needed
 import BootScreen from '@/pages/BootScreen.svelte';
@@ -74,7 +75,7 @@ export const routes = {
   }),
 
   '/live/watch/:channelId': wrap({
-    asyncComponent: () => import('@/pages/LiveWatchScreen.svelte'),
+    asyncComponent: safeImport(() => import('@/pages/LiveWatchScreen.svelte'), 'src/pages/LiveWatchScreen.svelte'),
     loadingComponent: RouteLoadingPlaceholder,
     conditions: [requireAuthOrGuest],
   }),
@@ -90,13 +91,13 @@ export const routes = {
   }),
 
   '/watch/:contentId': wrap({
-    asyncComponent: () => import('@/pages/WatchScreen.svelte'),
+    asyncComponent: safeImport(() => import('@/pages/WatchScreen.svelte'), 'src/pages/WatchScreen.svelte'),
     loadingComponent: RouteLoadingPlaceholder,
     conditions: [requireAuth],
   }),
 
   '/watch/:contentId/:episodeId': wrap({
-    asyncComponent: () => import('@/pages/WatchScreen.svelte'),
+    asyncComponent: safeImport(() => import('@/pages/WatchScreen.svelte'), 'src/pages/WatchScreen.svelte'),
     loadingComponent: RouteLoadingPlaceholder,
     conditions: [requireAuth],
   }),
