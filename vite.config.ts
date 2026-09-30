@@ -132,6 +132,7 @@ export default defineConfig({
     },
   },
   build: {
+    manifest: true,
     target: 'es2018',
     outDir: 'dist',
     rollupOptions: {
