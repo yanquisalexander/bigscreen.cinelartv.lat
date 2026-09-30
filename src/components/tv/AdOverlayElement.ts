@@ -405,6 +405,8 @@ export class AdOverlayElement extends LitElement {
         isFocusBoundary: true,
         trackChildren: true,
         autoRestoreFocus: true,
+        onUpdateFocus: () => {},
+        onUpdateHasFocusedChild: () => {},
       });
     } catch {
       // Si ya está registrado

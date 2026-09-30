@@ -10,6 +10,10 @@ export interface PanelItem {
   onSelect?: () => void;
   closeOnSelect?: boolean;
   readOnly?: boolean;
+  /** Inline SVG markup for a QR code (from generateQrSvg / generateQrDataModel) */
+  qrSvg?: string;
+  /** Optional caption rendered under the QR */
+  qrCaption?: string;
 }
 
 export interface PanelConfig {

@@ -128,9 +128,25 @@
         {#each lastPanel.items as item, index (item.id)}
           {#if item.readOnly}
             <div class="px-4 py-3">
-              <p class="text-white/85 text-[clamp(0.875rem,1.05vw,0.9375rem)] leading-snug">
-                {item.title}
-              </p>
+              {#if item.qrSvg}
+                <div class="flex flex-col items-center gap-3 py-2">
+                  <div class="bg-white rounded-2xl p-3 shadow-[0_8px_24px_rgba(0,0,0,0.4)]">
+                    <div class="qr-panel-svg [&>svg]:!w-[clamp(9rem,14vw,12rem)] [&>svg]:!h-[clamp(9rem,14vw,12rem)]">
+                      {@html item.qrSvg}
+                    </div>
+                  </div>
+                  {#if item.qrCaption}
+                    <p class="text-text-secondary text-[clamp(0.8125rem,0.95vw,0.875rem)] text-center leading-snug max-w-[18rem]">
+                      {item.qrCaption}
+                    </p>
+                  {/if}
+                </div>
+              {/if}
+              {#if item.title}
+                <p class="text-white/85 text-[clamp(0.875rem,1.05vw,0.9375rem)] leading-snug {item.qrSvg ? 'mt-2' : ''}">
+                  {item.title}
+                </p>
+              {/if}
               {#if item.subtitle}
                 <p class="text-text-secondary text-[clamp(0.8125rem,0.95vw,0.875rem)] mt-1 leading-snug">
                   {item.subtitle}

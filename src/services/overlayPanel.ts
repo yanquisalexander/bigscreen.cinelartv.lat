@@ -1,5 +1,6 @@
 import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
 import { useOverlayPanelStore, type PanelConfig, type PanelItem } from '@/stores/overlayPanelStore';
+import { generateQrSvg } from '@/utils/qr';
 
 let sequence = 0;
 let focusStack: string[] = [];
@@ -33,6 +34,60 @@ export function buttonItem(
 
 export function overlayMessage(title: string, subtitle?: string): PanelItem {
   return { id: nextId('msg'), title, subtitle, readOnly: true };
+}
+
+/**
+ * Creates a readOnly panel item that renders an inline QR code.
+ * Used on Connected TV so users can scan with their phone.
+ */
+export function qrItem(
+  opts: {
+    url: string;
+    title?: string;
+    subtitle?: string;
+    caption?: string;
+    size?: number;
+  },
+): PanelItem {
+  const svg = generateQrSvg(opts.url, opts.size ?? 200);
+  return {
+    id: nextId('qr'),
+    title: opts.title ?? '',
+    subtitle: opts.subtitle,
+    readOnly: true,
+    qrSvg: svg,
+    qrCaption: opts.caption ?? `Escaneá con tu celular para abrir ${opts.url}`,
+  };
+}
+
+/**
+ * Opens a side panel showing a QR code for the given URL.
+ * Typical use: subscribe / paywall flows on TV where there is no browser.
+ */
+export function showQrPanel(
+  opts: {
+    title: string;
+    subtitle?: string;
+    url: string;
+    caption?: string;
+    closeLabel?: string;
+  },
+): void {
+  showPanel({
+    title: opts.title,
+    subtitle: opts.subtitle,
+    items: [
+      qrItem({
+        url: opts.url,
+        caption: opts.caption,
+      }),
+      buttonItem({
+        title: opts.closeLabel ?? 'Cerrar',
+        subtitle: 'Volver al reproductor',
+        icon: 'x',
+      }),
+    ],
+  });
 }
 
 export function showPanel(

@@ -41,6 +41,7 @@
   import PlayerSettingsPanel from "@/components/player/PlayerSettingsPanel.svelte";
   import PlayerStage from "@/components/player/PlayerStage.svelte";
   import DebugStatsPanel from "@/components/player/DebugStatsPanel.svelte";
+  import { showQrPanel } from "@/services/overlayPanel";
   import {
     trackPlayIntent,
     trackPlaybackStart,
@@ -58,6 +59,7 @@
   import "@/components/tv/FocusableElement";
   import "@/components/tv/FocusableCardElement";
   import "@/components/tv/AdOverlayElement";
+  import "@/components/tv/PromoBarElement";
 
   interface Props {
     params?: {
@@ -88,10 +90,32 @@
     )
   );
 
+  const isSubscribed = $derived(
+    $svelteAuthStore.session?.current_user?.is_subscribed ?? false
+  );
+
+  // Preview mode: ?promo=1 forces promo bar for design review
+  const promoPreview = $derived(
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get('promo') === '1'
+  );
+
   let controlsEl = $state<any>(null);
   const supportsPip = supportsPiP();
   let adOverlayEl = $state<any>(null);
+  let promoBarEl = $state<any>(null);
   let videoEl = $state<HTMLVideoElement | null>(null);
+
+  // Promo bar state — YouTube mealbar pattern: pending → show during playback → autodismiss
+  let showPromo = $state(false);
+  let promoPending = $state(false);
+  let promoAdCounter = $state((() => {
+    try { return parseInt(localStorage.getItem('cinelar_promo_counter') || '0', 10); }
+    catch { return 0; }
+  })());
+  const PROMO_EVERY_N_ADS = 3;
+  const PROMO_DISMISS_MS = 15_000;
+  let promoDismissTimer: ReturnType<typeof setTimeout> | null = null;
 
   let pendingNavigation: { contentId: string; episodeId?: string } | null = null;
   let loadedUrl: string | null = null;
@@ -283,6 +307,7 @@
       }
       
       stopStreamPing();
+      if (promoDismissTimer) { clearTimeout(promoDismissTimer); promoDismissTimer = null; }
     };
     
     window.addEventListener("pagehide", handlePageHide);
@@ -301,6 +326,10 @@
     prerollChecked = false;
     adPhase = "none";
     currentAd = null;
+    promoPending = false;
+    showPromo = false;
+    _promoPreviewShown = false;
+    if (promoDismissTimer) { clearTimeout(promoDismissTimer); promoDismissTimer = null; }
     _playIntentTracked = false;
     clientRequestId =
       typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -437,6 +466,7 @@
 
   // Load stream
   $effect(() => {
+    // Stream loads after ad completes; promo will overlay during playback
     if (!streamUrl || adPhase !== "none" || !prerollChecked) return;
     let cancelled = false;
     const resume = watchData?.continue_watching?.progress ?? 0;
@@ -686,21 +716,149 @@
     const el = adOverlayEl;
     if (!el) return;
 
-    const handleAdComplete = () => {
+const handleAdComplete = () => {
       pdbg("watch.ad-complete", "received");
       const pending = pendingNavigation;
+      const wasPreroll = adPhase === "preroll";
+
       if (pending) {
         pendingNavigation = null;
         replace(pending.episodeId ? `/watch/${pending.contentId}/${pending.episodeId}` : `/watch/${pending.contentId}`);
         return;
       }
+
       currentAd = null;
       adPhase = "none";
+
+      // Defer promo until playback actually starts (YouTube mealbar pattern)
+      if (wasPreroll) {
+        const isAdminUser = isAdmin;
+        const isSubscribedUser = isSubscribed;
+        const promoPreview = typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get('promo') === '1';
+
+        if (promoPreview || isAdminUser) {
+          promoAdCounter++;
+          localStorage.setItem('cinelar_promo_counter', String(promoAdCounter));
+          pdbg("watch.promo", "preview/admin mode - pending, counter", promoAdCounter);
+          promoPending = true;
+        } else if (!isSubscribedUser) {
+          promoAdCounter++;
+          localStorage.setItem('cinelar_promo_counter', String(promoAdCounter));
+          pdbg("watch.promo", "normal mode - counter incremented", promoAdCounter);
+
+          if (promoAdCounter >= PROMO_EVERY_N_ADS) {
+            pdbg("watch.promo", "promo pending after N ads");
+            promoPending = true;
+            promoAdCounter = 0;
+            localStorage.setItem('cinelar_promo_counter', '0');
+          }
+        }
+      }
+
       setFocus("watch-playpause");
     };
 
     el.addEventListener("ad-complete", handleAdComplete);
     return () => el.removeEventListener("ad-complete", handleAdComplete);
+  });
+
+  // Show promo DURING playback — YouTube mealbar pattern
+  // Waits for playback to start, then overlays promo and hides controls
+  $effect(() => {
+    if (!promoPending || showPromo) return;
+    if (!engine.isPlaying) return;
+
+    pdbg("watch.promo", "showing promo during playback");
+    showPromo = true;
+    promoPending = false;
+
+    // Hide player controls while promo is visible; tell controls promo owns focus
+    if (controlsEl) {
+      controlsEl.promoActive = true;
+      controlsEl.showControls = false;
+    }
+
+    // Focus promo CTA — wait for element to mount
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        try { setFocus('promo-cta'); } catch { /* noop */ }
+      }, 60);
+    });
+
+    // Autodismiss
+    if (promoDismissTimer) clearTimeout(promoDismissTimer);
+    promoDismissTimer = setTimeout(() => {
+      pdbg("watch.promo", "auto-dismissed");
+      promoDismissTimer = null;
+      showPromo = false;
+      if (controlsEl) {
+        controlsEl.promoActive = false;
+        controlsEl.showControls = true;
+      }
+      focusPlaybackControl();
+    }, PROMO_DISMISS_MS);
+  });
+
+  // Promo bar events
+  $effect(() => {
+    const el = promoBarEl;
+    if (!el) return;
+
+    const clearPromoTimer = () => {
+      if (promoDismissTimer) { clearTimeout(promoDismissTimer); promoDismissTimer = null; }
+    };
+
+    const restoreControls = () => {
+      if (controlsEl) {
+        controlsEl.promoActive = false;
+        controlsEl.showControls = true;
+      }
+    };
+
+    const handleDismiss = () => {
+      pdbg("watch.promo", "dismissed");
+      showPromo = false;
+      clearPromoTimer();
+      restoreControls();
+      focusPlaybackControl();
+    };
+
+    const handleCta = () => {
+      pdbg("watch.promo", "cta clicked");
+      showPromo = false;
+      clearPromoTimer();
+      restoreControls();
+      const plansUrl = `https://cinelartv.lat/account/billing`;
+      showQrPanel({
+        title: "CinelarTV+",
+        subtitle: "Mirá sin anuncios, sin conexión y en segundo plano.",
+        url: plansUrl,
+        caption: "Escaneá con tu celular para suscribirte",
+        closeLabel: "Cerrar",
+      });
+      focusPlaybackControl();
+    };
+
+    el.addEventListener("promo-dismiss", handleDismiss);
+    el.addEventListener("promo-cta", handleCta);
+    return () => {
+      el.removeEventListener("promo-dismiss", handleDismiss);
+      el.removeEventListener("promo-cta", handleCta);
+    };
+  });
+
+  // Preview mode: force-show promo once for design review (?promo=1)
+  let _promoPreviewShown = false;
+  $effect(() => {
+    if (showPromo || promoPending || _promoPreviewShown) return;
+    const isPreview = typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get('promo') === '1';
+    if (!isPreview) return;
+    if (adPhase !== "none" || currentAd) return;
+    pdbg("watch.promo", "preview mode — pending promo");
+    _promoPreviewShown = true;
+    promoPending = true;
   });
 
   // Ad watchdog
@@ -736,6 +894,11 @@
   // Back button and Play/Pause inputs
   $effect(() => {
     const handleBack = () => {
+      // Promo takes priority — dismiss on back
+      if (showPromo) {
+        promoBarEl?.dismiss();
+        return;
+      }
       if (settingsOpen) {
         if (controlsEl) controlsEl.settingsOpen = false;
         return;
@@ -773,10 +936,11 @@
     };
   });
 
-  // Auto-hide controls
+  // Auto-hide controls — skip if promo overlay is active
   $effect(() => {
     if (hideTimeout) clearTimeout(hideTimeout);
     hideTimeout = null;
+    if (showPromo) return;
     if (engine.isPlaying && controlsEl) {
       controlsEl.showControls = true;
       hideTimeout = setTimeout(() => {
@@ -787,7 +951,8 @@
           !controls.video?.paused &&
           !controls.settingsOpen &&
           !controls.railExpanded &&
-          !currentFocus.startsWith("player-settings")
+          !currentFocus.startsWith("player-settings") &&
+          !showPromo
         ) {
           controls.showControls = false;
         }
@@ -959,7 +1124,7 @@
       {#if engine.engineReady}
         <tv-player-controls
           bind:this={controlsEl}
-          style="display: {ready ? 'block' : 'none'}; contain: layout style;"
+          style="display: {ready && !showPromo ? 'block' : 'none'}; contain: layout style;"
             supports-pip="${supportsPip}"
         ></tv-player-controls>
       {/if}
@@ -979,7 +1144,12 @@
           {prerollChecked}
         />
       {/if}
+
+      {#if showPromo}
+        <tv-promo-bar bind:this={promoBarEl}></tv-promo-bar>
+      {/if}
     </FocusContainer>
+
     </div>
 {/if}
 

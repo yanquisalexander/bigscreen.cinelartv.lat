@@ -327,6 +327,7 @@ export class PlayerControlsElement extends LitElement {
   @property({ type: Boolean, attribute: 'is-buffering' }) isBuffering!: boolean;
   @property({ type: Boolean, attribute: 'show-controls', reflect: true }) showControls!: boolean;
   @property({ type: Boolean, attribute: 'supports-pip' }) supportsPip = false;
+  @property({ type: Boolean, attribute: 'promo-active', reflect: true }) promoActive = false;
 
   constructor() {
     super();
@@ -390,6 +391,14 @@ export class PlayerControlsElement extends LitElement {
 
   updated(changedProperties: PropertyValues) {
     super.updated(changedProperties);
+
+    if (changedProperties.has('promoActive') && this.promoActive) {
+      // Promo owns the screen — hide controls and move focus out of hidden overlay
+      if (this.showControls) {
+        this.showControls = false;
+      }
+      this._syncOverlayFocusability();
+    }
 
     if (changedProperties.has('videoEl') || changedProperties.has('engineRef')) {
       const hadEngine = changedProperties.get('engineRef') !== undefined && changedProperties.get('engineRef') !== null;
@@ -803,6 +812,9 @@ export class PlayerControlsElement extends LitElement {
       const isDirectional = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key);
       const isAction = e.key === 'Enter' || e.key === ' ';
       if (!isDirectional && !isAction) return;
+
+      // Promo bar owns focus — do not steal arrow keys or re-show controls
+      if (this.promoActive) return;
 
       const currentFocus = getCurrentFocusKey() ?? '';
       if (this.settingsOpen || currentFocus.startsWith('player-settings') || this.showControls) return;
