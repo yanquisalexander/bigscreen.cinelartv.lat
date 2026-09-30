@@ -1,5 +1,6 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router';
+import { navigateBack } from '@/services/appNavigation';
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import FocusableButton from '@/components/tv/FocusableButton.svelte';
   import DetailHero from '@/components/detail/DetailHero.svelte';
@@ -75,7 +76,7 @@
     const handleBack = (e: KeyboardEvent) => {
       if (isBackKey(e)) {
         e.preventDefault();
-        window.history.back();
+        navigateBack();
       }
     };
     window.addEventListener('keydown', handleBack);
@@ -273,7 +274,7 @@
       <p class="text-white/70 text-[clamp(1rem,1.6vw,1.25rem)] font-semibold">Contenido no encontrado</p>
       <p class="text-white/40 text-[clamp(0.8125rem,1.1vw,0.9375rem)]">No se pudo cargar la información solicitada</p>
     </div>
-    <FocusableButton onEnterPress={() => push('/home')} autoFocus={true} playSound={true}>
+    <FocusableButton onEnterPress={() => navigateBack()} autoFocus={true} playSound={true}>
       {#snippet children()}
         Volver al inicio
       {/snippet}

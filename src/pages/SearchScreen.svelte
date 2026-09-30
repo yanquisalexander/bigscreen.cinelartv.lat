@@ -1,5 +1,6 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router';
+  import { navigateBack } from '@/services/appNavigation';
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import Focusable from '@/components/tv/Focusable.svelte';
   import FocusableCard from '@/components/tv/FocusableCard.svelte';
@@ -167,7 +168,7 @@
       if (e.ctrlKey || e.altKey || e.metaKey) return;
       if (['XF86Back', 'GoBack', 'BrowserBack', 'Escape', 'Back'].includes(e.key) || e.keyCode === 461 || e.keyCode === 10009) {
         e.preventDefault();
-        push('/home');
+        navigateBack();
         return;
       }
       if (e.key === 'Backspace') {
@@ -175,7 +176,7 @@
         if (query) {
           handleBackspace();
         } else {
-          push('/home');
+          navigateBack();
         }
         return;
       }

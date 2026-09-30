@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { push } from 'svelte-spa-router';
+  import { navigateBack } from '@/services/appNavigation';
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import Focusable from '@/components/tv/Focusable.svelte';
   import FocusableRow from '@/components/tv/FocusableRow.svelte';
@@ -65,7 +65,7 @@
           searchOpen = false;
           searchQuery = '';
         } else {
-          push('/home');
+          navigateBack();
         }
       }
     };
@@ -188,7 +188,7 @@
         </p>
         <Focusable
           focusKey="livetv-back"
-          onEnterPress={() => push('/home')}
+          onEnterPress={() => navigateBack()}
           focusedClass="!bg-white !text-black"
           class="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium flex items-center justify-center cursor-pointer"
           playSound={true}

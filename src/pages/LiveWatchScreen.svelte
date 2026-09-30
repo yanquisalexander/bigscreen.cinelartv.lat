@@ -1,5 +1,6 @@
 <script lang="ts">
   import { replace } from 'svelte-spa-router';
+import { navigateBack } from '@/services/appNavigation';
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import Focusable from '@/components/tv/Focusable.svelte';
   import { svelteAuthStore } from '@/stores/authStore';
@@ -131,7 +132,7 @@
     if (!el) return;
 
     const handleBack = () => {
-      window.history.back();
+      navigateBack({ fallback: '/live' });
     };
 
     el.addEventListener('live-back', handleBack);
@@ -141,7 +142,7 @@
   // Back button + play/pause
   $effect(() => {
     const handleBack = () => {
-      window.history.back();
+      navigateBack({ fallback: '/live' });
     };
 
     const handlePlayPause = () => {

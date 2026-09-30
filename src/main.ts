@@ -8,6 +8,7 @@ import { $body } from './lib/dom-selector';
 import { authStore } from '@/stores/authStore';
 import { configStore } from '@/stores/configStore';
 import { initAnalytics, trackAppLaunch, trackAppError } from '@/lib/analytics';
+import { initAppNavigation } from '@/services/appNavigation';
 
 // ── Initialize stores immediately ───────────────────────────────────────────
 authStore.getState().initialize();
@@ -16,6 +17,7 @@ configStore.getState().loadConfig();
 // ── Runtime & CTV tools ──────────────────────────────────────────────────────
 initRuntime();
 initCtvTools();
+initAppNavigation();
 
 // ── Analytics ────────────────────────────────────────────────────────────────
 initAnalytics();

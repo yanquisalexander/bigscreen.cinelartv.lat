@@ -1,5 +1,6 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router';
+  import { navigateBack } from '@/services/appNavigation';
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import Focusable from '@/components/tv/Focusable.svelte';
   import { settingsStore, svelteSettingsStore } from '@/stores/settingsStore';
@@ -83,7 +84,7 @@
   });
 
   function handleBack() {
-    push('/home');
+    navigateBack();
   }
 
   $effect(() => {

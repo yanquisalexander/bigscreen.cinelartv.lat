@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { replace, push } from "svelte-spa-router";
+  import { replace } from "svelte-spa-router";
+  import { navigateBack } from "@/services/appNavigation";
   import FocusContainer from "@/components/tv/FocusContainer.svelte";
   import Focusable from "@/components/tv/Focusable.svelte";
   import { svelteAuthStore } from "@/stores/authStore";
@@ -547,10 +548,10 @@
 
       if (isAdmin && !forceShowAds) {
         if (nextEpisode) replace(`/watch/${contentId}/${nextEpisode.id}`);
-        else window.history.back();
+        else navigateBack();
         return;
       }
-      
+
       postrollAds.next(7000)
         .then((ad) => {
           if (ad) {
@@ -559,12 +560,12 @@
             adPhase = "postroll";
           } else {
             if (nextEpisode) replace(`/watch/${contentId}/${nextEpisode.id}`);
-            else window.history.back();
+            else navigateBack();
           }
         })
         .catch(() => {
           if (nextEpisode) replace(`/watch/${contentId}/${nextEpisode.id}`);
-          else window.history.back();
+          else navigateBack();
         });
     };
     
@@ -919,7 +920,7 @@ const handleAdComplete = () => {
         trackPlaybackExit(contentId, video.currentTime, video.duration, watchedPct, 'back');
       }
 
-      window.history.back();
+      navigateBack();
     };
 
     const handlePlayPause = () => {
