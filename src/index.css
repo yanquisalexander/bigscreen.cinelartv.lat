@@ -392,13 +392,13 @@ body {
   }
 
   100% {
-    transform: translateX(1%) scale(1.05);
+    transform: translateX(4%) scale(1.05);
   }
 }
 
 @keyframes pan-left {
   0% {
-    transform: translateX(1%) scale(1.05);
+    transform: translateX(4%) scale(1.05);
   }
 
   100% {
@@ -407,12 +407,12 @@ body {
 }
 
 .pan-right {
-  animation: pan-right 8s linear infinite;
+  animation: pan-right 10s linear infinite;
   will-change: transform;
 }
 
 .pan-left {
-  animation: pan-left 8s linear infinite;
+  animation: pan-left 10s linear infinite;
   will-change: transform;
 }
 
