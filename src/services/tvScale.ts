@@ -1,28 +1,20 @@
 /**
- * TV root font scaling.
- *
- * Design was tuned around a ~16px root (browser default after the old
- * splash restore). We keep that as the TV baseline so rem/vw clamps look
- * like the original app on 1080p/4K webOS (which report ~1920×1080 CSS).
- *
- * Low-res TV viewports (webOS sim @ 960×540, etc.) get a YouTube-style
- * boost (~24px / 150%) so text is readable there.
- *
- * We do NOT multiply the TV root by the system/accessibility font size —
- * that was making the UI gigantic on real TVs. Desktop keeps a readable
- * floor (~16px) with the 1080p design base (~18px).
+ * TV root font scaling (Mejorado para 4K y detección de plataformas modernas).
  */
 
 const DESIGN_WIDTH = 1280;
 const DESIGN_HEIGHT = 720;
 const DESIGN_BASE_REM = 18;
 const SYSTEM_REFERENCE_PX = 16;
-/** YouTube TV on low-res sims uses ~150% → 24px. */
 const TV_LOW_RES_ROOT_PX = 24;
 const TV_BASE_ROOT_PX = 16;
 const DESKTOP_MIN_ROOT_PX = SYSTEM_REFERENCE_PX;
-/** Below this CSS width/height we treat the TV viewport as low-res. */
 const LOW_RES_TV_MAX_EDGE = 1280;
+
+// NUEVO: Límite máximo de escala para evitar que pantallas 4K/8K escalen la UI infinitamente
+const MAX_VIEWPORT_SCALE = 1.5;
+// NUEVO: Umbral para forzar modo TV en resoluciones nativas 4K no detectadas
+const UHD_WIDTH_THRESHOLD = 3000;
 
 let systemFontPx: number | null = null;
 let resizeBound = false;
@@ -56,12 +48,30 @@ function detectTvPlatform(): boolean {
   try {
     const ua = navigator.userAgent || '';
     const w = window as unknown as Record<string, unknown>;
+
+    // 1. Detección tradicional (añadidos CrKey para Chromecast y Vidaa para Hisense)
     isTv =
-      /Tizen\b|WebOS\b|webOS\b|Web0S|SmartTV|SMART-TV|Android\s+TV|AndroidTV|NetCast|HbbTV|Opera TV/i.test(ua) ||
+      /Tizen\b|WebOS\b|webOS\b|Web0S|SmartTV|SMART-TV|Android\s+TV|AndroidTV|NetCast|HbbTV|Opera TV|CrKey|Vidaa/i.test(ua) ||
       w.webOS != null ||
       w.tizen != null ||
       w.webapis != null ||
       w.NetCast != null;
+
+    // 2. Detección por Media Queries (TVs usan control remoto: puntero grueso y sin hover)
+    if (!isTv && typeof window.matchMedia === 'function') {
+      const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+      const noHover = window.matchMedia('(hover: none)').matches;
+      // Si es pantalla grande, sin hover y con puntero grueso, es casi seguro una TV
+      if (hasCoarsePointer && noHover && window.innerWidth >= 1280) {
+        isTv = true;
+      }
+    }
+
+    // 3. Fallback para TVs 4K que reportan su resolución nativa completa (ej. 3840px) 
+    // pero tienen un User-Agent genérico de WebView/Chrome.
+    if (!isTv && window.innerWidth >= UHD_WIDTH_THRESHOLD) {
+      isTv = true;
+    }
   } catch {
     isTv = false;
   }
@@ -79,14 +89,18 @@ export function applyTvRootScale(): void {
   if (isTv) {
     const isLowResTv =
       width < LOW_RES_TV_MAX_EDGE || height < Math.round(LOW_RES_TV_MAX_EDGE * (DESIGN_HEIGHT / DESIGN_WIDTH));
-    // Fixed values only — never systemScale × viewport (that exploded on 4K).
+
     fontSize = isLowResTv ? TV_LOW_RES_ROOT_PX : TV_BASE_ROOT_PX;
   } else {
     const viewportScale = Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT);
-    // Cap system zoom on desktop so a large OS font doesn't blow up the UI.
+
+    // ¡MEJORA CLAVE! Limitamos el viewportScale para evitar que monitores 4K 
+    // o TVs no detectadas escalen la interfaz al 300% (lo que causaba el efecto "gigante").
+    const cappedViewportScale = Math.min(viewportScale, MAX_VIEWPORT_SCALE);
+
     const systemScale = Math.min(readSystemFontPx() / SYSTEM_REFERENCE_PX, 1.15);
     const minScale = DESKTOP_MIN_ROOT_PX / DESIGN_BASE_REM;
-    const scale = Math.max(viewportScale, minScale) * systemScale;
+    const scale = Math.max(cappedViewportScale, minScale) * systemScale;
     fontSize = Math.max(DESIGN_BASE_REM * scale, DESKTOP_MIN_ROOT_PX);
   }
 
@@ -103,7 +117,6 @@ export function initTvScale(): void {
   window.addEventListener('orientationchange', applyTvRootScale);
 }
 
-/** Design px → rendered px at the current root scale. */
 export function designPx(px: number): number {
   const root = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize);
   const base = Number.isFinite(root) && root > 0 ? root : DESIGN_BASE_REM;
