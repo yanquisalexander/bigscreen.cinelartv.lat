@@ -14,6 +14,8 @@ export function initAnalytics(): void {
 
 // ── P0: Activation ───────────────────────────────────────────────────────────
 export function trackAppLaunch(): void {
+  enqueue({ event: 'session_start' });
+  enqueue({ event: 'page_view' });
   enqueue({
     event: 'app_launch',
     params: {
@@ -345,6 +347,14 @@ export function trackContinueWatchingSelect(
 let _previousScreen = '';
 
 export function trackScreenView(screenName: string): void {
+  enqueue({
+    event: 'page_view',
+    params: {
+      page_title: screenName,
+      screen_name: screenName,
+      previous_screen: _previousScreen || undefined,
+    },
+  });
   enqueue({
     event: 'screen_view',
     params: {

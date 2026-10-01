@@ -1,31 +1,33 @@
 import { buildContext } from './context';
 import type { AnalyticsEvent } from './types';
+import { authStore } from '@/stores/authStore';
 
 // ── Minimal GA4 — Measurement Protocol (no gtag.js, no GTM) ──────────────────
 // Sends events directly to google-analytics.com/mp/collect
-// ~1.5kB vs 73kB for the full gtag.js library
 
 const ENDPOINT = 'https://www.google-analytics.com/mp/collect';
 const FLUSH_INTERVAL_MS = 2000;
+const HEARTBEAT_INTERVAL_MS = 30000; // Keep-alive for active user realtime tracking
 const MAX_BATCH_SIZE = 20;
 const CLIENT_ID_KEY = 'cinelar_ga_cid';
 
 let _measurementId = '';
 let _queue: AnalyticsEvent[] = [];
 let _flushTimer: ReturnType<typeof setInterval> | null = null;
+let _heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let _enabled = false;
 let _debugMode = false;
 
-// ── Client ID (persistent per device) ────────────────────────────────────────
+// ── Client ID (persistent per device, GA4 standard format: <random>.<timestamp>) ────
 function getClientId(): string {
   try {
     let cid = localStorage.getItem(CLIENT_ID_KEY);
-    if (cid) return cid;
-    cid = `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+    if (cid && /^\d+\.\d+$/.test(cid)) return cid;
+    cid = `${Math.floor(Math.random() * 1000000000)}.${Math.floor(Date.now() / 1000)}`;
     localStorage.setItem(CLIENT_ID_KEY, cid);
     return cid;
   } catch {
-    return `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+    return `${Math.floor(Math.random() * 1000000000)}.${Math.floor(Date.now() / 1000)}`;
   }
 }
 
@@ -36,25 +38,45 @@ function buildUrl(): string {
   return `${ENDPOINT}?measurement_id=${_measurementId}&api_secret=${apiSecret}${debugSecret ? `&debug_secret=${debugSecret}` : ''}`;
 }
 
+// ── Wrap events payload with top-level attributes ──────────────────────────
+function buildPayload(events: Array<{ name: string; params: Record<string, unknown> }>): object {
+  const auth = authStore.getState();
+  const userId = auth.session?.current_user?.id ? String(auth.session.current_user.id) : undefined;
+
+  return {
+    client_id: getClientId(),
+    ...(userId ? { user_id: userId } : {}),
+    events,
+  };
+}
+
 // ── Send payload ─────────────────────────────────────────────────────────────
 function post(payload: object): void {
   const url = buildUrl();
+  const body = JSON.stringify(payload);
   try {
     if (_debugMode) {
-      fetch(url, { method: 'POST', body: JSON.stringify(payload), keepalive: true }).catch(() => {});
-    } else if (navigator.sendBeacon) {
-      navigator.sendBeacon(url, JSON.stringify(payload));
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      }).catch(() => {});
+    } else if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+      const blob = new Blob([body], { type: 'application/json' });
+      navigator.sendBeacon(url, blob);
     } else {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url, true);
-      xhr.send(JSON.stringify(payload));
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.send(body);
     }
   } catch {
     // Silently fail — TV networks can be unreliable
   }
 }
 
-// ── Send to GA4 Measurement Protocol ─────────────────────────────────────────
+// ── Send single event to GA4 Measurement Protocol ───────────────────────────
 function send(event: AnalyticsEvent): void {
   if (!_measurementId) return;
 
@@ -64,10 +86,7 @@ function send(event: AnalyticsEvent): void {
     ...event.params,
   };
 
-  post({
-    client_id: getClientId(),
-    events: [{ name: event.event, params }],
-  });
+  post(buildPayload([{ name: event.event, params }]));
 }
 
 // ── Flush queue ──────────────────────────────────────────────────────────────
@@ -94,10 +113,7 @@ function flush(): void {
       params: { ...ctx, ...evt.params },
     }));
 
-    post({
-      client_id: getClientId(),
-      events,
-    });
+    post(buildPayload(events));
   } catch {
     // Silently fail
   }
@@ -112,7 +128,18 @@ export function initProvider(measurementId: string): void {
   _enabled = true;
 
   // Periodic flush
-  _flushTimer = setInterval(flush, FLUSH_INTERVAL_MS);
+  if (!_flushTimer) {
+    _flushTimer = setInterval(flush, FLUSH_INTERVAL_MS);
+  }
+
+  // Periodic user_engagement heartbeat (keeps active user status live in GA4 Realtime)
+  if (!_heartbeatTimer) {
+    _heartbeatTimer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        enqueue({ event: 'user_engagement' });
+      }
+    }, HEARTBEAT_INTERVAL_MS);
+  }
 
   // Flush on page hide (TV apps may background)
   if (typeof document !== 'undefined') {

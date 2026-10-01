@@ -17,8 +17,12 @@ export interface AnalyticsContext {
   installation_id?: string;
   profile_id?: string;
 
-  // Session
-  session_id: string;
+  // GA4 Session & Engagement (Required for active users)
+  ga_session_id: number;
+  ga_session_number: number;
+  engagement_time_msec: number;
+  page_location?: string;
+  page_title?: string;
 }
 
 // ── P0: Activation ───────────────────────────────────────────────────────────

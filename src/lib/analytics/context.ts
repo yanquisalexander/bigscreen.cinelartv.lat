@@ -17,28 +17,29 @@ function getOrCreateInstallationId(): string {
   }
 }
 
-// ── Session ID (per app open) ────────────────────────────────────────────────
-let _sessionId = '';
-let _sessionStartedAt = 0;
+// ── Session ID & Engagement (per app open) ───────────────────────────────────
+let _sessionStartSec = 0;
+let _lastEventTime = 0;
 
 export function initSession(): void {
-  _sessionId = `ses_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  _sessionStartedAt = Date.now();
+  _sessionStartSec = Math.floor(Date.now() / 1000);
+  _lastEventTime = Date.now();
 }
 
-export function getSessionId(): string {
-  if (!_sessionId) initSession();
-  return _sessionId;
-}
-
-export function getSessionStartMs(): number {
-  return _sessionStartedAt;
+export function getSessionStartSec(): number {
+  if (!_sessionStartSec) initSession();
+  return _sessionStartSec;
 }
 
 // ── Context builder ──────────────────────────────────────────────────────────
 export function buildContext(): AnalyticsContext {
   const runtime = getRuntimeConfig();
   const auth = authStore.getState();
+
+  const now = Date.now();
+  if (!_lastEventTime) _lastEventTime = now;
+  const engagementTime = Math.max(1, now - _lastEventTime);
+  _lastEventTime = now;
 
   return {
     // Platform (from runtime detection)
@@ -56,7 +57,11 @@ export function buildContext(): AnalyticsContext {
       ? `prof_${auth.selectedProfile.id}`
       : undefined,
 
-    // Session
-    session_id: getSessionId(),
+    // GA4 session & engagement parameters (required for active user tracking)
+    ga_session_id: getSessionStartSec(),
+    ga_session_number: 1,
+    engagement_time_msec: engagementTime,
+    page_location: typeof window !== 'undefined' ? window.location.href : undefined,
+    page_title: typeof document !== 'undefined' ? document.title : undefined,
   };
 }
