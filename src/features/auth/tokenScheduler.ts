@@ -12,9 +12,9 @@ export type TokenSchedulerState = {
 };
 
 const EXPIRES_KEY = 'cinelar_token_expires_at';
-const TOKEN_MARGIN_MS = 60_000;
+const TOKEN_MARGIN_MS = 5 * 60_000;   // Refrescar 5 min antes de expirar
 const FALLBACK_INTERVAL_MS = 30 * 60 * 1000;
-const MIN_DELAY_MS = 30_000;
+const MIN_DELAY_MS = 5 * 60_000;      // Nunca refrescar más frecuente que cada 5 min
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 let unsubscribe: (() => void) | null = null;
