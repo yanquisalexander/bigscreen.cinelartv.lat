@@ -183,6 +183,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: () => {
     clearTokens();
+    lastRefreshAt = 0;
     set({
       tokens: null,
       session: null,
@@ -279,9 +280,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (
         currentAccess &&
         lastRefreshAt > 0 &&
-        Date.now() - lastRefreshAt < REFRESH_COOLDOWN_MS &&
-        expiresAt &&
-        expiresAt > Date.now()
+        Date.now() - lastRefreshAt < REFRESH_COOLDOWN_MS
       ) {
         return { ok: true, accessToken: currentAccess };
       }
