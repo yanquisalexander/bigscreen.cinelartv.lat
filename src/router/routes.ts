@@ -19,7 +19,7 @@ import LiveTVScreen from '@/pages/LiveTVScreen.svelte';
 import RouteLoadingPlaceholder from '@/components/loading/RouteLoadingPlaceholder.svelte';
 import ContentDetailScreen from "@/pages/ContentDetailScreen.svelte";
 
-const GUEST_ALLOWED_PATHS = ['/home', '/search', '/live'];
+const GUEST_ALLOWED_PATHS = ['/home', '/search', '/live', '/settings'];
 const GUEST_BLOCKED_PREFIXES = ['/watch', '/select-profile'];
 
 function isGuestAllowed(pathname: string): boolean {
@@ -49,6 +49,11 @@ function requireAuthenticated(_detail: RouteDetail): boolean {
   return state.isAuthenticated || state.isGuest;
 }
 
+// Live TV y Settings no requieren sesión/tokens (ajustes locales y EPG pública).
+function alwaysAllowed(_detail: RouteDetail): boolean {
+  return authStore.getState().isReady;
+}
+
 export const routes = {
   '/': BootScreen,
   '/auth': AuthScreen,
@@ -71,18 +76,18 @@ export const routes = {
 
   '/live': wrap({
     component: LiveTVScreen,
-    conditions: [requireAuthOrGuest],
+    conditions: [alwaysAllowed],
   }),
 
   '/live/watch/:channelId': wrap({
     asyncComponent: safeImport(() => import('@/pages/LiveWatchScreen.svelte'), 'src/pages/LiveWatchScreen.svelte'),
     loadingComponent: RouteLoadingPlaceholder,
-    conditions: [requireAuthOrGuest],
+    conditions: [alwaysAllowed],
   }),
 
   '/settings': wrap({
     component: SettingsScreen,
-    conditions: [requireAuth],
+    conditions: [alwaysAllowed],
   }),
 
   '/content/:contentId': wrap({

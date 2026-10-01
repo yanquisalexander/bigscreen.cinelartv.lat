@@ -41,9 +41,13 @@
     push('/auth');
   }
 
-  function handleProfile() {
-    const token = authStore.getState().tokens?.accessToken;
-    if (token) deassignProfile(token).catch(() => {});
+  function handleChangeProfile() {
+    const { isAuthenticated, isGuest, tokens } = authStore.getState();
+    if (!isAuthenticated || isGuest || !tokens?.accessToken) {
+      push('/auth');
+      return;
+    }
+    deassignProfile(tokens.accessToken).catch(() => {});
     push('/select-profile');
   }
 
@@ -146,7 +150,7 @@
       {:else if profile}
         <Focusable
           focusKey="nav-profile"
-          onEnterPress={handleProfile}
+          onEnterPress={handleChangeProfile}
           onArrowPress={focusContent}
           focusedClass="!bg-white !text-black border-transparent [&_span]:text-black"
           class="{itemBaseClasses} {collapsed ? 'justify-center px-0' : 'justify-start px-3'} text-white border-l-2 border-transparent"

@@ -20,6 +20,8 @@
 }
 
 :root {
+  /* Fallback if JS scale hasn't run yet; live value is set by tvScale.ts */
+  font-size: 16px;
   --topnav-h: clamp(3.5rem, 6vh, 4.5rem);
 }
 

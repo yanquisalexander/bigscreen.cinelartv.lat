@@ -8,8 +8,9 @@ export function isBundled(): boolean {
 
 export function canPlayHttpStreams(): boolean {
   if (typeof window === 'undefined') return false;
-  const { protocol } = window.location;
-  return protocol !== 'https:';
+  return typeof (window as any).MediaSource !== 'undefined'
+    || typeof (window as any).ManagedMediaSource !== 'undefined'
+    || typeof HTMLVideoElement !== 'undefined';
 }
 
 export function resolveImageUrl(path?: string | null, baseUrl?: string): string | null {

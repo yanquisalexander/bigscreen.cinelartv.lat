@@ -121,9 +121,16 @@
 
   async function handleSignOut() {
     if (signingOut) return;
+    const { isAuthenticated, isGuest } = authStore.getState();
+    if (!isAuthenticated && !isGuest) {
+      push('/auth');
+      return;
+    }
     signingOut = true;
     try {
-      authStore.getState().logout();
+      if (isAuthenticated && !isGuest) {
+        authStore.getState().logout();
+      }
       push('/auth');
     } catch (err) {
       console.warn(err);
@@ -134,10 +141,14 @@
 
   async function handleChangeProfile() {
     if (changingProfile) return;
+    const { isAuthenticated, isGuest, tokens } = authStore.getState();
+    if (!isAuthenticated || isGuest || !tokens?.accessToken) {
+      push('/auth');
+      return;
+    }
     changingProfile = true;
     try {
-      const token = authStore.getState().tokens?.accessToken;
-      if (token) await deassignProfile(token);
+      await deassignProfile(tokens.accessToken);
     } catch (err) {
       console.warn('deassignProfile failed', err);
     }

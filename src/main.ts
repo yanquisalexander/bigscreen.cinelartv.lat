@@ -4,12 +4,16 @@ import './index.css';
 import App from './App.svelte';
 import { initCtvTools } from './services/ctvTools';
 import { initRuntime, getRuntimeConfig } from './runtime';
+import { initTvScale } from './services/tvScale';
 import { $body } from './lib/dom-selector';
 import { authStore, useAuthStore } from '@/stores/authStore';
 import { configStore } from '@/stores/configStore';
 import { startTokenScheduler } from '@/features/auth/tokenScheduler';
 import { initAnalytics, trackAppLaunch, trackAppError } from '@/lib/analytics';
 import { initAppNavigation } from '@/services/appNavigation';
+
+// ── Root rem scale for TV viewports (keep for entire app lifetime) ──────────
+initTvScale();
 
 // ── Initialize stores immediately ───────────────────────────────────────────
 void authStore.getState().initialize();

@@ -64,10 +64,10 @@ import { navigateBack } from '@/services/appNavigation';
     }
   });
 
-  // Fetch EPG
+  // Fetch EPG (Live TV no requiere sesión/tokens)
   $effect(() => {
-    if (!channelId || !tokens?.accessToken) return;
-    getChannelGuide(channelId, undefined, undefined, tokens.accessToken)
+    if (!channelId) return;
+    getChannelGuide(channelId, undefined, undefined, tokens?.accessToken)
       .then((guide) => {
         const now = new Date();
         const nowIso = now.toISOString();

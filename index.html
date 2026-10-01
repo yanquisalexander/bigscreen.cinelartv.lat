@@ -228,24 +228,34 @@
         return has3d;
       })();
 
-      /* Save original root font-size before splash scaling */
-      var _origFontSize = getComputedStyle(document.documentElement).fontSize;
+      /* System/TV default font-size (accessibility zoom) — same as tvScale.ts */
+      var _systemFontPx = 16;
+      try {
+        var _probe = document.createElement('div');
+        _probe.style.cssText = 'position:absolute;left:-99999px;top:0;width:0;height:0;visibility:hidden;font-size:medium;';
+        document.documentElement.appendChild(_probe);
+        var _probeSize = parseFloat(getComputedStyle(_probe).fontSize);
+        if (_probeSize > 0) _systemFontPx = _probeSize;
+        _probe.remove();
+      } catch (e) {}
 
+      /* Keep rem scaling active for the whole app session.
+         Floor at ~16px so laptop/desktop windows stay readable;
+         scale up on large TV viewports (matches tvScale.ts). */
       function scaleRoot() {
-        var scaled = 17 * Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
-        var minSize = 180 / 16.5;
-        document.documentElement.style.fontSize = Math.max(scaled, minSize) + "px";
-      }
-
-      function restoreRoot() {
-        document.documentElement.style.fontSize = _origFontSize;
+        var w = window.innerWidth || 1920;
+        var h = window.innerHeight || 1080;
+        var viewportScale = Math.min(w / 1920, h / 1080);
+        var systemScale = _systemFontPx / 16;
+        var minScale = 16 / 18;
+        var scale = Math.max(viewportScale, minScale) * systemScale;
+        document.documentElement.style.fontSize = Math.max(18 * scale, 16) + "px";
       }
 
       function showStaticAndDispatch() {
         el("animation").style.display = "none";
         el("loading-screen").style.opacity = "1";
-        window.removeEventListener("resize", scaleRoot);
-        restoreRoot();
+        scaleRoot();
         document.dispatchEvent(new CustomEvent("splash:ended"));
       }
 
