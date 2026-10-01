@@ -1,15 +1,16 @@
 /**
  * TV root font scaling (YouTube TV–style).
  *
- * On TV platforms (webOS, Tizen, Android TV…) we keep a large root font
- * even when the CSS viewport is small (e.g. webOS sim @ 960×540).
- * YouTube TV forces ~150% font-size there; we do the same (~24px).
+ * On TV platforms (webOS, Tizen, Android TV…) we set a **fixed** large root
+ * (~24px = 150% of browser default), same idea as YouTube TV on low-res sims.
+ * We do NOT multiply by viewport — 4K CSS viewports would double-scale rem
+ * and vw and make the UI gigantic.
  *
  * On desktop/laptop we floor at the browser default (~16px) and use the
  * 1080p design base (~18px) so dev windows stay readable.
  *
- * Real webOS UHD/FHD apps usually report ~1920×1080 CSS pixels; large
- * viewports scale the root further (4K).
+ * Real webOS UHD apps usually report ~1920×1080 CSS pixels (the OS scales
+ * the app buffer to the panel).
  */
 
 const DESIGN_WIDTH = 1920;
@@ -75,9 +76,10 @@ export function applyTvRootScale(): void {
 
   let fontSize: number;
   if (isTv) {
-    // Never shrink below TV base on low-res TVs/sims; only grow past 1080p.
-    const largeScale = viewportScale > 1 ? viewportScale : 1;
-    fontSize = TV_BASE_REM * systemScale * largeScale;
+    // Fixed TV root (YouTube-style ~150%). Do NOT multiply by viewport:
+    // 4K CSS viewports would double-scale rem + vw and blow up the UI.
+    // Real webOS apps usually run at 1920×1080 CSS anyway.
+    fontSize = TV_BASE_REM * systemScale;
   } else {
     // Desktop/laptop: readable floor, design base at 1080p.
     const minScale = DESKTOP_MIN_ROOT_PX / DESIGN_BASE_REM;

@@ -246,8 +246,8 @@
           || w.webOS != null || w.tizen != null || w.webapis != null || w.NetCast != null;
       }
 
-      /* TV: YouTube-style ~150% (24px), never shrink on low-res sims.
-         Desktop: floor ~16px, design base 18px @1080p. Matches tvScale.ts. */
+      /* TV: fixed ~24px root (YouTube-style 150%). Never multiply by
+         viewport — 4K CSS would double-scale rem+vw. Desktop: floor 16px. */
       function scaleRoot() {
         var w = window.innerWidth || 1920;
         var h = window.innerHeight || 1080;
@@ -255,8 +255,7 @@
         var systemScale = _systemFontPx / 16;
         var fontSize;
         if (_isTvPlatform()) {
-          var largeScale = viewportScale > 1 ? viewportScale : 1;
-          fontSize = 24 * systemScale * largeScale;
+          fontSize = 24 * systemScale;
         } else {
           var minScale = 16 / 18;
           var scale = Math.max(viewportScale, minScale) * systemScale;
