@@ -285,12 +285,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return { ok: false, tokenInvalid: state.isAuthenticated && !state.isGuest };
       }
 
+      // Cooldown: evitar refreshes repetidos en corto plazo.
+      // El check de expiresAt es una salvaguarda extra, pero el cooldown
+      // debe aplicarse siempre que haya un refresh reciente, sin importar
+      // si expiresAt está seteado o no.
       if (
         currentAccess &&
         lastRefreshAt > 0 &&
-        Date.now() - lastRefreshAt < REFRESH_COOLDOWN_MS &&
-        state.tokens?.expiresAt &&
-        state.tokens.expiresAt > Date.now()
+        Date.now() - lastRefreshAt < REFRESH_COOLDOWN_MS
       ) {
         return { ok: true, accessToken: currentAccess };
       }

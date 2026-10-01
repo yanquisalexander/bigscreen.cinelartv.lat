@@ -20,6 +20,11 @@ const TOKEN_LIFETIME_FRACTION = 0.2;
 const FALLBACK_INTERVAL_MS = 30 * 60 * 1000; // 30 min si no hay expiresAt
 const MIN_DELAY_MS = 2 * 60_000;             // Mínimo 2 minutos entre refreshes
 const MAX_MARGIN_MS = 30 * 60_000;           // Máximo 30 min de anticipación
+const COOLDOWN_DELAY_MS = 30_000;            // 30 s si ya estamos dentro del margen o expirados
+
+// setTimeout en JS usa un entero de 32 bits con signo. Delays mayores a 2^31-1 (~24.85 días)
+// causan desbordamiento (integer overflow) en los navegadores, disparando la función INMEDIATAMENTE.
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 let unsubscribe: (() => void) | null = null;
@@ -35,20 +40,25 @@ function clearTimer() {
 /**
  * Calcula cuántos ms esperar antes de refrescar.
  * Usa el 20% del lifetime del token como margen, con floor/ceil sensatos.
+ * Garantiza un límite máximo de MAX_TIMEOUT_MS para evitar desbordamiento de entero en setTimeout.
  */
 function scheduleDelay(expiresAt?: number): number {
   if (!expiresAt || !Number.isFinite(expiresAt)) return FALLBACK_INTERVAL_MS;
 
   const now = Date.now();
   const msUntilExpiry = expiresAt - now;
-  if (msUntilExpiry <= 0) return FALLBACK_INTERVAL_MS;
+  if (msUntilExpiry <= 0) return COOLDOWN_DELAY_MS;
 
   // Intentar recuperar issuedAt para calcular el lifetime real
   const issuedAt = loadTokenIssuedAt();
   const lifetime = issuedAt ? expiresAt - issuedAt : msUntilExpiry;
   const margin = Math.min(Math.max(lifetime * TOKEN_LIFETIME_FRACTION, MIN_DELAY_MS), MAX_MARGIN_MS);
 
-  return Math.max(MIN_DELAY_MS, msUntilExpiry - margin);
+  const rawDelay = msUntilExpiry - margin;
+  if (rawDelay <= 0) return COOLDOWN_DELAY_MS;
+
+  // Limitar al entero máximo de 32 bits para evitar desbordamiento de setTimeout
+  return Math.min(rawDelay, MAX_TIMEOUT_MS);
 }
 
 export function startTokenScheduler(store: StoreApi<TokenSchedulerState>): void {
@@ -56,6 +66,7 @@ export function startTokenScheduler(store: StoreApi<TokenSchedulerState>): void 
   started = true;
 
   let refreshInProgress = false;
+  let pendingRearm = false;
 
   const arm = () => {
     clearTimer();
@@ -73,18 +84,27 @@ export function startTokenScheduler(store: StoreApi<TokenSchedulerState>): void 
         return;
       }
 
-      // Bloquear el subscriber durante el refresh para evitar doble arm
       refreshInProgress = true;
+      pendingRearm = false;
       try {
         const result = await currentState.refreshNow();
-        if (result.ok) {
+        if (!result.ok) {
+          // El subscriber detectará el logout y detendrá el scheduler
+          return;
+        }
+        // Si los tokens cambiaron, el subscriber ya marcó pendingRearm.
+        // Si no cambiaron (cooldown), re-armar manualmente.
+        if (!pendingRearm) {
           arm();
         }
-        // Si no fue ok: el subscriber detectará el logout y detendrá el scheduler
       } catch {
         // Error de red: no re-armar, se rearmará en el próximo cambio de estado
       } finally {
         refreshInProgress = false;
+        if (pendingRearm) {
+          pendingRearm = false;
+          arm();
+        }
       }
     }, delay);
   };
@@ -95,10 +115,12 @@ export function startTokenScheduler(store: StoreApi<TokenSchedulerState>): void 
       return;
     }
 
-    // No interferir si el timeout ya está ejecutando el refresh
-    if (refreshInProgress) return;
-
     if (state.tokens !== prev.tokens || state.isAuthenticated !== prev.isAuthenticated) {
+      if (refreshInProgress) {
+        // El refresh está en vuelo: marcar para re-armar al terminar
+        pendingRearm = true;
+        return;
+      }
       arm();
     }
   });
@@ -160,9 +182,11 @@ export function clearTokenExpiry(): void {
 
 export function isTokenExpiringSoon(expiresAt?: number): boolean {
   if (!expiresAt || !Number.isFinite(expiresAt)) return false;
+  const now = Date.now();
+  if (expiresAt <= now) return true;
   // Considera expirado si queda menos del 20% del lifetime (mínimo 2 min)
   const issuedAt = loadTokenIssuedAt();
   const lifetime = issuedAt ? expiresAt - issuedAt : 60 * 60 * 1000; // fallback 1h
   const margin = Math.min(Math.max(lifetime * TOKEN_LIFETIME_FRACTION, MIN_DELAY_MS), MAX_MARGIN_MS);
-  return expiresAt - Date.now() < margin;
+  return expiresAt - now < margin;
 }
