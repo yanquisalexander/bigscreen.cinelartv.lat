@@ -5,7 +5,7 @@
   import VirtualizedShelves from '@/components/home/VirtualizedShelves.svelte';
   import HeroSection from '@/components/home/HeroSection.svelte';
   import ExitDialog from '@/components/ui/ExitDialog.svelte';
-  import {  svelteAuthStore } from '@/stores/authStore';
+  import { authStore, svelteAuthStore } from '@/stores/authStore';
   import { svelteConfigStore } from '@/stores/configStore';
   import { toastStore } from '@/stores/toastStore';
   import { getExplore } from '@/features/content/explore';
@@ -24,7 +24,7 @@
   let scrollY = $state(0);
   let viewportHeight = $state(0);
 
-  const tokens = $derived($svelteAuthStore.tokens);
+  const accessToken = $derived($svelteAuthStore.tokens?.accessToken);
   const clientEndpoint = $derived($svelteConfigStore.config.CLIENT_ENDPOINT);
 
   async function fetchData() {
@@ -32,7 +32,7 @@
     loading = true;
     const startTime = performance.now();
     try {
-      const explore = await getExplore(tokens?.accessToken, {
+      const explore = await getExplore(authStore.getState().tokens?.accessToken, {
         include_trailers: true,
         img_variants: ['xlarge', 'large', 'medium'],
       });

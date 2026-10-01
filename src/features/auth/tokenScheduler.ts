@@ -19,7 +19,6 @@ const MIN_DELAY_MS = 30_000;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let unsubscribe: (() => void) | null = null;
 let started = false;
-let rearmGuard = false;
 
 function clearTimer() {
   if (timer) {
@@ -38,6 +37,8 @@ function scheduleDelay(expiresAt?: number): number {
 export function startTokenScheduler(store: StoreApi<TokenSchedulerState>): void {
   if (started) return;
   started = true;
+
+  let refreshInProgress = false;
 
   const arm = () => {
     clearTimer();
@@ -58,23 +59,21 @@ export function startTokenScheduler(store: StoreApi<TokenSchedulerState>): void 
         return;
       }
 
+      // Marcar que hay un refresh en progreso para que el subscriber no interfiera
+      refreshInProgress = true;
       try {
         const result = await currentState.refreshNow();
 
         // Solo re-armar si el refresh fue exitoso
-        if (!result.ok) {
-          // Si el token es inválido, NO re-armar. El logout del store
-          // actualizará el estado y el subscribe detendrá el scheduler.
-          return;
+        if (result.ok) {
+          arm();
         }
-
-        // Re-armar solo si no hay una guardia activa
-        if (rearmGuard) return;
-        rearmGuard = true;
-        arm();
-        rearmGuard = false;
+        // Si no fue ok: el logout del store actualizará el estado
+        // y el subscriber detendrá el scheduler.
       } catch {
         // Si hay un error, no re-armar
+      } finally {
+        refreshInProgress = false;
       }
     }, delay);
   };
@@ -85,6 +84,10 @@ export function startTokenScheduler(store: StoreApi<TokenSchedulerState>): void 
       clearTimer();
       return;
     }
+
+    // No interferir si hay un refresh en progreso — el callback del timeout
+    // se encarga de re-armar una vez que termine.
+    if (refreshInProgress) return;
 
     // Re-armar solo si los tokens o el estado de autenticación cambiaron
     if (state.tokens !== prev.tokens || state.isAuthenticated !== prev.isAuthenticated) {
