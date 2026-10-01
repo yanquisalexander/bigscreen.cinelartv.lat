@@ -239,17 +239,30 @@
         _probe.remove();
       } catch (e) {}
 
-      /* Keep rem scaling active for the whole app session.
-         Floor at ~16px so laptop/desktop windows stay readable;
-         scale up on large TV viewports (matches tvScale.ts). */
+      function _isTvPlatform() {
+        var ua = navigator.userAgent || '';
+        var w = window;
+        return /Tizen\b|WebOS\b|webOS\b|Web0S|SmartTV|SMART-TV|Android\s+TV|AndroidTV|NetCast|HbbTV|Opera TV/i.test(ua)
+          || w.webOS != null || w.tizen != null || w.webapis != null || w.NetCast != null;
+      }
+
+      /* TV: YouTube-style ~150% (24px), never shrink on low-res sims.
+         Desktop: floor ~16px, design base 18px @1080p. Matches tvScale.ts. */
       function scaleRoot() {
         var w = window.innerWidth || 1920;
         var h = window.innerHeight || 1080;
         var viewportScale = Math.min(w / 1920, h / 1080);
         var systemScale = _systemFontPx / 16;
-        var minScale = 16 / 18;
-        var scale = Math.max(viewportScale, minScale) * systemScale;
-        document.documentElement.style.fontSize = Math.max(18 * scale, 16) + "px";
+        var fontSize;
+        if (_isTvPlatform()) {
+          var largeScale = viewportScale > 1 ? viewportScale : 1;
+          fontSize = 24 * systemScale * largeScale;
+        } else {
+          var minScale = 16 / 18;
+          var scale = Math.max(viewportScale, minScale) * systemScale;
+          fontSize = Math.max(18 * scale, 16);
+        }
+        document.documentElement.style.fontSize = fontSize + "px";
       }
 
       function showStaticAndDispatch() {
