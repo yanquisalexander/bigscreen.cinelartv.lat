@@ -22,4 +22,6 @@ export interface TokenPair {
   refreshToken?: string;
   /** Epoch ms when the access token expires. Derived from `expires_in`. */
   expiresAt?: number;
+  /** Epoch ms when the access token was issued. */
+  issuedAt?: number;
 }

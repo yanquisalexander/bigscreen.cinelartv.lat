@@ -113,11 +113,11 @@ export function stopTokenScheduler(): void {
   started = false;
 }
 
-export function persistTokenExpiry(expiresAt?: number): void {
+export function persistTokenExpiry(expiresAt?: number, issuedAt?: number): void {
   try {
     if (expiresAt && Number.isFinite(expiresAt)) {
       localStorage.setItem(EXPIRES_KEY, String(expiresAt));
-      localStorage.setItem(ISSUED_KEY, String(Date.now()));
+      localStorage.setItem(ISSUED_KEY, String(issuedAt ?? Date.now()));
     } else {
       localStorage.removeItem(EXPIRES_KEY);
       localStorage.removeItem(ISSUED_KEY);
@@ -138,7 +138,7 @@ export function loadTokenExpiry(): number | undefined {
   }
 }
 
-function loadTokenIssuedAt(): number | undefined {
+export function loadTokenIssuedAt(): number | undefined {
   try {
     const raw = localStorage.getItem(ISSUED_KEY);
     if (!raw) return undefined;

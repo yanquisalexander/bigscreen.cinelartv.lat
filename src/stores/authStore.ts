@@ -6,6 +6,7 @@ import { getApiConfig } from '@/api/config';
 import { requestTokenRefresh } from '@/features/auth/tokenRefresh';
 import {
   loadTokenExpiry,
+  loadTokenIssuedAt,
   persistTokenExpiry,
   clearTokenExpiry,
   isTokenExpiringSoon,
@@ -36,6 +37,7 @@ function loadTokens(): TokenPair | null {
       accessToken: access,
       refreshToken: refresh ?? undefined,
       expiresAt: loadTokenExpiry(),
+      issuedAt: loadTokenIssuedAt(),
     };
   } catch {
     return null;
@@ -49,7 +51,7 @@ function saveTokens(tokens: TokenPair) {
   } else if (tokens.refreshToken === undefined) {
     localStorage.removeItem(REFRESH_KEY);
   }
-  persistTokenExpiry(tokens.expiresAt);
+  persistTokenExpiry(tokens.expiresAt, tokens.issuedAt);
 }
 
 function clearTokens() {
@@ -165,16 +167,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: (tokens: TokenPair) => {
     localStorage.removeItem(GUEST_KEY);
+    const issuedAt = tokens.issuedAt ?? Date.now();
     saveTokens({
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       expiresAt: tokens.expiresAt,
+      issuedAt,
     });
     set({
       tokens: {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         expiresAt: tokens.expiresAt,
+        issuedAt,
       },
       isAuthenticated: true,
       isGuest: false,
@@ -253,6 +258,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         (current && tokens.accessToken === current.accessToken
           ? current.expiresAt
           : undefined),
+      issuedAt:
+        tokens.issuedAt ??
+        current?.issuedAt ??
+        (tokens.accessToken === current?.accessToken ? loadTokenIssuedAt() : undefined),
     };
     saveTokens(merged);
     set({ tokens: merged });
@@ -276,11 +285,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return { ok: false, tokenInvalid: state.isAuthenticated && !state.isGuest };
       }
 
-      const expiresAt = state.tokens?.expiresAt;
       if (
         currentAccess &&
         lastRefreshAt > 0 &&
-        Date.now() - lastRefreshAt < REFRESH_COOLDOWN_MS
+        Date.now() - lastRefreshAt < REFRESH_COOLDOWN_MS &&
+        state.tokens?.expiresAt &&
+        state.tokens.expiresAt > Date.now()
       ) {
         return { ok: true, accessToken: currentAccess };
       }
@@ -297,6 +307,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         accessToken: outcome.accessToken,
         refreshToken: outcome.refreshToken,
         expiresAt: outcome.expiresAt,
+        issuedAt: outcome.issuedAt,
       });
 
       return { ok: true, accessToken: outcome.accessToken };

@@ -2,6 +2,7 @@ export interface TokenRefreshResponse {
   access_token?: string;
   refresh_token?: string;
   expires_in?: number;
+  created_at?: string;
   token_type?: string;
   scope?: string;
   error?: string;
@@ -9,7 +10,13 @@ export interface TokenRefreshResponse {
 }
 
 export type TokenRefreshOutcome =
-  | { ok: true; accessToken: string; refreshToken?: string; expiresAt?: number }
+  | {
+    ok: true;
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt?: number;
+    issuedAt?: number;
+  }
   | { ok: false; tokenInvalid: boolean; error?: string };
 
 async function parseBody(response: Response): Promise<TokenRefreshResponse | null> {
@@ -20,6 +27,12 @@ async function parseBody(response: Response): Promise<TokenRefreshResponse | nul
   } catch {
     return null;
   }
+}
+
+function parseIssuedAt(createdAt?: string): number | undefined {
+  if (!createdAt) return undefined;
+  const parsed = Date.parse(createdAt);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 /**
@@ -50,8 +63,9 @@ export async function requestTokenRefresh(
       return { ok: false, tokenInvalid: invalid, error: data?.error };
     }
 
+    const issuedAt = parseIssuedAt(data.created_at) ?? Date.now();
     const expiresAt = data.expires_in
-      ? Date.now() + data.expires_in * 1000
+      ? issuedAt + data.expires_in * 1000
       : undefined;
 
     return {
@@ -59,6 +73,7 @@ export async function requestTokenRefresh(
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       expiresAt,
+      issuedAt,
     };
   } catch {
     return { ok: false, tokenInvalid: false };
