@@ -13,8 +13,8 @@
  * floor (~16px) with the 1080p design base (~18px).
  */
 
-const DESIGN_WIDTH = 1920;
-const DESIGN_HEIGHT = 1080;
+const DESIGN_WIDTH = 1280;
+const DESIGN_HEIGHT = 720;
 const DESIGN_BASE_REM = 18;
 const SYSTEM_REFERENCE_PX = 16;
 /** YouTube TV on low-res sims uses ~150% → 24px. */
