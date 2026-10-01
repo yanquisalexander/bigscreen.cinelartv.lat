@@ -246,17 +246,19 @@
           || w.webOS != null || w.tizen != null || w.webapis != null || w.NetCast != null;
       }
 
-      /* TV: fixed ~24px root (YouTube-style 150%). Never multiply by
-         viewport — 4K CSS would double-scale rem+vw. Desktop: floor 16px. */
+      /* TV: fixed root only — 24px on low-res (sim), 16px on normal TV.
+         Never multiply by system font or viewport (exploded on 4K).
+         Desktop: floor 16px. Matches tvScale.ts. */
       function scaleRoot() {
         var w = window.innerWidth || 1920;
         var h = window.innerHeight || 1080;
-        var viewportScale = Math.min(w / 1920, h / 1080);
-        var systemScale = _systemFontPx / 16;
         var fontSize;
         if (_isTvPlatform()) {
-          fontSize = 24 * systemScale;
+          var isLowRes = w < 1280 || h < 720;
+          fontSize = isLowRes ? 24 : 16;
         } else {
+          var viewportScale = Math.min(w / 1920, h / 1080);
+          var systemScale = Math.min(_systemFontPx / 16, 1.15);
           var minScale = 16 / 18;
           var scale = Math.max(viewportScale, minScale) * systemScale;
           fontSize = Math.max(18 * scale, 16);
