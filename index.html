@@ -228,48 +228,24 @@
         return has3d;
       })();
 
-      /* System/TV default font-size (accessibility zoom) — same as tvScale.ts */
-      var _systemFontPx = 16;
-      try {
-        var _probe = document.createElement('div');
-        _probe.style.cssText = 'position:absolute;left:-99999px;top:0;width:0;height:0;visibility:hidden;font-size:medium;';
-        document.documentElement.appendChild(_probe);
-        var _probeSize = parseFloat(getComputedStyle(_probe).fontSize);
-        if (_probeSize > 0) _systemFontPx = _probeSize;
-        _probe.remove();
-      } catch (e) {}
+      /* Save original root font-size before splash scaling */
+      var _origFontSize = getComputedStyle(document.documentElement).fontSize;
 
-      function _isTvPlatform() {
-        var ua = navigator.userAgent || '';
-        var w = window;
-        return /Tizen\b|WebOS\b|webOS\b|Web0S|SmartTV|SMART-TV|Android\s+TV|AndroidTV|NetCast|HbbTV|Opera TV/i.test(ua)
-          || w.webOS != null || w.tizen != null || w.webapis != null || w.NetCast != null;
+      function scaleRoot() {
+        var scaled = 17 * Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+        var minSize = 180 / 16.5;
+        document.documentElement.style.fontSize = Math.max(scaled, minSize) + "px";
       }
 
-      /* TV: fixed root only — 24px on low-res (sim), 16px on normal TV.
-         Never multiply by system font or viewport (exploded on 4K).
-         Desktop: floor 16px. Matches tvScale.ts. */
-      function scaleRoot() {
-        var w = window.innerWidth || 1920;
-        var h = window.innerHeight || 1080;
-        var fontSize;
-        if (_isTvPlatform()) {
-          var isLowRes = w < 1280 || h < 720;
-          fontSize = isLowRes ? 24 : 16;
-        } else {
-          var viewportScale = Math.min(w / 1920, h / 1080);
-          var systemScale = Math.min(_systemFontPx / 16, 1.15);
-          var minScale = 16 / 18;
-          var scale = Math.max(viewportScale, minScale) * systemScale;
-          fontSize = Math.max(18 * scale, 16);
-        }
-        document.documentElement.style.fontSize = fontSize + "px";
+      function restoreRoot() {
+        document.documentElement.style.fontSize = _origFontSize;
       }
 
       function showStaticAndDispatch() {
         el("animation").style.display = "none";
         el("loading-screen").style.opacity = "1";
-        scaleRoot();
+        window.removeEventListener("resize", scaleRoot);
+        restoreRoot();
         document.dispatchEvent(new CustomEvent("splash:ended"));
       }
 
