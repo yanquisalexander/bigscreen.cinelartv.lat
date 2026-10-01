@@ -12,9 +12,14 @@ export type TokenSchedulerState = {
 };
 
 const EXPIRES_KEY = 'cinelar_token_expires_at';
-const TOKEN_MARGIN_MS = 5 * 60_000;   // Refrescar 5 min antes de expirar
-const FALLBACK_INTERVAL_MS = 30 * 60 * 1000;
-const MIN_DELAY_MS = 5 * 60_000;      // Nunca refrescar más frecuente que cada 5 min
+const ISSUED_KEY = 'cinelar_token_issued_at';
+
+// Refrescar cuando quede el 20% de la vida del token.
+// Nunca antes de 2 minutos ni con más de 30 min de anticipación.
+const TOKEN_LIFETIME_FRACTION = 0.2;
+const FALLBACK_INTERVAL_MS = 30 * 60 * 1000; // 30 min si no hay expiresAt
+const MIN_DELAY_MS = 2 * 60_000;             // Mínimo 2 minutos entre refreshes
+const MAX_MARGIN_MS = 30 * 60_000;           // Máximo 30 min de anticipación
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 let unsubscribe: (() => void) | null = null;
@@ -27,11 +32,23 @@ function clearTimer() {
   }
 }
 
+/**
+ * Calcula cuántos ms esperar antes de refrescar.
+ * Usa el 20% del lifetime del token como margen, con floor/ceil sensatos.
+ */
 function scheduleDelay(expiresAt?: number): number {
   if (!expiresAt || !Number.isFinite(expiresAt)) return FALLBACK_INTERVAL_MS;
-  const msUntilExpiry = expiresAt - Date.now();
+
+  const now = Date.now();
+  const msUntilExpiry = expiresAt - now;
   if (msUntilExpiry <= 0) return FALLBACK_INTERVAL_MS;
-  return Math.max(MIN_DELAY_MS, msUntilExpiry - TOKEN_MARGIN_MS);
+
+  // Intentar recuperar issuedAt para calcular el lifetime real
+  const issuedAt = loadTokenIssuedAt();
+  const lifetime = issuedAt ? expiresAt - issuedAt : msUntilExpiry;
+  const margin = Math.min(Math.max(lifetime * TOKEN_LIFETIME_FRACTION, MIN_DELAY_MS), MAX_MARGIN_MS);
+
+  return Math.max(MIN_DELAY_MS, msUntilExpiry - margin);
 }
 
 export function startTokenScheduler(store: StoreApi<TokenSchedulerState>): void {
@@ -44,34 +61,28 @@ export function startTokenScheduler(store: StoreApi<TokenSchedulerState>): void 
     clearTimer();
     const state = store.getState();
 
-    // No armar si no está autenticado o no hay refresh token
     if (!state.isAuthenticated || state.isGuest || !state.tokens?.refreshToken) {
       return;
     }
 
     const delay = scheduleDelay(state.tokens.expiresAt);
     timer = setTimeout(async () => {
-      // Re-leer el estado en el momento de ejecutar
       const currentState = store.getState();
 
-      // Doble verificación antes de intentar refresh
       if (!currentState.isAuthenticated || currentState.isGuest || !currentState.tokens?.refreshToken) {
         return;
       }
 
-      // Marcar que hay un refresh en progreso para que el subscriber no interfiera
+      // Bloquear el subscriber durante el refresh para evitar doble arm
       refreshInProgress = true;
       try {
         const result = await currentState.refreshNow();
-
-        // Solo re-armar si el refresh fue exitoso
         if (result.ok) {
           arm();
         }
-        // Si no fue ok: el logout del store actualizará el estado
-        // y el subscriber detendrá el scheduler.
+        // Si no fue ok: el subscriber detectará el logout y detendrá el scheduler
       } catch {
-        // Si hay un error, no re-armar
+        // Error de red: no re-armar, se rearmará en el próximo cambio de estado
       } finally {
         refreshInProgress = false;
       }
@@ -79,17 +90,14 @@ export function startTokenScheduler(store: StoreApi<TokenSchedulerState>): void 
   };
 
   unsubscribe = store.subscribe((state, prev) => {
-    // Detener el scheduler si el usuario se desloguea o pierde autenticación
     if (!state.isAuthenticated || state.isGuest || !state.tokens?.refreshToken) {
       clearTimer();
       return;
     }
 
-    // No interferir si hay un refresh en progreso — el callback del timeout
-    // se encarga de re-armar una vez que termine.
+    // No interferir si el timeout ya está ejecutando el refresh
     if (refreshInProgress) return;
 
-    // Re-armar solo si los tokens o el estado de autenticación cambiaron
     if (state.tokens !== prev.tokens || state.isAuthenticated !== prev.isAuthenticated) {
       arm();
     }
@@ -109,8 +117,10 @@ export function persistTokenExpiry(expiresAt?: number): void {
   try {
     if (expiresAt && Number.isFinite(expiresAt)) {
       localStorage.setItem(EXPIRES_KEY, String(expiresAt));
+      localStorage.setItem(ISSUED_KEY, String(Date.now()));
     } else {
       localStorage.removeItem(EXPIRES_KEY);
+      localStorage.removeItem(ISSUED_KEY);
     }
   } catch {
     /* ignore */
@@ -128,15 +138,31 @@ export function loadTokenExpiry(): number | undefined {
   }
 }
 
+function loadTokenIssuedAt(): number | undefined {
+  try {
+    const raw = localStorage.getItem(ISSUED_KEY);
+    if (!raw) return undefined;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function clearTokenExpiry(): void {
   try {
     localStorage.removeItem(EXPIRES_KEY);
+    localStorage.removeItem(ISSUED_KEY);
   } catch {
     /* ignore */
   }
 }
 
-export function isTokenExpiringSoon(expiresAt?: number, marginMs = TOKEN_MARGIN_MS): boolean {
+export function isTokenExpiringSoon(expiresAt?: number): boolean {
   if (!expiresAt || !Number.isFinite(expiresAt)) return false;
-  return expiresAt - Date.now() < marginMs;
+  // Considera expirado si queda menos del 20% del lifetime (mínimo 2 min)
+  const issuedAt = loadTokenIssuedAt();
+  const lifetime = issuedAt ? expiresAt - issuedAt : 60 * 60 * 1000; // fallback 1h
+  const margin = Math.min(Math.max(lifetime * TOKEN_LIFETIME_FRACTION, MIN_DELAY_MS), MAX_MARGIN_MS);
+  return expiresAt - Date.now() < margin;
 }
