@@ -129,9 +129,17 @@ function post(payload: object): void {
   }
 }
 
+// Nombres reservados que GA4 MP rechaza con NAME_RESERVED. Se filtran en
+// cliente para no spamear la consola ni desperdiciar requests.
+const RESERVED_EVENT_NAMES = new Set(['session_start', 'first_visit']);
+
+function isReserved(name: string): boolean {
+  return RESERVED_EVENT_NAMES.has(name);
+}
+
 // ── Send single event to GA4 Measurement Protocol ───────────────────────────
 function send(event: AnalyticsEvent): void {
-  if (!_measurementId) return;
+  if (!_measurementId || isReserved(event.event)) return;
 
   const ctx = buildContext();
   const params: Record<string, unknown> = {
@@ -153,7 +161,8 @@ function flush(): void {
     // Context unavailable
   }
 
-  const batch = _queue.splice(0, MAX_BATCH_SIZE);
+  const batch = _queue.splice(0, MAX_BATCH_SIZE).filter((e) => !isReserved(e.event));
+  if (batch.length === 0) return;
 
   try {
     if (batch.length === 1) {

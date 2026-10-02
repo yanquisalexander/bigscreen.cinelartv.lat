@@ -13,8 +13,11 @@ export function initAnalytics(): void {
 }
 
 // ── P0: Activation ───────────────────────────────────────────────────────────
+// NOTA: 'session_start' y 'first_visit' son nombres reservados de GA4 y el
+// Measurement Protocol los rechaza (NAME_RESERVED). La sesión la deriva GA
+// automáticamente del primer evento válido, así que aquí solo mandamos
+// page_view + app_launch.
 export function trackAppLaunch(): void {
-  enqueue({ event: 'session_start' });
   enqueue({ event: 'page_view' });
   enqueue({
     event: 'app_launch',
