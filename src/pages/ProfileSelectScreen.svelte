@@ -5,7 +5,10 @@
   import { selectProfile, getCurrentSession } from '@/features/auth/session';
   import { getExplore } from '@/features/content/explore';
   import Focusable from '@/components/tv/Focusable.svelte';
-  import { resolveBackdrop, resolveLogo } from '@/utils/helpers';
+  import { resolveBackdrop, resolveLogo, isBackKey } from '@/utils/helpers';
+  import { exitApp } from '@/services/NativeBridge';
+  import ExitDialog from '@/components/ui/ExitDialog.svelte';
+  import { setFocus, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation-core';
   import { LogOut } from '@lucide/svelte';
   import type { Profile } from '@/types/api';
   import type { ContentItem } from '@/types/content';
@@ -15,6 +18,8 @@
   const FADE_MS = 800;
 
   let selecting = $state<string | null>(null);
+  let showExitDialog = $state(false);
+  let lastFocusKey: string | null = null;
   let banners = $state<ContentItem[]>([]);
   let bannerIndex = $state(0);
   let currentUrl = $state<string | null>(null);
@@ -147,6 +152,36 @@
     authStore.getState().logout();
     replace('/auth');
   }
+
+  function handleCancelExit() {
+    showExitDialog = false;
+    // Restaurar foco al elemento que lo tenía antes del diálogo
+    const restoreKey = lastFocusKey;
+    lastFocusKey = null;
+    if (restoreKey) {
+      setTimeout(() => setFocus(restoreKey), 50);
+    } else if (profiles.length > 0) {
+      setTimeout(() => setFocus(`profile-${profiles[0].id}`), 50);
+    }
+  }
+
+  // Atrás en /select-profile → cerrar la app (si la plataforma lo permite).
+  // Igual que en HomeScreen: muestra confirmación y llama a exitApp().
+  $effect(() => {
+    const handleBack = (e: KeyboardEvent) => {
+      if (!isBackKey(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (showExitDialog) {
+        handleCancelExit();
+        return;
+      }
+      lastFocusKey = getCurrentFocusKey() ?? null;
+      showExitDialog = true;
+    };
+    window.addEventListener('keydown', handleBack);
+    return () => window.removeEventListener('keydown', handleBack);
+  });
 
   const profiles = $derived(session?.current_user?.profiles ?? []);
 </script>
@@ -286,3 +321,10 @@
     </div>
   {/if}
 </div>
+
+{#if showExitDialog}
+  <ExitDialog
+    onConfirm={() => exitApp()}
+    onCancel={handleCancelExit}
+  />
+{/if}
