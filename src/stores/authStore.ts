@@ -99,6 +99,7 @@ interface AuthState {
   exitGuestMode: () => void;
   setSession: (session: CurrentSessionResponse) => void;
   setProfile: (profile: Profile) => void;
+  clearProfile: () => void;
   updateTokens: (tokens: TokenPair) => void;
   initialize: () => void;
   getRefreshToken: () => string | null;
@@ -137,8 +138,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const freshSession = await getCurrentSession(accessToken);
         saveSession(freshSession);
         session = freshSession;
+
+        // El servidor es la fuente de verdad para current_profile.
+        // Si dice null, no hay perfil seleccionado: limpiar caché local
+        // en vez de resucitar un perfil viejo por id.
+        const serverProfile = freshSession.current_user?.current_profile ?? null;
+        if (serverProfile) {
+          saveProfileId(serverProfile.id);
+        } else {
+          localStorage.removeItem(PROFILE_KEY);
+        }
+        set({
+          tokens: get().tokens ?? tokens,
+          session,
+          selectedProfile: serverProfile,
+          isAuthenticated: true,
+          isGuest: false,
+          isReady: true,
+        });
+        return;
       } catch {
-        // Fallback to cached session if offline
+        // Fallback to cached session if offline: ahí sí vale usar el id cacheado
       }
 
       const profileId = loadProfileId();
@@ -209,28 +229,45 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setSession: (session: CurrentSessionResponse) => {
-    saveSession(session);
-    const { selectedProfile } = get();
-    const profiles = session.current_user?.profiles ?? [];
-    let profile = selectedProfile;
-    if (!profile && session.current_user?.current_profile) {
-      profile = session.current_user.current_profile;
-      saveProfileId(session.current_user.current_profile.id);
-    } else if (profile) {
-      const updated = profiles.find((p) => p.id === profile!.id);
-      if (updated) {
-        profile = updated;
-      } else {
-        profile = null;
-        localStorage.removeItem(PROFILE_KEY);
-      }
+    // El servidor es la fuente de verdad: sincronizar selectedProfile con
+    // current_profile y limpiar caché si es null.
+    const serverProfile = session.current_user?.current_profile ?? null;
+    if (serverProfile) {
+      saveProfileId(serverProfile.id);
+    } else {
+      localStorage.removeItem(PROFILE_KEY);
     }
-    set({ session, selectedProfile: profile });
+    set({ session, selectedProfile: serverProfile });
   },
 
   setProfile: (profile: Profile) => {
     saveProfileId(profile.id);
-    set({ selectedProfile: profile });
+    const { session } = get();
+    if (session?.current_user) {
+      const nextSession: CurrentSessionResponse = {
+        ...session,
+        current_user: { ...session.current_user, current_profile: profile },
+      };
+      saveSession(nextSession);
+      set({ selectedProfile: profile, session: nextSession });
+    } else {
+      set({ selectedProfile: profile });
+    }
+  },
+
+  clearProfile: () => {
+    localStorage.removeItem(PROFILE_KEY);
+    const { session } = get();
+    if (session?.current_user) {
+      const nextSession: CurrentSessionResponse = {
+        ...session,
+        current_user: { ...session.current_user, current_profile: null },
+      };
+      saveSession(nextSession);
+      set({ selectedProfile: null, session: nextSession });
+    } else {
+      set({ selectedProfile: null });
+    }
   },
 
   updateTokens: (tokens: TokenPair) => {

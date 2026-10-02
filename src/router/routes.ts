@@ -40,7 +40,7 @@ function requireAuthOrGuest(detail: RouteDetail): boolean {
   const state = authStore.getState();
   if (!state.isReady) return false;
   if (state.isGuest) return isGuestAllowed(detail.location);
-  return state.isAuthenticated;
+  return state.isAuthenticated && !!state.selectedProfile;
 }
 
 function requireAuthenticated(_detail: RouteDetail): boolean {

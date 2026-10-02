@@ -47,6 +47,7 @@
       push('/auth');
       return;
     }
+    authStore.getState().clearProfile();
     deassignProfile(tokens.accessToken).catch(() => {});
     push('/select-profile');
   }

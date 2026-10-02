@@ -152,6 +152,7 @@
     } catch (err) {
       console.warn('deassignProfile failed', err);
     }
+    authStore.getState().clearProfile();
     changingProfile = false;
     push('/select-profile');
   }
