@@ -120,7 +120,7 @@
   }
 
   const bannerItems = $derived(data?.banner_content ?? []);
-  const firstRowId = $derived(data?.content?.[0]?.content?.[0]?.id);
+  const firstRowId = $derived(data?.content?.[0]?.content?.find((c) => c?.id != null)?.id);
   const firstRowFocusKey = $derived(firstRowId != null ? `home-row-0-item-${firstRowId}` : undefined);
   const preferredChildFocusKey = $derived(bannerItems.length > 0 ? 'hero-section' : 'home-row-0');
   const heroHeight = $derived(

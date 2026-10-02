@@ -5,11 +5,19 @@
   import { setFocusContext } from '@/lib/spatial/spatialContext';
   import { useAmbientStore } from '@/stores/ambientStore';
   import type { ContentItem } from '@/types/content';
-  import { resolveBackdrop } from '@/utils/helpers';
+  import { resolveBackdrop, resolveImageUrl } from '@/utils/helpers';
+
+  interface EpisodeInfo {
+    title?: string;
+    position?: number | null;
+    thumbnail?: string | null;
+    thumbnail_resized?: string | null;
+  }
 
   interface Props {
     title?: string;
     items: ContentItem[];
+    sectionKind?: string;
     categoryIndex: number;
     focusKey: string;
     clientEndpoint: string;
@@ -23,6 +31,7 @@
   let {
     title,
     items,
+    sectionKind,
     categoryIndex,
     focusKey,
     clientEndpoint,
@@ -225,6 +234,39 @@
     return Math.min(100, Math.round((item.progress / item.duration) * 100));
   }
 
+  const isContinueWatching = $derived(sectionKind === 'continue_watching');
+
+  function getEpisode(item: ContentItem): EpisodeInfo | null {
+    const ep = (item as Record<string, unknown>)?.episode;
+    if (typeof ep !== 'object' || ep === null) return null;
+    return ep as EpisodeInfo;
+  }
+
+  function episodeLabel(item: ContentItem): string | null {
+    const ep = getEpisode(item);
+    if (!ep) return null;
+    if (ep.title) return ep.title;
+    if (typeof ep.position === 'number') return `Episodio ${ep.position + 1}`;
+    return null;
+  }
+
+  function remainingLabel(item: ContentItem): string | null {
+    if (!item.duration) return null;
+    const left = Math.max(0, item.duration - (item.progress ?? 0));
+    if (left <= 0) return null;
+    const h = Math.floor(left / 3600);
+    const m = Math.round((left % 3600) / 60);
+    if (h > 0) return m > 0 ? `${h} h ${m} min restantes` : `${h} h restantes`;
+    if (m > 0) return `${m} min restantes`;
+    return 'Menos de 1 min restante';
+  }
+
+  function episodeThumb(item: ContentItem): string | null {
+    const ep = getEpisode(item);
+    if (!ep) return null;
+    return resolveImageUrl(ep.thumbnail_resized ?? ep.thumbnail, clientEndpoint);
+  }
+
   $effect(() => {
     if (viewportEl && !metricsMeasured) {
       computeMetrics();
@@ -282,7 +324,10 @@
           clientEndpoint,
           'medium',
         )}
+        {@const thumbImage = isContinueWatching ? (episodeThumb(item) ?? bannerImage) : bannerImage}
         {@const progress = progressPercent(item)}
+        {@const epLabel = isContinueWatching ? episodeLabel(item) : null}
+        {@const remainLabel = isContinueWatching ? remainingLabel(item) : null}
 
         <div
           class="home-card"
@@ -294,15 +339,15 @@
           style="width: clamp(13rem,14vw,18rem); --card-x: {x}px;"
         >
           <div class="home-card-thumb">
-            {#if bannerImage}
+            {#if thumbImage}
               <img
-                src={bannerImage}
+                src={thumbImage}
                 alt={item.title}
                 loading="lazy"
                 decoding="async"
               />
             {:else}
-              <div class="home-card-fallback">{item.title.charAt(0)}</div>
+              <div class="home-card-fallback">{(item.title ?? '?').charAt(0)}</div>
             {/if}
             {#if progress > 0}
               <div class="home-card-progress">
@@ -312,7 +357,13 @@
           </div>
           <div class="home-card-meta">
             <p class="home-card-title">{item.title}</p>
-            {#if item.description}
+            {#if isContinueWatching && (epLabel || remainLabel)}
+              <p class="home-card-sub">
+                {#if epLabel}<span class="home-card-sub-ep">{epLabel}</span>{/if}
+                {#if epLabel && remainLabel}<span class="home-card-sub-sep"> · </span>{/if}
+                {#if remainLabel}<span class="home-card-sub-rem">{remainLabel}</span>{/if}
+              </p>
+            {:else if item.description}
               <p class="home-card-desc" style="opacity: 0; transform: translateY(4px);">{item.description}</p>
             {/if}
           </div>
@@ -401,6 +452,30 @@
     -webkit-line-clamp: 2;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .home-card-sub {
+    margin: 2px 0 0 0;
+    font-size: clamp(0.65rem, 0.85vw, 0.75rem);
+    font-weight: 400;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  .home-card-sub-ep {
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 500;
+  }
+
+  .home-card-sub-sep {
+    color: rgba(255, 255, 255, 0.3);
+  }
+
+  .home-card-sub-rem {
+    color: rgba(255, 255, 255, 0.55);
   }
 
   .home-card-progress {

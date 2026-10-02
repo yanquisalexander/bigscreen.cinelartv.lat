@@ -119,6 +119,23 @@
     return Math.min(100, Math.round((progress / d) * 100));
   });
 
+  // Si se reanuda un episodio: "T01 E07" (temporada = índice+1, episodio = position+1)
+  const resumeEpisodeTag = $derived.by(() => {
+    const epId = content.continue_watching?.episode_id;
+    if (!epId) return null;
+    const seasons = content.seasons ?? [];
+    for (let si = 0; si < seasons.length; si++) {
+      const eps = seasons[si].episodes ?? [];
+      const ei = eps.findIndex((e) => e.id === epId);
+      if (ei >= 0) {
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const epNum = eps[ei].position != null ? (eps[ei].position as number) + 1 : ei + 1;
+        return `T${pad(si + 1)} E${pad(epNum)}`;
+      }
+    }
+    return null;
+  });
+
   const contentType = $derived.by(() => {
     if (isTVShow(content)) return 'Serie';
     if (content.content_type || content.contentType) return 'Película';
@@ -241,11 +258,13 @@
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between mb-[0.3125rem]">
               <span class="text-[clamp(0.6875rem,0.85vw,0.75rem)] text-white/70 font-semibold uppercase tracking-wide">
-                Continuar viendo
+                {resumeEpisodeTag ? `Reanudar ${resumeEpisodeTag}` : 'Continuar viendo'}
               </span>
-              <span class="text-[clamp(0.6875rem,0.85vw,0.75rem)] text-white/90 font-bold">
-                {continuePercent}%
-              </span>
+              {#if !resumeEpisodeTag}
+                <span class="text-[clamp(0.6875rem,0.85vw,0.75rem)] text-white/90 font-bold">
+                  {continuePercent}%
+                </span>
+              {/if}
             </div>
             <div class="h-[4px] bg-white/20 rounded-full overflow-hidden">
               <div

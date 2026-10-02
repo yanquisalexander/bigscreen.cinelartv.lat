@@ -113,6 +113,7 @@
           <VirtualizedRow
             title={category.title}
             items={category.content ?? []}
+            sectionKind={category.section_kind}
             categoryIndex={catIdx}
             focusKey="home-row-{catIdx}"
             {clientEndpoint}

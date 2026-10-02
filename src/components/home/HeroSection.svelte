@@ -1,7 +1,7 @@
 <script lang="ts">
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import Focusable from '@/components/tv/Focusable.svelte';
-  import { setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
+  import { setFocus, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
   import { Play, Info } from '@lucide/svelte';
   import { resolveBackdrop, resolveLogo } from '@/utils/helpers';
   import { getRuntimeConfig } from '@/runtime';
@@ -132,9 +132,17 @@
   }
 
   function focusDown(): boolean {
-    if (firstRowFocusKey) {
-      setFocus(firstRowFocusKey);
-      return false;
+    // Igual que antes: salto directo a la primera card de la fila 0.
+    // Si la key no existe (aún no registrada / item sin id), NO consumimos
+    // el evento: devolvemos true para que la navegación espacial por defecto
+    // mueva el foco geométricamente en vez de dejarlo atrapado en el hero.
+    if (firstRowFocusKey && doesFocusableExist(firstRowFocusKey)) {
+      try {
+        setFocus(firstRowFocusKey);
+        return false;
+      } catch {
+        return true;
+      }
     }
     return true;
   }
@@ -422,8 +430,11 @@
                 </p>
               {/if}
             </div>
+          </div>
+        {/key}
 
-            <!-- Doble CTA: Ver ahora (primario) + Más info (secundario) -->
+        <!-- Doble CTA estable: fuera del {#key} para que el autoslide no recree
+             los nodos enfocables (recrearlos mataba el foco y bloqueaba la navegación) -->
             <div class="flex items-center gap-3">
               <Focusable
                 onEnterPress={handlePrimary}
@@ -482,9 +493,7 @@
                   <span>Más info</span>
                 {/snippet}
               </Focusable>
-            </div>
-          </div>
-        {/key}
+        </div>
         </div>
 
         <!-- Layer 5: Paginación estilo Google TV (píldoras + contador) -->
