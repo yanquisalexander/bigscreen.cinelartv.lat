@@ -60,11 +60,18 @@ function buildPayload(events: Array<{ name: string; params: Record<string, unkno
 }
 
 // ── Send payload ─────────────────────────────────────────────────────────────
+// GA4 MP /mp/collect (prod) NO devuelve cabeceras CORS (ACAO), así que un
+// fetch/XHR en modo CORS falla en consola aunque el evento sí llegue al
+// servidor. Por eso prod siempre se envía opaco: sendBeacon (ya es no-CORS)
+// o fetch con mode:'no-cors'. Solo el endpoint /debug/mp/collect sí soporta
+// CORS (necesario para leer la validación).
 function post(payload: object): void {
   const body = JSON.stringify(payload);
   try {
     if (_debugMode) {
       // Validation server: verifies events without recording them.
+      // Si el debug endpoint falla por CORS/red, reintento opaco para no
+      // perder el evento ni spamear la consola en TVs.
       fetch(buildUrl(true), {
         method: 'POST',
         headers: { 'Content-Type': PLAIN_CONTENT_TYPE },
@@ -80,15 +87,42 @@ function post(payload: object): void {
             }
           } catch { /* non-JSON response, ignore */ }
         })
-        .catch(() => {});
+        .catch(() => {
+          try {
+            fetch(buildUrl(), {
+              method: 'POST',
+              mode: 'no-cors',
+              credentials: 'omit',
+              keepalive: true,
+              headers: { 'Content-Type': PLAIN_CONTENT_TYPE },
+              body,
+            }).catch(() => {});
+          } catch { /* ignore */ }
+        });
     } else if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
       const blob = new Blob([body], { type: PLAIN_CONTENT_TYPE });
-      navigator.sendBeacon(buildUrl(), blob);
+      const ok = navigator.sendBeacon(buildUrl(), blob);
+      if (!ok) {
+        // sendBeacon rechazado (cola llena) → fallback opaco
+        fetch(buildUrl(), {
+          method: 'POST',
+          mode: 'no-cors',
+          credentials: 'omit',
+          keepalive: true,
+          headers: { 'Content-Type': PLAIN_CONTENT_TYPE },
+          body,
+        }).catch(() => {});
+      }
     } else {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', buildUrl(), true);
-      xhr.setRequestHeader('Content-Type', PLAIN_CONTENT_TYPE);
-      xhr.send(body);
+      // Sin sendBeacon (algunos WebViews de TV): fetch opaco, sin error CORS.
+      fetch(buildUrl(), {
+        method: 'POST',
+        mode: 'no-cors',
+        credentials: 'omit',
+        keepalive: true,
+        headers: { 'Content-Type': PLAIN_CONTENT_TYPE },
+        body,
+      }).catch(() => {});
     }
   } catch {
     // Silently fail — TV networks can be unreliable
