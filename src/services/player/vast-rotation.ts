@@ -15,11 +15,22 @@ const CLIENT_HINTS_HINTS = [
 ];
 
 function ensureClientHints(domains: string[]): void {
-  if (typeof document === 'undefined' || document.querySelector(`meta[${CLIENT_HINTS_ATTR}]`)) return;
+  if (typeof document === 'undefined' || domains.length === 0) return;
+  // Si ya existe un Delegate-CH estático (index.html) que cubre estos dominios, no duplicar.
+  // El estático gana porque el browser lo procesa antes del primer fetch VAST.
+  const existing = document.querySelector('meta[http-equiv="Delegate-CH"]');
+  if (existing) {
+    const content = existing.getAttribute('content') ?? '';
+    const covered = domains.every((d) => content.includes(d));
+    if (covered) return;
+    // Si el estático existe pero no cubre todo, lo complementamos solo si aún
+    // no inyectamos el dinámico.
+    if (document.querySelector(`meta[${CLIENT_HINTS_ATTR}]`)) return;
+  } else if (document.querySelector(`meta[${CLIENT_HINTS_ATTR}]`)) {
+    return;
+  }
 
-  const content = CLIENT_HINTS_HINTS.map(
-    (h) => domains.map((d) => `${h} ${d}`).join('; '),
-  ).join('; ');
+  const content = CLIENT_HINTS_HINTS.map((h) => `${h} ${domains.join(`; ${h} `)}`).join('; ');
 
   const meta = document.createElement('meta');
   meta.httpEquiv = 'Delegate-CH';
@@ -32,8 +43,9 @@ function extractDomains(urls: string[]): string[] {
   const seen = new Set<string>();
   for (const raw of urls) {
     try {
-      const h = new URL(raw).hostname;
-      if (h) seen.add(h);
+      // Delegate-CH exige origins completos (https://host), no solo hostname.
+      const origin = new URL(raw).origin;
+      if (origin && origin.startsWith('https://')) seen.add(origin);
     } catch {
       // invalid URL, skip
     }

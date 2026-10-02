@@ -6,6 +6,7 @@ import { authStore } from '@/stores/authStore';
 // Sends events directly to google-analytics.com/mp/collect
 
 const ENDPOINT = 'https://www.google-analytics.com/mp/collect';
+const DEBUG_ENDPOINT = 'https://www.google-analytics.com/debug/mp/collect';
 const FLUSH_INTERVAL_MS = 2000;
 const HEARTBEAT_INTERVAL_MS = 30000; // Keep-alive for active user realtime tracking
 const MAX_BATCH_SIZE = 20;
@@ -32,11 +33,19 @@ function getClientId(): string {
 }
 
 // ── Build URL with api_secret (always) + debug_secret (only in debug) ────────
-function buildUrl(): string {
+// NOTE: /mp/collect rejects CORS preflights (OPTIONS → 405), so callers must
+// send a CORS-simple request (see PLAIN_CONTENT_TYPE) to avoid preflight.
+function buildUrl(debug = false): string {
+  const base = debug ? DEBUG_ENDPOINT : ENDPOINT;
   const apiSecret = import.meta.env.VITE_GA_API_SECRET ?? '';
   const debugSecret = _debugMode ? (import.meta.env.VITE_GA_DEBUG_SECRET ?? '') : '';
-  return `${ENDPOINT}?measurement_id=${_measurementId}&api_secret=${apiSecret}${debugSecret ? `&debug_secret=${debugSecret}` : ''}`;
+  return `${base}?measurement_id=${_measurementId}&api_secret=${apiSecret}${debugSecret ? `&debug_secret=${debugSecret}` : ''}`;
 }
+
+// GA4 MP does NOT answer OPTIONS preflights (405). `application/json` forces a
+// preflight on fetch/XHR, so we send as text/plain (CORS-safelisted, no
+// preflight). GA parses the JSON body regardless of the content type.
+const PLAIN_CONTENT_TYPE = 'text/plain;charset=UTF-8';
 
 // ── Wrap events payload with top-level attributes ──────────────────────────
 function buildPayload(events: Array<{ name: string; params: Record<string, unknown> }>): object {
@@ -52,23 +61,33 @@ function buildPayload(events: Array<{ name: string; params: Record<string, unkno
 
 // ── Send payload ─────────────────────────────────────────────────────────────
 function post(payload: object): void {
-  const url = buildUrl();
   const body = JSON.stringify(payload);
   try {
     if (_debugMode) {
-      fetch(url, {
+      // Validation server: verifies events without recording them.
+      fetch(buildUrl(true), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': PLAIN_CONTENT_TYPE },
         body,
         keepalive: true,
-      }).catch(() => {});
+      })
+        .then(async (res) => {
+          try {
+            const data = await res.json();
+            const messages = (data as { validationMessages?: unknown[] })?.validationMessages;
+            if (messages?.length) {
+              console.warn('[analytics] MP validation', JSON.stringify(messages));
+            }
+          } catch { /* non-JSON response, ignore */ }
+        })
+        .catch(() => {});
     } else if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-      const blob = new Blob([body], { type: 'application/json' });
-      navigator.sendBeacon(url, blob);
+      const blob = new Blob([body], { type: PLAIN_CONTENT_TYPE });
+      navigator.sendBeacon(buildUrl(), blob);
     } else {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', url, true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.open('POST', buildUrl(), true);
+      xhr.setRequestHeader('Content-Type', PLAIN_CONTENT_TYPE);
       xhr.send(body);
     }
   } catch {
