@@ -263,16 +263,16 @@ import { navigateBack } from '@/services/appNavigation';
 {#if loading}
   <div class="w-full h-dvh bg-bg flex flex-col items-center justify-center gap-[clamp(1rem,2vh,1.5rem)]">
     <div class="w-8 h-8 rounded-full border-[3px] border-white/10 border-t-white animate-spin"></div>
-    <p class="text-white/30 text-[clamp(0.75rem,1vw,0.875rem)] font-medium tracking-wide">Cargando contenido</p>
+    <p class="text-white/30 text-[0.875rem] font-medium tracking-wide">Cargando contenido</p>
   </div>
 {:else if !content}
   <div class="w-full h-dvh bg-bg flex flex-col items-center justify-center gap-[clamp(1.5rem,3vh,2rem)]">
     <div class="w-[clamp(4rem,8vh,5rem)] h-[clamp(4rem,8vh,5rem)] rounded-full bg-surface-elevated border border-white/10 flex items-center justify-center">
-      <span class="text-white/30 text-[clamp(1.5rem,2.5vh,2rem)] font-bold">!</span>
+      <span class="text-white/30 text-[2rem] font-bold">!</span>
     </div>
     <div class="flex flex-col items-center gap-[clamp(0.5rem,1vh,0.75rem)]">
-      <p class="text-white/70 text-[clamp(1rem,1.6vw,1.25rem)] font-semibold">Contenido no encontrado</p>
-      <p class="text-white/40 text-[clamp(0.8125rem,1.1vw,0.9375rem)]">No se pudo cargar la información solicitada</p>
+      <p class="text-white/70 text-[1.25rem] font-semibold">Contenido no encontrado</p>
+      <p class="text-white/40 text-[0.9375rem]">No se pudo cargar la información solicitada</p>
     </div>
     <FocusableButton onEnterPress={() => navigateBack()} autoFocus={true} playSound={true}>
       {#snippet children()}
@@ -319,7 +319,7 @@ import { navigateBack } from '@/services/appNavigation';
         <!-- Seasons & Episodes -->
         {#if seasons.length > 0}
           <section class="animate-content-in">
-            <h2 class="text-white font-bold tracking-tight text-[clamp(1.25rem,1.8vw,1.625rem)] mb-[clamp(1.5rem,3.5vh,2.5rem)]">
+            <h2 class="text-white font-bold tracking-tight text-[1.625rem] mb-[clamp(1.5rem,3.5vh,2.5rem)]">
               Episodios
             </h2>
 
@@ -350,7 +350,7 @@ import { navigateBack } from '@/services/appNavigation';
         <!-- Recommendations -->
         {#if relatedContent.length > 0}
           <section class="animate-content-in delay-1">
-            <h2 class="text-white font-bold tracking-tight text-[clamp(1.25rem,1.8vw,1.625rem)] mb-[clamp(1.5rem,3.5vh,2.5rem)]">
+            <h2 class="text-white font-bold tracking-tight text-[1.625rem] mb-[clamp(1.5rem,3.5vh,2.5rem)]">
               También te puede gustar
             </h2>
 

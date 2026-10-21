@@ -431,7 +431,7 @@
       <div class="flex-1 min-w-0 max-w-[48rem] flex flex-col justify-start">
         
         <!-- Title: compact TV size (approx 20px - 24px) -->
-        <h1 class="text-[#f1f1f1] font-bold text-[clamp(1.15rem,1.7vw,1.45rem)] leading-snug truncate">
+        <h1 class="text-[#f1f1f1] font-bold text-[1.45rem] leading-snug truncate">
           {focusedProgram?.title || focusedChannel.name}
         </h1>
 
@@ -498,7 +498,7 @@
             loading="lazy"
           />
         {:else}
-          <div class="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-[#1c1c1e]">
+          <div class="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-surface">
             <Tv class="w-7 h-7 text-white/30" />
             <span class="text-white/40 text-[10px] font-medium">{focusedChannel.name}</span>
           </div>

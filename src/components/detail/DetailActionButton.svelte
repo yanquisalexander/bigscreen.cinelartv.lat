@@ -46,7 +46,7 @@
   onArrowPress={onArrowPress ? (dir) => onArrowPress(dir) : undefined}
   {onFocus}
   focusedClass={focusedVariantClasses[variant]}
-  class="tv-no-select inline-flex items-center justify-center gap-[clamp(0.625rem,1.2vw,0.875rem)] rounded-full cursor-pointer {variant === 'primary' ? 'px-[clamp(2.5rem,5vw,4rem)] py-[clamp(0.875rem,2vh,1.25rem)] text-[clamp(1rem,1.5vw,1.25rem)]' : 'px-[clamp(1.5rem,3vw,2.25rem)] py-[clamp(0.625rem,1.4vh,0.875rem)] text-[clamp(0.875rem,1.2vw,1rem)]'} {variantClasses[variant]} {className}"
+  class="tv-no-select inline-flex items-center justify-center gap-[clamp(0.625rem,1.2vw,0.875rem)] rounded-full cursor-pointer {variant === 'primary' ? 'px-[clamp(2.5rem,5vw,4rem)] py-[clamp(0.875rem,2vh,1.25rem)] text-[1.25rem]' : 'px-[clamp(1.5rem,3vw,2.25rem)] py-[clamp(0.625rem,1.4vh,0.875rem)] text-[1rem]'} {variantClasses[variant]} {className}"
   playSound={true}
 >
   {#snippet children()}

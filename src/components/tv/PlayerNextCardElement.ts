@@ -52,10 +52,10 @@ export class PlayerNextCardElement extends LitElement {
     }
 
     .next-card .content { flex: 1; min-width: 0; }
-    .next-card .label { font-size: clamp(0.65rem, 0.8vw, 0.7rem); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); }
-    .next-card .title { color: #ffffff; font-size: clamp(0.875rem, 1.1vw, 1rem); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .next-card .label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); }
+    .next-card .title { color: #ffffff; font-size: 1rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .next-card .actions { display: flex; align-items: center; gap: clamp(0.5rem, 1vw, 0.75rem); }
-    .next-card .countdown { color: rgba(255,255,255,0.7); font-size: clamp(0.75rem, 1vw, 0.875rem); font-variant-numeric: tabular-nums; background: rgba(255,255,255,0.08); padding: clamp(0.25rem, 0.5vw, 0.375rem) clamp(0.5rem, 1vw, 0.75rem); border-radius: clamp(0.25rem, 0.5vw, 0.375rem); }
+    .next-card .countdown { color: rgba(255,255,255,0.7); font-size: 0.875rem; font-variant-numeric: tabular-nums; background: rgba(255,255,255,0.08); padding: clamp(0.25rem, 0.5vw, 0.375rem) clamp(0.5rem, 1vw, 0.75rem); border-radius: clamp(0.25rem, 0.5vw, 0.375rem); }
 
     .next-card .play-btn {
       width: clamp(2.25rem, 4vw, 2.5rem);

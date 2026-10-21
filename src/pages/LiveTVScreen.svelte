@@ -180,17 +180,17 @@
         <div class="w-[clamp(4rem,8vw,6rem)] h-[clamp(4rem,8vw,6rem)] rounded-full bg-surface flex items-center justify-center mb-[clamp(1.5rem,3vh,2.5rem)]">
           <Tv class="w-[clamp(1.75rem,3.5vw,2.5rem)] h-[clamp(1.75rem,3.5vw,2.5rem)] text-text-secondary" />
         </div>
-        <h1 class="text-white text-[clamp(1.5rem,3vw,2.25rem)] font-semibold mb-[clamp(0.75rem,1.5vh,1rem)]">
+        <h1 class="text-white text-[2.25rem] font-semibold mb-[clamp(0.75rem,1.5vh,1rem)]">
           TV en Vivo
         </h1>
-        <p class="text-text-secondary text-[clamp(0.9rem,1.3vw,1.125rem)] leading-relaxed mb-[clamp(2rem,4vh,3rem)]">
+        <p class="text-text-secondary text-[1.125rem] leading-relaxed mb-[clamp(2rem,4vh,3rem)]">
           La funcionalidad de TV en vivo no está disponible para este dispositivo.
         </p>
         <Focusable
           focusKey="livetv-back"
           onEnterPress={() => navigateBack()}
           focusedClass="!bg-white !text-black"
-          class="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium flex items-center justify-center cursor-pointer"
+          class="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[1rem] font-medium flex items-center justify-center cursor-pointer"
           playSound={true}
         >
           {#snippet children()}
@@ -204,14 +204,14 @@
     <div class="w-full h-dvh flex flex-col place-items-center justify-center uppercase bg-bg">Cargando...</div>
   {:else if error}
     <div class="w-full h-dvh flex flex-col items-center justify-center bg-bg px-[clamp(3rem,7.5vw,6rem)]">
-      <p class="text-text-secondary text-[clamp(0.9rem,1.3vw,1.125rem)] mb-[clamp(1.5rem,3vh,2rem)]">
+      <p class="text-text-secondary text-[1.125rem] mb-[clamp(1.5rem,3vh,2rem)]">
         {error}
       </p>
       <Focusable
         focusKey="livetv-retry"
         onEnterPress={fetchChannels}
         focusedClass="!bg-white !text-black"
-        class="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium flex items-center gap-2 cursor-pointer"
+        class="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(1.5rem,3vw,2.5rem)] rounded-full bg-surface text-white text-[1rem] font-medium flex items-center gap-2 cursor-pointer"
         playSound={true}
       >
         {#snippet children()}
@@ -223,7 +223,7 @@
   {:else if channels.length === 0}
     <div class="w-full h-dvh flex flex-col items-center justify-center bg-bg">
       <Tv class="w-16 h-16 text-text-tertiary mb-4" />
-      <p class="text-text-secondary text-[clamp(0.9rem,1.3vw,1.125rem)]">
+      <p class="text-text-secondary text-[1.125rem]">
         No hay canales disponibles en este momento.
       </p>
     </div>
@@ -274,7 +274,7 @@
                 return true;
               }}
               focusedClass="!text-white"
-              class="shrink-0 px-3 py-1.5 rounded-full text-[clamp(0.7rem,0.9vw,0.8rem)] font-medium cursor-pointer transition-colors {activeCategory === cat ? 'bg-white/15 text-white' : 'text-text-secondary hover:text-white/70'}"
+              class="shrink-0 px-3 py-1.5 rounded-full text-[0.8rem] font-medium cursor-pointer transition-colors {activeCategory === cat ? 'bg-white/15 text-white' : 'text-text-secondary hover:text-white/70'}"
               style="transition-duration: var(--animation-duration);"
               playSound={true}
             >
@@ -322,7 +322,7 @@
           <input
             bind:value={searchQuery}
             placeholder="Buscar canal..."
-            class="bg-transparent text-white text-[clamp(0.8rem,1.1vw,0.9rem)] outline-none w-[clamp(120px,18vw,220px)]"
+            class="bg-transparent text-white text-[0.9rem] outline-none w-[clamp(120px,18vw,220px)]"
           />
           <button type="button" onclick={() => { searchOpen = false; searchQuery = ''; }}>
             <X class="w-4 h-4 text-text-secondary" />
@@ -334,7 +334,7 @@
     {#if filteredChannels.length === 0}
       <div class="flex-1 flex flex-col items-center justify-center">
         <Search class="w-12 h-12 text-text-tertiary mb-4" />
-        <p class="text-text-secondary text-[clamp(0.9rem,1.3vw,1.125rem)]">
+        <p class="text-text-secondary text-[1.125rem]">
           Ningún canal coincide con "{searchQuery}"
         </p>
       </div>

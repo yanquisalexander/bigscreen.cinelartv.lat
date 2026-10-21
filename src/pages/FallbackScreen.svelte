@@ -19,14 +19,14 @@
   trackChildren={true}
   class="w-full h-dvh flex flex-col items-center justify-center gap-8 px-8 bg-bg"
 >
-  <p class="text-text-secondary text-[clamp(1rem,1.4vw,1.25rem)] text-center max-w-md">
+  <p class="text-text-secondary text-[1.25rem] text-center max-w-md">
     Algo salió mal. Por favor, intenta de nuevo.
   </p>
   <Focusable
     focusKey="fallback-retry"
     onEnterPress={() => replace('/home')}
     focusedClass="!bg-white !text-black scale-105"
-    class="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(2rem,3vw,3rem)] rounded-full bg-surface text-white text-[clamp(0.875rem,1.25vw,1rem)] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
+    class="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(2rem,3vw,3rem)] rounded-full bg-surface text-white text-[1rem] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
     playSound={true}
   >
     {#snippet children()}

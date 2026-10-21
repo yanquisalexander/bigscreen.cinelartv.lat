@@ -71,7 +71,7 @@
         </div>
       {/if}
 
-      <p class="text-white text-[clamp(0.75rem,1vw,0.9rem)] font-semibold text-center leading-tight line-clamp-1">
+      <p class="text-white text-[0.9rem] font-semibold text-center leading-tight line-clamp-1">
         {channel.name}
       </p>
 
@@ -84,15 +84,15 @@
 
     <div class="px-3 pb-3 mt-auto">
       {#if channel.current_program}
-        <p class="text-white text-[clamp(0.6rem,0.8vw,0.75rem)] font-medium truncate">
+        <p class="text-white text-[0.75rem] font-medium truncate">
           {channel.current_program.title}
         </p>
-        <p class="text-text-secondary text-[clamp(0.55rem,0.65vw,0.65rem)] mt-0.5">
+        <p class="text-text-secondary text-[0.65rem] mt-0.5">
           {formatTime(channel.current_program.start_time)} – {formatTime(channel.current_program.end_time)}
         </p>
         <EpgProgressBar program={channel.current_program} class="mt-1.5" size="sm" />
       {:else}
-        <p class="text-text-tertiary text-[clamp(0.55rem,0.65vw,0.65rem)]">Sin programación</p>
+        <p class="text-text-tertiary text-[0.65rem]">Sin programación</p>
       {/if}
     </div>
 

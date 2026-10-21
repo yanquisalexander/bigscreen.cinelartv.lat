@@ -306,7 +306,7 @@
     background: rgba(0, 0, 0, 0.88);
     color: #f1f1f1;
     font-family: 'Roboto Mono', 'Consolas', 'Courier New', monospace;
-    font-size: clamp(10px, 0.9vw, 13px);
+    font-size: 0.8125rem;
     line-height: 1.2;
     border-radius: 4px;
     max-height: 88vh;
@@ -339,14 +339,14 @@
     color: rgba(255, 255, 255, 0.5);
     white-space: nowrap;
     flex-shrink: 0;
-    font-size: clamp(9px, 0.8vw, 12px);
+    font-size: 0.75rem;
   }
 
   .stats-value {
     color: #e8e8e8;
     text-align: right;
     word-break: break-word;
-    font-size: clamp(10px, 0.9vw, 13px);
+    font-size: 0.8125rem;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -368,16 +368,16 @@
     image-rendering: crisp-edges;
   }
 
-  .stats-warn { color: #fbbf24; font-size: clamp(9px, 0.8vw, 12px); }
-  .stats-ok { color: #4ade80; font-size: clamp(9px, 0.8vw, 12px); }
-  .stats-dim { color: rgba(255, 255, 255, 0.2); font-size: clamp(9px, 0.8vw, 12px); }
-  .stats-mono { font-size: clamp(9px, 0.8vw, 12px); color: rgba(255, 255, 255, 0.4); letter-spacing: 0.02em; }
+  .stats-warn { color: #fbbf24; font-size: 0.75rem; }
+  .stats-ok { color: #4ade80; font-size: 0.75rem; }
+  .stats-dim { color: rgba(255, 255, 255, 0.2); font-size: 0.75rem; }
+  .stats-mono { font-size: 0.75rem; color: rgba(255, 255, 255, 0.4); letter-spacing: 0.02em; }
 
   .stats-badge {
     display: inline-block;
     padding: 1px 6px;
     border-radius: 3px;
-    font-size: clamp(9px, 0.8vw, 12px);
+    font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.03em;
   }

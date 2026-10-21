@@ -76,13 +76,13 @@ class FocusableCardElement extends HTMLElement {
       ">
         ${image
         ? `<img data-card-image src="${image}" alt="${title}" style="width:100%;height:100%;object-fit:cover;" loading="lazy" decoding="async">`
-        : `<div data-card-placeholder style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#262626;color:#525252;font-size:22px;">?</div>`
+        : `<div data-card-placeholder style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#262626;color:#525252;font-size:1.375rem;">?</div>`
       }
         <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.6),transparent);pointer-events:none;"></div>
         ${progress > 0 ? `<div style="position:absolute;bottom:0;left:0;right:0;height:1px;background:rgba(255,255,255,0.2);"><div data-card-progress style="height:100%;background:#fff;width:0%;"></div></div>` : ''}
         <div style="position:absolute;bottom:0;left:0;right:0;padding:clamp(0.5rem,1.2vw,0.75rem);">
-          <p data-card-title style="color:#fff;font-size:clamp(0.75rem,1.1vw,0.875rem);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</p>
-          ${subtitle ? `<p data-card-subtitle style="color:#8e8e93;font-size:clamp(0.6875rem,0.95vw,0.75rem);margin-top:0.25rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${subtitle}</p>` : ''}
+          <p data-card-title style="color:#fff;font-size: 0.875rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</p>
+          ${subtitle ? `<p data-card-subtitle style="color:#8e8e93;font-size: 0.75rem;margin-top:0.25rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${subtitle}</p>` : ''}
         </div>
       </div>
       <style>
@@ -117,7 +117,7 @@ class FocusableCardElement extends HTMLElement {
     if (!el) {
       el = document.createElement('p');
       el.setAttribute('data-card-subtitle', '');
-      el.style.cssText = 'color:#8e8e93;font-size:clamp(0.6875rem,0.95vw,0.75rem);margin-top:0.25rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+      el.style.cssText = 'color:#8e8e93;font-size: 0.75rem;margin-top:0.25rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
       const container = this.querySelector('[data-card] > div:nth-child(3)');
       if (container) container.appendChild(el);
     }

@@ -42,7 +42,7 @@ export class PlayerSeekbarElement extends LitElement {
 
     .seekbar-time {
       color: rgba(255,255,255,0.9);
-      font-size: clamp(0.8rem, 1vw, 0.9rem);
+      font-size: 0.9rem;
       font-variant-numeric: tabular-nums;
       width: clamp(2.5rem, 4vw, 3rem);
       text-align: right;
@@ -142,7 +142,7 @@ export class PlayerSeekbarElement extends LitElement {
 
     .seekbar-time-end {
       color: rgba(255,255,255,0.7);
-      font-size: clamp(0.8rem, 1vw, 0.9rem);
+      font-size: 0.9rem;
       font-variant-numeric: tabular-nums;
       width: clamp(2.5rem, 4vw, 3rem);
       text-align: right;

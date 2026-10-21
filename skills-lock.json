@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "106acf230014cbb43ca34e6410371321b56ca742f9ee0442e8ec05bf02eb0384"
+    },
     "norigin-spatial-navigation-react": {
       "source": "NoriginMedia/Norigin-Spatial-Navigation",
       "sourceType": "github",
@@ -12,6 +18,18 @@
       "sourceType": "github",
       "skillPath": "SKILL.md",
       "computedHash": "96477653ee57713896da240098d55095ac120a79988d531c91c16eaa0ad0d4bd"
+    },
+    "tv-app-development": {
+      "source": "vageez/html-tv-codex-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tv-app-development/SKILL.md",
+      "computedHash": "7a8446e946bf4678f99092f47eccb268b8bd6162f967f7c84c9e7b99d454b222"
+    },
+    "tvos-design-guidelines": {
+      "source": "ehmo/platform-design-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tvos/SKILL.md",
+      "computedHash": "a07f855d2499d4ca457bf00471209134b57851919dc556164fcca0adbed3270e"
     }
   }
 }

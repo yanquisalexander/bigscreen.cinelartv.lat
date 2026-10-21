@@ -47,7 +47,7 @@
   {#if showLabel}
     <span
       bind:this={labelEl}
-      class="text-accent-light text-[clamp(0.55rem,0.7vw,0.65rem)] font-medium shrink-0 tabular-nums"
+      class="text-accent-light text-[0.65rem] font-medium shrink-0 tabular-nums"
     ></span>
   {/if}
 </div>

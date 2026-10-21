@@ -116,12 +116,12 @@ export class AdOverlayElement extends LitElement {
   background-color: rgba(255,255,255,0.15);
   border: 1px solid rgba(255,255,255,0.2);
   flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: clamp(14px, 1.1vw, 18px); font-weight: 700;
+  color: #fff; font-size: 1.125rem; font-weight: 700;
 }
 .ad-info-texts { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.ad-domain { color: #fff; font-size: clamp(14px, 1vw, 16px); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ad-meta-row { display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,0.7); font-size: clamp(11px, 0.85vw, 13px); }
-.yt-badge { background: rgba(255,255,255,0.2); color: #fff; border-radius: 4px; padding: 2px 6px; font-size: clamp(10px, 0.75vw, 12px); font-weight: 600; }
+.ad-domain { color: #fff; font-size: 1rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ad-meta-row { display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,0.7); font-size: 0.8125rem; }
+.yt-badge { background: rgba(255,255,255,0.2); color: #fff; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; font-weight: 600; }
 
 /* ── Actions ── */
 .ytlr-actions-row { display: flex; align-items: center; gap: clamp(10px, 0.8vw, 12px); }
@@ -133,8 +133,8 @@ export class AdOverlayElement extends LitElement {
   transition: transform 150ms ease, background-color 150ms ease;
 }
 .circle-btn[data-focused="true"] { background: #f1f1f1 !important; color: #0f0f0f !important; transform: scale(1.08); outline: 3px solid #fff; }
-.ytlr-skip-ad-timer { padding: clamp(8px, 0.7vw, 10px) clamp(16px, 1.2vw, 20px); border-radius: 9999px; background: rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.18); color: #fff; font-size: clamp(13px, 0.9vw, 15px); font-weight: 500; font-variant-numeric: tabular-nums; }
-.ytlr-skip-button { padding: clamp(8px, 0.7vw, 10px) clamp(18px, 1.5vw, 24px); border-radius: 9999px; background: rgba(255,255,255,0.18); color: #fff; border: none; font-size: clamp(13px, 0.9vw, 15px); font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+.ytlr-skip-ad-timer { padding: clamp(8px, 0.7vw, 10px) clamp(16px, 1.2vw, 20px); border-radius: 9999px; background: rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.18); color: #fff; font-size: 0.9375rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.ytlr-skip-button { padding: clamp(8px, 0.7vw, 10px) clamp(18px, 1.5vw, 24px); border-radius: 9999px; background: rgba(255,255,255,0.18); color: #fff; border: none; font-size: 0.9375rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
 .ytlr-skip-button[data-focused="true"] { background: #f1f1f1 !important; color: #0f0f0f !important; transform: scale(1.04); outline: 3px solid #fff; }
 .skip-icon { width: clamp(16px, 1.2vw, 18px); height: clamp(16px, 1.2vw, 18px); }
 
@@ -168,7 +168,7 @@ export class AdOverlayElement extends LitElement {
 }
 .qr-svg-wrapper { display: flex; align-items: center; justify-content: center; width: 100%; }
 .qr-svg-wrapper svg { width: clamp(120px, 11vw, 160px) !important; height: clamp(120px, 11vw, 160px) !important; }
-.qr-hint-row { display: flex; align-items: center; gap: 8px; color: #202020; font-size: clamp(11px, 0.8vw, 13px); font-weight: 600; text-align: center; }
+.qr-hint-row { display: flex; align-items: center; gap: 8px; color: #202020; font-size: 0.8125rem; font-weight: 600; text-align: center; }
 
 .ad-spinner { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 20; pointer-events: none; }
 .ad-spinner-dot { width: clamp(32px, 2.8vw, 44px); height: clamp(32px, 2.8vw, 44px); border: 3px solid rgba(255,255,255,0.25); border-top-color: #fabb05; border-radius: 50%; animation: spin 0.8s linear infinite; }

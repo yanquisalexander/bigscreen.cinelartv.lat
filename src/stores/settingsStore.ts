@@ -5,7 +5,6 @@ const MODERN_PLAYBACK_KEY = 'cinelar_prefers_modern_playback';
 const NAV_SOUND_KEY = 'cinelar_navigation_sound';
 const DEBUG_MODE_KEY = 'cinelar_debug_mode';
 const FORCE_SHOW_ADS_KEY = 'cinelar_force_show_ads';
-
 function loadPrefersModern(): boolean {
   try {
     const stored = localStorage.getItem(MODERN_PLAYBACK_KEY);

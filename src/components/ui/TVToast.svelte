@@ -31,20 +31,20 @@
       {#if hasTitle}
         <p
           class="text-white font-semibold leading-snug"
-          style="font-size: clamp(0.9375rem, 1.2vw, 1rem); white-space: normal; overflow-wrap: anywhere;"
+          style="font-size: 1rem; white-space: normal; overflow-wrap: anywhere;"
         >
           {$svelteToastStore.title}
         </p>
         <p
           class="text-white/70 leading-snug"
-          style="font-size: clamp(0.8125rem, 1vw, 0.875rem); margin-top: clamp(0.25rem, 0.6vh, 0.375rem); white-space: normal; overflow-wrap: anywhere;"
+          style="font-size: 0.875rem; margin-top: clamp(0.25rem, 0.6vh, 0.375rem); white-space: normal; overflow-wrap: anywhere;"
         >
           {$svelteToastStore.message}
         </p>
       {:else}
         <p
           class="text-white/80 leading-snug"
-          style="font-size: clamp(0.875rem, 1.1vw, 0.9375rem); white-space: normal; overflow-wrap: anywhere;"
+          style="font-size: 0.9375rem; white-space: normal; overflow-wrap: anywhere;"
         >
           {$svelteToastStore.message}
         </p>

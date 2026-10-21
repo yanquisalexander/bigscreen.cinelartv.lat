@@ -231,11 +231,11 @@
           {/if}
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-white text-[clamp(0.85rem,1.2vw,1rem)] font-semibold truncate">
+          <div class="text-white text-[1rem] font-semibold truncate">
             {profile?.name ?? 'Usuario'}
           </div>
           {#if !isGuest}
-            <div class="text-text-secondary text-[clamp(0.65rem,0.85vw,0.75rem)] truncate mt-0.5">
+            <div class="text-text-secondary text-[0.75rem] truncate mt-0.5">
               Cambiar perfil
             </div>
           {/if}
@@ -270,7 +270,7 @@
           return true;
         }}
         focusedClass="!bg-white/10"
-        class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] px-[clamp(0.75rem,1.2vw,1rem)] py-[clamp(0.5rem,0.8vh,0.65rem)] rounded-xl text-[clamp(0.85rem,1.1vw,0.95rem)] font-medium cursor-pointer {isActive ? 'text-white bg-white/5' : 'text-text-secondary hover:text-white'}"
+        class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] px-[clamp(0.75rem,1.2vw,1rem)] py-[clamp(0.5rem,0.8vh,0.65rem)] rounded-xl text-[0.95rem] font-medium cursor-pointer {isActive ? 'text-white bg-white/5' : 'text-text-secondary hover:text-white'}"
         playSound={true}
       >
         {#snippet children()}
@@ -288,7 +288,7 @@
         <Server class="w-4 h-4 text-text-tertiary" />
       </div>
       <div class="min-w-0">
-        <div class="text-text-secondary text-[clamp(0.7rem,0.9vw,0.8rem)] font-medium truncate">CinelarTV</div>
+        <div class="text-text-secondary text-[0.8rem] font-medium truncate">CinelarTV</div>
       </div>
     </div>
   </nav>
@@ -298,7 +298,7 @@
 
     {#if activeSection === 'reproduccion'}
       <div data-settings-section="reproduccion">
-        <h3 class="text-[clamp(0.65rem,0.85vw,0.75rem)] font-bold uppercase tracking-wider text-text-secondary mb-[clamp(0.75rem,1.2vh,1rem)]">
+        <h3 class="text-[0.75rem] font-bold uppercase tracking-wider text-text-secondary mb-[clamp(0.75rem,1.2vh,1rem)]">
           Reproducción
         </h3>
         <div class="bg-surface rounded-2xl overflow-hidden">
@@ -325,10 +325,10 @@
               <div class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] flex-1 min-w-0">
                 <Play class="w-[clamp(1.1rem,1.6vw,1.35rem)] h-[clamp(1.1rem,1.6vw,1.35rem)] text-text-secondary" />
                 <div class="flex flex-col flex-1 min-w-0">
-                  <span class="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">
+                  <span class="text-white text-[1.05rem] font-medium">
                     Reproductor moderno
                   </span>
-                  <span class="text-text-secondary text-[clamp(0.75rem,1vw,0.85rem)] mt-0.5">
+                  <span class="text-text-secondary text-[0.85rem] mt-0.5">
                     Usa el reproductor web en lugar del nativo del dispositivo.
                   </span>
                 </div>
@@ -370,10 +370,10 @@
               <div class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] flex-1 min-w-0">
                 <Tv class="w-[clamp(1.1rem,1.6vw,1.35rem)] h-[clamp(1.1rem,1.6vw,1.35rem)] text-text-secondary" />
                 <div class="flex flex-col flex-1 min-w-0">
-                  <span class="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">
+                  <span class="text-white text-[1.05rem] font-medium">
                     Forzar mostrar anuncios
                   </span>
-                  <span class="text-text-secondary text-[clamp(0.75rem,1vw,0.85rem)] mt-0.5">
+                  <span class="text-text-secondary text-[0.85rem] mt-0.5">
                     Muestra anuncios publicitarios en el reproductor para pruebas y verificación.
                   </span>
                 </div>
@@ -411,10 +411,10 @@
               <div class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] flex-1 min-w-0">
                 <Info class="w-[clamp(1.1rem,1.6vw,1.35rem)] h-[clamp(1.1rem,1.6vw,1.35rem)] text-text-secondary" />
                 <div class="flex flex-col flex-1 min-w-0">
-                  <span class="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">
+                  <span class="text-white text-[1.05rem] font-medium">
                     Habilitar depuración
                   </span>
-                  <span class="text-text-secondary text-[clamp(0.75rem,1vw,0.85rem)] mt-0.5">
+                  <span class="text-text-secondary text-[0.85rem] mt-0.5">
                     Muestra información técnica del reproductor durante la reproducción.
                   </span>
                 </div>
@@ -431,7 +431,7 @@
 
     {:else if activeSection === 'audio'}
       <div data-settings-section="audio">
-        <h3 class="text-[clamp(0.65rem,0.85vw,0.75rem)] font-bold uppercase tracking-wider text-text-secondary mb-[clamp(0.75rem,1.2vh,1rem)]">
+        <h3 class="text-[0.75rem] font-bold uppercase tracking-wider text-text-secondary mb-[clamp(0.75rem,1.2vh,1rem)]">
           Audio
         </h3>
         <div class="bg-surface rounded-2xl overflow-hidden">
@@ -453,10 +453,10 @@
               <div class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)] flex-1 min-w-0">
                 <Volume2 class="w-[clamp(1.1rem,1.6vw,1.35rem)] h-[clamp(1.1rem,1.6vw,1.35rem)] text-text-secondary" />
                 <div class="flex flex-col flex-1 min-w-0">
-                  <span class="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">
+                  <span class="text-white text-[1.05rem] font-medium">
                     Sonido de navegación
                   </span>
-                  <span class="text-text-secondary text-[clamp(0.75rem,1vw,0.85rem)] mt-0.5">
+                  <span class="text-text-secondary text-[0.85rem] mt-0.5">
                     Reproduce un sonido al cambiar el foco entre elementos.
                   </span>
                 </div>
@@ -473,23 +473,23 @@
 
     {:else if activeSection === 'apariencia'}
       <div data-settings-section="apariencia">
-        <h3 class="text-[clamp(0.65rem,0.85vw,0.75rem)] font-bold uppercase tracking-wider text-text-secondary mb-[clamp(0.75rem,1.2vh,1rem)]">
+        <h3 class="text-[0.75rem] font-bold uppercase tracking-wider text-text-secondary mb-[clamp(0.75rem,1.2vh,1rem)]">
           Apariencia
         </h3>
         <div class="bg-surface rounded-2xl p-[clamp(1rem,2vw,1.5rem)]">
-          <p class="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)] text-center py-[clamp(1rem,2vh,1.25rem)]">
-            Próximamente
+          <p class="text-text-secondary text-[0.95rem] py-[clamp(1rem,2vh,1.25rem)]">
+            El tamaño de la interfaz se adapta automáticamente a la resolución del televisor.
           </p>
         </div>
       </div>
 
     {:else if activeSection === 'privacidad'}
       <div data-settings-section="privacidad">
-        <h3 class="text-[clamp(0.65rem,0.85vw,0.75rem)] font-bold uppercase tracking-wider text-text-secondary mb-[clamp(0.75rem,1.2vh,1rem)]">
+        <h3 class="text-[0.75rem] font-bold uppercase tracking-wider text-text-secondary mb-[clamp(0.75rem,1.2vh,1rem)]">
           Privacidad
         </h3>
         <div class="bg-surface rounded-2xl p-[clamp(1rem,2vw,1.5rem)]">
-          <p class="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)] text-center py-[clamp(1rem,2vh,1.25rem)]">
+          <p class="text-text-secondary text-[0.95rem] text-center py-[clamp(1rem,2vh,1.25rem)]">
             Próximamente
           </p>
         </div>
@@ -497,7 +497,7 @@
 
     {:else if activeSection === 'informacion'}
       <div data-settings-section="informacion">
-        <h3 class="text-[clamp(0.65rem,0.85vw,0.75rem)] font-bold uppercase tracking-wider text-text-secondary mb-[clamp(0.75rem,1.2vh,1rem)]">
+        <h3 class="text-[0.75rem] font-bold uppercase tracking-wider text-text-secondary mb-[clamp(0.75rem,1.2vh,1rem)]">
           Información
         </h3>
         <div class="bg-surface rounded-2xl overflow-hidden">
@@ -517,10 +517,10 @@
               playSound={true}
             >
               {#snippet children()}
-                <span class="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)]">
+                <span class="text-text-secondary text-[0.95rem]">
                   {row.label}
                 </span>
-                <span class="text-white text-[clamp(0.8rem,1.1vw,0.95rem)] font-medium text-right max-w-[clamp(10rem,22vw,18rem)] overflow-hidden text-ellipsis">
+                <span class="text-white text-[0.95rem] font-medium text-right max-w-[clamp(10rem,22vw,18rem)] overflow-hidden text-ellipsis">
                   {row.value}
                 </span>
               {/snippet}
@@ -532,7 +532,7 @@
         </div>
 
         <!-- Certificación de dispositivo -->
-        <h3 class="text-[clamp(0.65rem,0.85vw,0.75rem)] font-bold uppercase tracking-wider text-text-secondary mt-[clamp(1.5rem,3vh,2.5rem)] mb-[clamp(0.75rem,1.2vh,1rem)]">
+        <h3 class="text-[0.75rem] font-bold uppercase tracking-wider text-text-secondary mt-[clamp(1.5rem,3vh,2.5rem)] mb-[clamp(0.75rem,1.2vh,1rem)]">
           Certificación de dispositivo
         </h3>
 
@@ -556,15 +556,15 @@
               <div class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)]">
                 <MonitorPlay class="w-[clamp(1.1rem,1.6vw,1.35rem)] h-[clamp(1.1rem,1.6vw,1.35rem)] text-accent-light" />
                 <div class="flex flex-col">
-                  <span class="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">
+                  <span class="text-white text-[1.05rem] font-medium">
                     App Quality
                   </span>
-                  <span class="text-text-secondary text-[clamp(0.75rem,1vw,0.85rem)] mt-0.5">
+                  <span class="text-text-secondary text-[0.85rem] mt-0.5">
                     Esto no afecta la reproducción del contenido en CinelarTV; simplemente optimizamos el rendimiento para adaptarlo mejor a tu TV.
                   </span>
                 </div>
               </div>
-              <div class="text-white text-[clamp(0.8rem,1.1vw,0.95rem)] font-semibold mt-2 ml-[clamp(1.85rem,2.85rem,2.35rem)]">
+              <div class="text-white text-[0.95rem] font-semibold mt-2 ml-[clamp(1.85rem,2.85rem,2.35rem)]">
                 {runtimeConfig.appQuality}
               </div>
             {/snippet}
@@ -591,11 +591,11 @@
             {#snippet children()}
               <div class="flex items-center gap-[clamp(0.75rem,1.2vw,1rem)]">
                 <ShieldCheck class="w-[clamp(1.1rem,1.6vw,1.35rem)] h-[clamp(1.1rem,1.6vw,1.35rem)] {certification?.level === 'certified' ? 'text-green-400' : certification?.level === 'standard' ? 'text-yellow-400' : 'text-text-secondary'}" />
-                <span class="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">
+                <span class="text-white text-[1.05rem] font-medium">
                   Nivel de certificación
                 </span>
               </div>
-              <span class="text-white text-[clamp(0.8rem,1.1vw,0.95rem)] font-semibold">
+              <span class="text-white text-[0.95rem] font-semibold">
                 {certification?.label ?? 'Cargando...'}
               </span>
             {/snippet}
@@ -619,8 +619,8 @@
             playSound={true}
           >
             {#snippet children()}
-              <span class="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)]">4K</span>
-              <span class="text-[clamp(0.8rem,1.1vw,0.95rem)] font-medium {certification?.supports4K ? 'text-green-400' : 'text-red-400'}">
+              <span class="text-text-secondary text-[0.95rem]">4K</span>
+              <span class="text-[0.95rem] font-medium {certification?.supports4K ? 'text-green-400' : 'text-red-400'}">
                 {certification?.supports4K ? 'Soportado' : 'No soportado'}
               </span>
             {/snippet}
@@ -644,8 +644,8 @@
             playSound={true}
           >
             {#snippet children()}
-              <span class="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)]">4K HDR</span>
-              <span class="text-[clamp(0.8rem,1.1vw,0.95rem)] font-medium {certification?.supportsHDR ? 'text-green-400' : 'text-red-400'}">
+              <span class="text-text-secondary text-[0.95rem]">4K HDR</span>
+              <span class="text-[0.95rem] font-medium {certification?.supportsHDR ? 'text-green-400' : 'text-red-400'}">
                 {certification?.supportsHDR ? 'Soportado' : 'No soportado'}
               </span>
             {/snippet}
@@ -669,10 +669,10 @@
             playSound={true}
           >
             {#snippet children()}
-              <span class="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)]">Codecs</span>
+              <span class="text-text-secondary text-[0.95rem]">Codecs</span>
               <div class="flex gap-[clamp(0.35rem,0.6vw,0.5rem)]">
                 {#each Object.entries(certification?.codecs ?? {}) as [codec, supported]}
-                  <span class="text-[clamp(0.65rem,0.85vw,0.75rem)] font-medium px-[clamp(0.35rem,0.6vw,0.5rem)] py-0.5 rounded {supported ? 'bg-green-400/15 text-green-400' : 'bg-white/5 text-text-secondary'}">
+                  <span class="text-[0.75rem] font-medium px-[clamp(0.35rem,0.6vw,0.5rem)] py-0.5 rounded {supported ? 'bg-green-400/15 text-green-400' : 'bg-white/5 text-text-secondary'}">
                     {codec.toUpperCase()}
                   </span>
                 {/each}
@@ -698,14 +698,14 @@
             playSound={true}
           >
             {#snippet children()}
-              <span class="text-text-secondary text-[clamp(0.8rem,1.1vw,0.95rem)]">Widevine DRM</span>
+              <span class="text-text-secondary text-[0.95rem]">Widevine DRM</span>
               <div class="flex items-center gap-[clamp(0.35rem,0.6vw,0.5rem)]">
                 {#if certification?.widevine.supported}
-                  <span class="text-[clamp(0.8rem,1.1vw,0.95rem)] font-medium text-green-400">
+                  <span class="text-[0.95rem] font-medium text-green-400">
                     {certification.widevine.level}
                   </span>
                 {:else}
-                  <span class="text-[clamp(0.8rem,1.1vw,0.95rem)] font-medium text-red-400">
+                  <span class="text-[0.95rem] font-medium text-red-400">
                     No soportado
                   </span>
                 {/if}
@@ -720,10 +720,10 @@
         <div class="w-[clamp(4rem,7vw,5.5rem)] h-[clamp(4rem,7vw,5.5rem)] rounded-2xl bg-accent/20 flex items-center justify-center mb-[clamp(1.5rem,3vh,2.5rem)]">
           <RotateCcw class="w-[clamp(2rem,3.5vw,3rem)] h-[clamp(2rem,3.5vw,3rem)] text-accent-light" />
         </div>
-        <h2 class="text-white text-[clamp(1.5rem,3vw,2.25rem)] font-bold mb-[clamp(0.75rem,1.5vh,1rem)]">
+        <h2 class="text-white text-[2.25rem] font-bold mb-[clamp(0.75rem,1.5vh,1rem)]">
           Reiniciar app
         </h2>
-        <p class="text-text-secondary text-[clamp(0.85rem,1.2vw,1.05rem)] leading-relaxed max-w-[clamp(300px,40vw,500px)] mb-[clamp(2rem,4vh,3rem)]">
+        <p class="text-text-secondary text-[1.05rem] leading-relaxed max-w-[clamp(300px,40vw,500px)] mb-[clamp(2rem,4vh,3rem)]">
           Vuelve a cargar la aplicación y regresa a la pantalla de inicio. Esto puede ayudar a corregir problemas temporales.
         </p>
         <Focusable
@@ -737,7 +737,7 @@
             return true;
           }}
           focusedClass="!bg-white !text-black"
-          class="inline-flex items-center justify-center px-[clamp(2rem,4vw,3rem)] py-[clamp(0.625rem,1.4vh,0.875rem)] rounded-full bg-surface text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-semibold border border-white/10 cursor-pointer"
+          class="inline-flex items-center justify-center px-[clamp(2rem,4vw,3rem)] py-[clamp(0.625rem,1.4vh,0.875rem)] rounded-full bg-surface text-white text-[1.05rem] font-semibold border border-white/10 cursor-pointer"
           playSound={true}
         >
           {#snippet children()}
@@ -751,10 +751,10 @@
         <div class="w-[clamp(4rem,7vw,5.5rem)] h-[clamp(4rem,7vw,5.5rem)] rounded-2xl bg-red-500/20 flex items-center justify-center mb-[clamp(1.5rem,3vh,2.5rem)]">
           <Trash2 class="w-[clamp(2rem,3.5vw,3rem)] h-[clamp(2rem,3.5vw,3rem)] text-red-500" />
         </div>
-        <h2 class="text-white text-[clamp(1.5rem,3vw,2.25rem)] font-bold mb-[clamp(0.75rem,1.5vh,1rem)]">
+        <h2 class="text-white text-[2.25rem] font-bold mb-[clamp(0.75rem,1.5vh,1rem)]">
           Restablecer app
         </h2>
-        <p class="text-text-secondary text-[clamp(0.85rem,1.2vw,1.05rem)] leading-relaxed max-w-[clamp(300px,40vw,500px)] mb-[clamp(2rem,4vh,3rem)]">
+        <p class="text-text-secondary text-[1.05rem] leading-relaxed max-w-[clamp(300px,40vw,500px)] mb-[clamp(2rem,4vh,3rem)]">
           Esto borrará todos los datos de la aplicación y la devolverá a su estado original. Úsalo solo si es necesario.
         </p>
         <Focusable
@@ -780,7 +780,7 @@
             return true;
           }}
           focusedClass="!bg-white !text-black"
-          class="inline-flex items-center justify-center px-[clamp(2rem,4vw,3rem)] py-[clamp(0.625rem,1.4vh,0.875rem)] rounded-full bg-red-500 text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-semibold border border-red-500/50 cursor-pointer"
+          class="inline-flex items-center justify-center px-[clamp(2rem,4vw,3rem)] py-[clamp(0.625rem,1.4vh,0.875rem)] rounded-full bg-red-500 text-white text-[1.05rem] font-semibold border border-red-500/50 cursor-pointer"
           playSound={true}
         >
           {#snippet children()}

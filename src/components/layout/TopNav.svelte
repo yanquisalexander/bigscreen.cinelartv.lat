@@ -134,7 +134,7 @@
         onEnterPress={() => push(item.path)}
         onArrowPress={focusContent}
         focusedClass="!bg-white !text-black !scale-105"
-        class="topnav-item px-[clamp(1rem,1.8vw,1.5rem)] py-[clamp(0.3rem,0.6vh,0.5rem)] rounded-full text-[clamp(0.8rem,1vw,0.9rem)] font-medium transition-all duration-200 {isActive ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white'}"
+        class="topnav-item px-[clamp(1rem,1.8vw,1.5rem)] py-[clamp(0.3rem,0.6vh,0.5rem)] rounded-full text-[0.9rem] font-medium transition-all duration-200 {isActive ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white'}"
         playSound={true}
       >
         {#snippet children()}
@@ -155,7 +155,7 @@
         playSound={true}
       >
       {#snippet children()}
-        <i class="ctv-settings text-[clamp(0.9rem,1.2vw,1.05rem)]"></i>
+        <i class="ctv-settings text-[1.05rem]"></i>
       {/snippet}
     </Focusable>
   </div>

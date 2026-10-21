@@ -232,7 +232,7 @@
 <div class="top10-shelf mb-[clamp(2.5rem,5vh,4rem)]">
   {#if title}
     <div class="flex items-center gap-[clamp(0.5rem,0.8vw,0.75rem)] px-[clamp(3rem,7.5vw,6rem)] mb-[clamp(0.35rem,0.7vh,0.5rem)]">
-      <h2 class="text-[clamp(1rem,1.4vw,1.25rem)] font-medium text-white/95">
+      <h2 class="text-[1.25rem] font-medium text-white/95">
         {title}
       </h2>
       <span class="top10-badge">TOP 10</span>
@@ -354,7 +354,7 @@
 
   .top10-number-stroke {
     position: absolute;
-    font-size: clamp(6rem, 10vw, 9rem);
+    font-size: 9rem;
     font-weight: 900;
     line-height: 0.8;
     letter-spacing: -6px;
@@ -364,7 +364,7 @@
 
   .top10-number-fill {
     position: relative;
-    font-size: clamp(6rem, 10vw, 9rem);
+    font-size: 9rem;
     font-weight: 900;
     line-height: 0.8;
     letter-spacing: -6px;
@@ -450,7 +450,7 @@
 
   .top10-title {
     margin: 0;
-    font-size: clamp(0.75rem, 1.1vw, 0.875rem);
+    font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.25;
     overflow: hidden;

@@ -24,10 +24,10 @@
     trackChildren={true}
     class="flex flex-col items-center text-center w-[clamp(420px,55vw,720px)]"
   >
-    <h2 class="text-white text-[clamp(2rem,4vw,3rem)] font-semibold leading-tight">
+    <h2 class="text-white text-[3rem] font-semibold leading-tight">
       Salir de CinelarTV
     </h2>
-    <p class="text-text-secondary text-[clamp(1rem,1.6vw,1.25rem)] mt-[clamp(1rem,2vh,1.5rem)] max-w-[clamp(420px,50vw,600px)] leading-relaxed">
+    <p class="text-text-secondary text-[1.25rem] mt-[clamp(1rem,2vh,1.5rem)] max-w-[clamp(420px,50vw,600px)] leading-relaxed">
       ¿Quieres cerrar la aplicación? Se detendrá cualquier reproducción en curso.
     </p>
     <div class="flex items-center gap-[clamp(1rem,2vw,1.5rem)] mt-[clamp(2.5rem,6vh,4rem)]">
@@ -35,7 +35,7 @@
         onEnterPress={onCancel}
         focusKey="exit-cancel"
         focusedClass="!bg-white !text-black scale-105"
-        class="h-[clamp(3rem,5.5vh,3.75rem)] px-[clamp(2.5rem,5vw,4rem)] rounded-full bg-white/10 text-white text-[clamp(1rem,1.5vw,1.25rem)] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
+        class="h-[clamp(3rem,5.5vh,3.75rem)] px-[clamp(2.5rem,5vw,4rem)] rounded-full bg-white/10 text-white text-[1.25rem] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
         playSound={true}
       >
         Cancelar
@@ -44,13 +44,13 @@
         onEnterPress={onConfirm}
         focusKey="exit-confirm"
         focusedClass="!bg-white !text-black scale-105"
-        class="h-[clamp(3rem,5.5vh,3.75rem)] px-[clamp(2.5rem,5vw,4rem)] rounded-full bg-live text-white text-[clamp(1rem,1.5vw,1.25rem)] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
+        class="h-[clamp(3rem,5.5vh,3.75rem)] px-[clamp(2.5rem,5vw,4rem)] rounded-full bg-live text-white text-[1.25rem] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
         playSound={true}
       >
         Salir
       </Focusable>
     </div>
-    <p class="text-text-tertiary text-[clamp(0.8rem,1.1vw,0.95rem)] mt-[clamp(2rem,4vh,3rem)]">
+    <p class="text-text-tertiary text-[0.95rem] mt-[clamp(2rem,4vh,3rem)]">
       Pulsa ATRÁS para seguir viendo CinelarTV
     </p>
   </FocusContainer>

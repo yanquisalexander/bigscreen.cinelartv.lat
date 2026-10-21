@@ -54,7 +54,7 @@ class FocusableRowElement extends HTMLElement {
         margin-bottom: clamp(1.5rem, 4vh, 2rem);
       ">
         ${title ? `<h2 data-row-title style="
-          font-size: clamp(1rem, 1.4vw, 1.125rem);
+          font-size: 1.125rem;
           font-weight: 700;
           color: #ffffff;
           margin-bottom: clamp(0.75rem, 2vh, 1rem);

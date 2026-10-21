@@ -299,7 +299,7 @@
 <div class="home-shelf mb-[clamp(0.5rem,1.2vh,1rem)]">
   {#if title}
     <h2
-      class="text-[clamp(1rem,1.4vw,1.25rem)] font-medium text-white/95 mb-[clamp(0.35rem,0.7vh,0.5rem)] px-[clamp(3rem,7.5vw,6rem)]"
+      class="text-[1.25rem] font-medium text-white/95 mb-[clamp(0.35rem,0.7vh,0.5rem)] px-[clamp(3rem,7.5vw,6rem)]"
     >
       {title}
     </h2>
@@ -432,7 +432,7 @@
 
   .home-card-title {
     margin: 0;
-    font-size: clamp(0.75rem, 1.1vw, 0.875rem);
+    font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.25;
     overflow: hidden;
@@ -443,7 +443,7 @@
 
   .home-card-desc {
     margin: 0;
-    font-size: clamp(0.65rem, 0.85vw, 0.75rem);
+    font-size: 0.75rem;
     font-weight: 400;
     line-height: 1.35;
     color: rgba(255, 255, 255, 0.6);
@@ -456,7 +456,7 @@
 
   .home-card-sub {
     margin: 2px 0 0 0;
-    font-size: clamp(0.65rem, 0.85vw, 0.75rem);
+    font-size: 0.75rem;
     font-weight: 400;
     line-height: 1.35;
     overflow: hidden;

@@ -28,15 +28,15 @@
 <div
   style="width: 100vw; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f0f0f; color: #ffffff; font-family: Arial, Helvetica, sans-serif; text-align: center; padding: 40px; box-sizing: border-box;"
 >
-  <div style="font-size: 64px; margin-bottom: 32px;">&#9888;</div>
-  <h1 style="font-size: 36px; font-weight: bold; margin: 0 0 24px 0;">
+  <div style="font-size: 4rem; margin-bottom: 32px;">&#9888;</div>
+  <h1 style="font-size: 2.25rem; font-weight: bold; margin: 0 0 24px 0;">
     Navegador no compatible
   </h1>
-  <p style="font-size: 20px; line-height: 1.6; color: #cccccc; max-width: 600px; margin: 0 0 32px 0;">
+  <p style="font-size: 1.25rem; line-height: 1.6; color: #cccccc; max-width: 600px; margin: 0 0 32px 0;">
     Tu dispositivo necesita una versión más reciente de Android WebView para
     ejecutar CinelarTV.
   </p>
-  <div style="font-size: 18px; color: #999999; line-height: 1.8;">
+  <div style="font-size: 1.125rem; color: #999999; line-height: 1.8;">
     {#if result.detectedVersion != null}
       <p style="margin: 0;">
         Versión detectada: Chrome {result.detectedVersion}
@@ -54,7 +54,7 @@
     onclick={handleAction}
     onkeydown={handleKeyDown}
     class="hover:bg-[#e0e0e0] focus:border-white focus:shadow-[0_0_0_4px_rgba(255,255,255,0.3)]"
-    style="margin-top: 48px; padding: 16px 48px; font-size: 22px; font-weight: bold; color: #000000; background-color: #ffffff; border-radius: 999px; cursor: pointer; outline: none; border: 3px solid transparent; transition: none;"
+    style="margin-top: 48px; padding: 16px 48px; font-size: 1.375rem; font-weight: bold; color: #000000; background-color: #ffffff; border-radius: 999px; cursor: pointer; outline: none; border: 3px solid transparent; transition: none;"
   >
     Actualizar WebView
   </div>

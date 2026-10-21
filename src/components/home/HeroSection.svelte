@@ -390,13 +390,13 @@
                 class="h-[clamp(3.5rem,8vh,5.5rem)] max-w-[80%] object-contain object-left mb-3 drop-shadow-2xl"
               />
             {:else}
-              <h1 class="text-[clamp(2.2rem,3.6vw,3.2rem)] font-black text-white leading-[1.02] mb-3 tracking-[-0.02em] text-left drop-shadow-xl">
+              <h1 class="text-[3.2rem] font-black text-white leading-[1.02] mb-3 tracking-[-0.02em] text-left drop-shadow-xl">
                 {currentItem.title}
               </h1>
             {/if}
 
             <!-- Metadata rica: año • duración • rating • calidad • géneros -->
-            <div class="flex items-center gap-2 mb-3 text-[clamp(0.8rem,1vw,0.9rem)] font-medium text-white/70 flex-wrap">
+            <div class="flex items-center gap-2 mb-3 text-[0.9rem] font-medium text-white/70 flex-wrap">
               {#if currentItem.year}
                 <span class="text-white/90 font-semibold">{currentItem.year}</span>
               {/if}
@@ -425,7 +425,7 @@
               class="transition-all duration-700 ease-in-out overflow-hidden w-full {showTrailer ? 'max-h-0 opacity-0 mb-0' : 'max-h-24 opacity-100 mb-6'}"
             >
               {#if currentItem.description}
-                <p class="text-[clamp(0.9rem,1.15vw,1rem)] text-white/60 line-clamp-2 leading-relaxed font-normal text-left max-w-[clamp(24rem,36vw,32rem)]">
+                <p class="text-[1rem] text-white/60 line-clamp-2 leading-relaxed font-normal text-left max-w-[clamp(24rem,36vw,32rem)]">
                   {currentItem.description}
                 </p>
               {/if}
@@ -457,7 +457,7 @@
                 autoFocus={true}
                 focusKey="hero-view-more"
                 focusedClass="scale-105 ring-4 ring-white/60"
-                class="h-[clamp(2.75rem,5vh,3.25rem)] px-[clamp(1.75rem,3vw,2.5rem)] inline-flex items-center gap-2.5 bg-white text-black text-[clamp(0.9rem,1.15vw,1rem)] font-bold rounded-full transition-all duration-200 cursor-pointer"
+                class="h-[clamp(2.75rem,5vh,3.25rem)] px-[clamp(1.75rem,3vw,2.5rem)] inline-flex items-center gap-2.5 bg-white text-black text-[1rem] font-bold rounded-full transition-all duration-200 cursor-pointer"
                 playSound={true}
               >
                 {#snippet children()}
@@ -485,7 +485,7 @@
                 }}
                 focusKey="hero-more-info"
                 focusedClass="!bg-white !text-black scale-105 ring-4 ring-white/40"
-                class="h-[clamp(2.75rem,5vh,3.25rem)] px-[clamp(1.5rem,2.5vw,2rem)] inline-flex items-center gap-2 bg-white/10 text-white text-[clamp(0.9rem,1.15vw,1rem)] font-semibold rounded-full transition-all duration-200 cursor-pointer backdrop-blur-sm border border-white/10"
+                class="h-[clamp(2.75rem,5vh,3.25rem)] px-[clamp(1.5rem,2.5vw,2rem)] inline-flex items-center gap-2 bg-white/10 text-white text-[1rem] font-semibold rounded-full transition-all duration-200 cursor-pointer backdrop-blur-sm border border-white/10"
                 playSound={true}
               >
                 {#snippet children()}

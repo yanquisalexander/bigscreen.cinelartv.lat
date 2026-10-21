@@ -116,7 +116,7 @@ class PlayerSettingsElement extends HTMLElement {
         }
 
         .settings-section-title {
-          font-size: clamp(0.65rem, 0.85vw, 0.75rem);
+          font-size: 0.75rem;
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 0.05em;
@@ -138,7 +138,7 @@ class PlayerSettingsElement extends HTMLElement {
           padding: clamp(0.5rem, 1vh, 0.75rem) clamp(0.75rem, 1.5vw, 1rem);
           margin: clamp(0.125rem, 0.25vh, 0.25rem) clamp(0.25rem, 0.5vw, 0.5rem);
           border-radius: clamp(0.375rem, 0.7vw, 0.5rem);
-          font-size: clamp(0.8rem, 1vw, 0.875rem);
+          font-size: 0.875rem;
           color: #ffffff;
           cursor: pointer;
           outline: none;
@@ -158,21 +158,21 @@ class PlayerSettingsElement extends HTMLElement {
         }
 
         .settings-item-icon {
-          font-size: clamp(1rem, 1.3vw, 1.125rem);
+          font-size: 1.125rem;
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
         .settings-check {
-          font-size: clamp(0.65rem, 0.8vw, 0.7rem);
+          font-size: 0.7rem;
           opacity: 0.7;
         }
 
         .settings-empty {
           padding: clamp(0.75rem, 1.5vh, 1rem) clamp(0.75rem, 1.5vw, 1rem);
           color: rgba(255, 255, 255, 0.5);
-          font-size: clamp(0.8rem, 1vw, 0.875rem);
+          font-size: 0.875rem;
         }
       </style>
       <div class="settings-panel" data-settings-panel>

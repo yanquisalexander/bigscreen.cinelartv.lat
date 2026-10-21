@@ -25,7 +25,7 @@ export class PlayerSkipButtonElement extends LitElement {
       backdrop-filter: blur(12px);
       border-radius: clamp(0.75rem, 1.5vw, 1rem);
       color: #000000;
-      font-size: clamp(0.875rem, 1.1vw, 1rem);
+      font-size: 1rem;
       font-weight: 600;
       cursor: pointer;
       outline: none;

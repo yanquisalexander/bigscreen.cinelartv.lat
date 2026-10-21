@@ -72,7 +72,7 @@
   class="mb-[clamp(0.5rem,1.5vh,1rem)] {className}"
 >
   {#if title}
-    <h2 class="text-[clamp(1rem,1.4vw,1.125rem)] font-bold text-text-primary mb-[clamp(0.25rem,0.6vh,0.5rem)] px-[clamp(3rem,7.5vw,6rem)]">
+    <h2 class="text-[1.125rem] font-bold text-text-primary mb-[clamp(0.25rem,0.6vh,0.5rem)] px-[clamp(3rem,7.5vw,6rem)]">
       {title}
     </h2>
   {/if}

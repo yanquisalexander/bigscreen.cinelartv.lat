@@ -94,7 +94,7 @@ export class PlayerEpisodeRailElement extends LitElement {
       width: 100%;
       margin: 0.4rem 0 0;
       color: rgba(255,255,255,0.9);
-      font-size: clamp(0.75rem, 1.1vw, 0.875rem);
+      font-size: 0.875rem;
       font-weight: 600;
       line-height: 1.25;
       overflow: hidden;
@@ -115,7 +115,7 @@ export class PlayerEpisodeRailElement extends LitElement {
       width: 100%;
       margin: 0.25rem 0 0;
       color: rgba(255,255,255,0.45);
-      font-size: clamp(0.65rem, 0.85vw, 0.75rem);
+      font-size: 0.75rem;
       line-height: 1.35;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -136,7 +136,7 @@ export class PlayerEpisodeRailElement extends LitElement {
       z-index: 2;
       background: rgba(0,0,0,0.6);
       color: #fff;
-      font-size: clamp(0.55rem, 0.7vw, 0.65rem);
+      font-size: 0.65rem;
       font-weight: 600;
       padding: clamp(0.1rem, 0.2vh, 0.15rem) clamp(0.3rem, 0.5vw, 0.4rem);
       border-radius: clamp(0.2rem, 0.4vw, 0.25rem);
@@ -149,7 +149,7 @@ export class PlayerEpisodeRailElement extends LitElement {
       left: clamp(0.35rem, 0.6vw, 0.5rem);
       z-index: 2;
       color: #fff;
-      font-size: clamp(0.55rem, 0.7vw, 0.65rem);
+      font-size: 0.65rem;
       font-weight: 500;
       pointer-events: none;
     }

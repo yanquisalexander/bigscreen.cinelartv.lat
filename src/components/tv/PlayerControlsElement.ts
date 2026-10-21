@@ -76,7 +76,7 @@ export class PlayerControlsElement extends LitElement {
       right: clamp(2rem, 4vw, 3rem);
       z-index: 2;
       color: #fff;
-      font-size: clamp(1.1rem, 1.45vw, 1.2rem);
+      font-size: 1.2rem;
       font-weight: 500;
       letter-spacing: 0.02em;
       opacity: 1;
@@ -94,7 +94,7 @@ export class PlayerControlsElement extends LitElement {
       opacity: 0;
       transform: translateX(1em);
       transition: opacity 500ms ease, transform 500ms cubic-bezier(0.4, 0, 0.2, 1);
-      font-size: clamp(0.65rem, 0.85vw, 0.75rem);
+      font-size: 0.75rem;
       font-weight: 400;
       line-height: 1.3;
       max-width: 14rem;
@@ -131,8 +131,8 @@ export class PlayerControlsElement extends LitElement {
     :host([rail-expanded]) .top-scrim { opacity: 0; }
 
     .top-title { margin-top: clamp(1rem, 3vh, 1.75rem); max-width: 60vw; }
-    .top-title h1 { color: #ffffff; font-weight: 700; font-size: clamp(1.5rem, 2.6vw, 2.2rem); line-height: 1.2; }
-    .top-title p { color: rgba(255,255,255,0.3); font-size: 15px; font-weight: 500; margin-top: 0.25rem; }
+    .top-title h1 { color: #ffffff; font-weight: 700; font-size: 2.2rem; line-height: 1.2; }
+    .top-title p { color: rgba(255,255,255,0.3); font-size: 0.9375rem; font-weight: 500; margin-top: 0.25rem; }
 
     .controls-row {
       display: flex;
@@ -168,7 +168,7 @@ export class PlayerControlsElement extends LitElement {
 
     .circle-btn { width: 3rem; height: 3rem; border-radius: 1.5rem; }
     .play-pause-btn { width: 4rem; height: 4rem; border-radius: 2rem; }
-    .pill-btn { padding: 0 1rem; height: 2.25rem; border-radius: 1.125rem; font-size: clamp(0.7rem, 0.9vw, 0.8rem); font-weight: 600; letter-spacing: 0.01em; gap: 0.35rem; }
+    .pill-btn { padding: 0 1rem; height: 2.25rem; border-radius: 1.125rem; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.01em; gap: 0.35rem; }
 
     .pill-group {
       display: inline-flex;
@@ -203,8 +203,8 @@ export class PlayerControlsElement extends LitElement {
       color: #0f0f0f;
     }
 
-    .control-btn .ctv-icon { font-size: clamp(1.1rem, 2vw, 1.3rem); line-height: 1; color: inherit; }
-    .control-btn.play-pause-btn .ctv-icon { font-size: clamp(1.3rem, 2.4vw, 1.5rem); }
+    .control-btn .ctv-icon { font-size: 1.3rem; line-height: 1; color: inherit; }
+    .control-btn.play-pause-btn .ctv-icon { font-size: 1.5rem; }
 
     .bottom-scrim {
       width: 100%;
@@ -258,14 +258,14 @@ export class PlayerControlsElement extends LitElement {
       border-radius: 1rem;
       padding: 0.75rem 1.5rem;
       color: #fff;
-      font-size: clamp(1.4rem, 2.5vw, 2rem);
+      font-size: 2rem;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
       letter-spacing: 0.02em;
     }
 
     .seek-preview-badge .ctv-icon {
-      font-size: clamp(1.2rem, 2vw, 1.6rem);
+      font-size: 1.6rem;
       color: #f03;
     }
   `;

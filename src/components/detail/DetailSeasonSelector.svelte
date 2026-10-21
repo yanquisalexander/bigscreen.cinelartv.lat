@@ -46,7 +46,7 @@
           return true;
         }}
         focusedClass={isSelected ? 'scale-105 ring-2 ring-white/30' : '!bg-surface-elevated !text-white !border-white/25 scale-105'}
-        class="tv-no-select cursor-pointer border px-[clamp(1rem,2vw,1.5rem)] py-[clamp(0.375rem,0.9vh,0.625rem)] rounded-lg font-medium transition-all duration-200 ease-out text-[clamp(0.8125rem,1.2vw,1rem)] {isSelected ? 'bg-white text-black font-semibold border-white' : 'bg-surface-elevated text-white/60 border-white/10'}"
+        class="tv-no-select cursor-pointer border px-[clamp(1rem,2vw,1.5rem)] py-[clamp(0.375rem,0.9vh,0.625rem)] rounded-lg font-medium transition-all duration-200 ease-out text-[1rem] {isSelected ? 'bg-white text-black font-semibold border-white' : 'bg-surface-elevated text-white/60 border-white/10'}"
         playSound={true}
       >
         {#snippet children()}

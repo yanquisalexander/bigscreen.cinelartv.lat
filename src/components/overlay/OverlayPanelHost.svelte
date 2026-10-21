@@ -113,11 +113,11 @@
             class="w-[clamp(3rem,6vw,4.5rem)] h-[clamp(3rem,6vw,4.5rem)] rounded-2xl object-cover mb-4"
           />
         {/if}
-        <h2 class="text-white text-[clamp(1.375rem,2.4vw,1.75rem)] font-semibold leading-tight">
+        <h2 class="text-white text-[1.75rem] font-semibold leading-tight">
           {lastPanel.title}
         </h2>
         {#if lastPanel.subtitle}
-          <p class="text-text-secondary text-[clamp(0.875rem,1.1vw,1rem)] mt-2 leading-snug">
+          <p class="text-text-secondary text-[1rem] mt-2 leading-snug">
             {lastPanel.subtitle}
           </p>
         {/if}
@@ -136,19 +136,19 @@
                     </div>
                   </div>
                   {#if item.qrCaption}
-                    <p class="text-text-secondary text-[clamp(0.8125rem,0.95vw,0.875rem)] text-center leading-snug max-w-[18rem]">
+                    <p class="text-text-secondary text-[0.875rem] text-center leading-snug max-w-[18rem]">
                       {item.qrCaption}
                     </p>
                   {/if}
                 </div>
               {/if}
               {#if item.title}
-                <p class="text-white/85 text-[clamp(0.875rem,1.05vw,0.9375rem)] leading-snug {item.qrSvg ? 'mt-2' : ''}">
+                <p class="text-white/85 text-[0.9375rem] leading-snug {item.qrSvg ? 'mt-2' : ''}">
                   {item.title}
                 </p>
               {/if}
               {#if item.subtitle}
-                <p class="text-text-secondary text-[clamp(0.8125rem,0.95vw,0.875rem)] mt-1 leading-snug">
+                <p class="text-text-secondary text-[0.875rem] mt-1 leading-snug">
                   {item.subtitle}
                 </p>
               {/if}
@@ -191,11 +191,11 @@
                 </span>
               {/if}
               <div class="flex-1 min-w-0">
-                <p class="text-white text-[clamp(0.9375rem,1.15vw,1.0625rem)] font-medium truncate">
+                <p class="text-white text-[1.0625rem] font-medium truncate">
                   {item.title}
                 </p>
                 {#if item.subtitle}
-                  <p class="text-text-secondary text-[clamp(0.8125rem,0.95vw,0.875rem)] mt-0.5 truncate">
+                  <p class="text-text-secondary text-[0.875rem] mt-0.5 truncate">
                     {item.subtitle}
                   </p>
                 {/if}

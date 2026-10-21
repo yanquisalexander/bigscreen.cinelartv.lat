@@ -40,7 +40,7 @@
   saveLastFocusedChild={true}
   class="mb-[clamp(0.5rem,1.5vh,1rem)]"
 >
-  <h2 class="text-[clamp(1rem,1.4vw,1.125rem)] font-bold text-text-primary mb-[clamp(0.25rem,0.6vh,0.5rem)] px-[clamp(3rem,7.5vw,6rem)] flex items-center gap-2">
+  <h2 class="text-[1.125rem] font-bold text-text-primary mb-[clamp(0.25rem,0.6vh,0.5rem)] px-[clamp(3rem,7.5vw,6rem)] flex items-center gap-2">
     <span class="w-2 h-2 rounded-full bg-live animate-pulse"></span>
     En Vivo Ahora
   </h2>
@@ -81,7 +81,7 @@
 
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
-                <p class="text-white text-[clamp(0.8rem,1.1vw,1rem)] font-bold truncate">
+                <p class="text-white text-[1rem] font-bold truncate">
                   {ch.name}
                 </p>
                 <button
@@ -100,25 +100,25 @@
               {#if ch.current_program}
                 <div class="flex items-center gap-1.5 mb-1">
                   <div class="w-1.5 h-1.5 rounded-full bg-live shrink-0"></div>
-                  <p class="text-white text-[clamp(0.65rem,0.85vw,0.8rem)] font-medium truncate">
+                  <p class="text-white text-[0.8rem] font-medium truncate">
                     {ch.current_program.title}
                   </p>
                 </div>
                 <div class="flex items-center gap-1.5 mb-1.5">
                   <Clock class="w-3 h-3 text-accent-light shrink-0" />
-                  <p class="text-accent-light text-[clamp(0.55rem,0.7vw,0.65rem)]">
+                  <p class="text-accent-light text-[0.65rem]">
                     {formatTime(ch.current_program.start_time)} – {formatTime(ch.current_program.end_time)}
                   </p>
                 </div>
                 <EpgProgressBar program={ch.current_program} size="sm" />
               {:else}
-                <p class="text-text-tertiary text-[clamp(0.6rem,0.75vw,0.7rem)]">Sin programación</p>
+                <p class="text-text-tertiary text-[0.7rem]">Sin programación</p>
               {/if}
 
               {#if ch.upcoming_programs?.[0]}
                 <div class="flex items-center gap-1.5 mt-1.5">
-                  <span class="text-text-secondary text-[clamp(0.5rem,0.6vw,0.55rem)] uppercase tracking-wider">Siguiente:</span>
-                  <span class="text-text-secondary text-[clamp(0.5rem,0.6vw,0.55rem)] truncate">
+                  <span class="text-text-secondary text-[0.55rem] uppercase tracking-wider">Siguiente:</span>
+                  <span class="text-text-secondary text-[0.55rem] truncate">
                     {ch.upcoming_programs[0].title}
                   </span>
                 </div>

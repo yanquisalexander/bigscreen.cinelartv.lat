@@ -124,7 +124,7 @@
                 {#if episode.premium}
                   <Lock size={11} class="text-amber-400 shrink-0" />
                 {/if}
-                <span class="text-white text-[clamp(0.55rem,0.7vw,0.65rem)] font-semibold">
+                <span class="text-white text-[0.65rem] font-semibold">
                   T{seasonIndex + 1} · E{episodeNum}
                 </span>
               </div>
@@ -142,13 +142,13 @@
 
             <!-- Episode title -->
             <div class="px-[clamp(0.5rem,1vw,0.75rem)] pt-[clamp(0.4rem,0.8vh,0.6rem)] pb-[clamp(0.25rem,0.5vh,0.375rem)]">
-              <span class="block text-white/90 text-[clamp(0.75rem,1.1vw,0.875rem)] font-semibold leading-[1.25] overflow-hidden text-ellipsis transition-[white-space] duration-200" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;">
+              <span class="block text-white/90 text-[0.875rem] font-semibold leading-[1.25] overflow-hidden text-ellipsis transition-[white-space] duration-200" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;">
                 {episode.title}
               </span>
             </div>
 
             <div class="px-[clamp(0.5rem,1vw,0.75rem)] pb-[clamp(0.35rem,0.6vh,0.5rem)]">
-              <span class="block {focused ? 'text-white/60' : 'text-white/45'} text-[clamp(0.65rem,0.85vw,0.75rem)] leading-[1.35] overflow-hidden text-ellipsis transition-colors duration-200" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;">
+              <span class="block {focused ? 'text-white/60' : 'text-white/45'} text-[0.75rem] leading-[1.35] overflow-hidden text-ellipsis transition-colors duration-200" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;">
                 {episode.description || 'Este episodio no tiene descripción disponible.'}
               </span>
             </div>

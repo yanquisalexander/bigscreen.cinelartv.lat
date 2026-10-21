@@ -289,7 +289,7 @@
               class="h-[clamp(2.5rem,5vh,4rem)] max-w-[100%] object-contain object-right ml-auto mb-3 drop-shadow-2xl"
             />
           {:else}
-            <h2 class="text-[clamp(1.5rem,2.5vw,2.2rem)] font-black text-white leading-tight mb-3 drop-shadow-lg tracking-tight">
+            <h2 class="text-[2.2rem] font-black text-white leading-tight mb-3 drop-shadow-lg tracking-tight">
               {featuredItem.title}
             </h2>
           {/if}
@@ -306,13 +306,13 @@
           </div>
 
           {#if genreTags.length > 0}
-            <p class="text-[clamp(0.75rem,1vw,0.875rem)] text-white/50 font-medium tracking-wide">
+            <p class="text-[0.875rem] text-white/50 font-medium tracking-wide">
               {genreTags.join(' · ')}
             </p>
           {/if}
 
           {#if featuredItem.description}
-            <p class="text-[clamp(0.8rem,1vw,0.9rem)] text-white/40 mt-2 line-clamp-2 leading-relaxed">
+            <p class="text-[0.9rem] text-white/40 mt-2 line-clamp-2 leading-relaxed">
               {featuredItem.description}
             </p>
           {/if}

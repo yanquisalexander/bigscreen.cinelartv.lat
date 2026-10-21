@@ -147,7 +147,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--color-bg, #0a0a0f);
+    background: var(--color-bg, #0a0a0a);
   }
 
   .splash :global(.logo) {

@@ -101,7 +101,7 @@
               <!-- Premium badge -->
               {#if isPremium}
                 <div class="absolute top-[clamp(0.375rem,0.8vh,0.5rem)] right-[clamp(0.375rem,0.8vw,0.5rem)]">
-                  <span class="bg-gold text-black text-[clamp(0.5rem,0.7vw,0.625rem)] font-bold px-[clamp(0.25rem,0.5vw,0.375rem)] py-[clamp(0.0625rem,0.15vh,0.125rem)] rounded">
+                  <span class="bg-gold text-black text-[0.625rem] font-bold px-[clamp(0.25rem,0.5vw,0.375rem)] py-[clamp(0.0625rem,0.15vh,0.125rem)] rounded">
                     PREMIUM
                   </span>
                 </div>
@@ -109,20 +109,20 @@
 
               <!-- Info -->
               <div class="absolute bottom-0 left-0 right-0 p-[clamp(0.625rem,1.2vh,0.875rem)]">
-                <p class="text-white text-[clamp(0.8125rem,1.1vw,0.9375rem)] font-semibold truncate leading-tight">
+                <p class="text-white text-[0.9375rem] font-semibold truncate leading-tight">
                   {item.title}
                 </p>
                 <div class="flex items-center gap-[clamp(0.25rem,0.5vw,0.375rem)] mt-[clamp(0.1875rem,0.4vh,0.3125rem)]">
                   {#if item.year}
-                    <span class="text-white/50 text-[clamp(0.625rem,0.85vw,0.75rem)]">
+                    <span class="text-white/50 text-[0.75rem]">
                       {item.year}
                     </span>
                   {/if}
                   {#if item.content_type || item.contentType}
                     {#if item.year}
-                      <span class="text-white/25 text-[clamp(0.5rem,0.7vw,0.625rem)]">·</span>
+                      <span class="text-white/25 text-[0.625rem]">·</span>
                     {/if}
-                    <span class="text-white/50 text-[clamp(0.625rem,0.85vw,0.75rem)]">
+                    <span class="text-white/50 text-[0.75rem]">
                       {isTVShow(item) ? 'Serie' : 'Película'}
                     </span>
                   {/if}

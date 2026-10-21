@@ -124,14 +124,14 @@
 <div class="w-full h-full flex bg-bg">
   <!-- Left column: brand + steps -->
   <div class="w-[42%] h-full flex flex-col justify-center pl-[clamp(3rem,6.5vw,5rem)] pr-[clamp(2rem,4vw,3rem)]">
-    <h1 class="text-[clamp(1.5rem,2.4vw,1.875rem)] font-medium mb-[clamp(2.5rem,7vh,3.5rem)]">
+    <h1 class="text-[1.875rem] font-medium mb-[clamp(2.5rem,7vh,3.5rem)]">
       <span class="text-white">CinelarTV</span>
     </h1>
 
-    <p class="text-[clamp(0.75rem,1.1vw,0.875rem)] font-semibold tracking-[0.2em] text-text-tertiary uppercase mb-[clamp(0.5rem,1.4vh,0.75rem)]">
+    <p class="text-[0.875rem] font-semibold tracking-[0.2em] text-text-tertiary uppercase mb-[clamp(0.5rem,1.4vh,0.75rem)]">
       Activar dispositivo
     </p>
-    <h2 class="text-[clamp(2rem,3.2vw,2.5rem)] font-bold text-white mb-[clamp(2rem,5vh,2.5rem)] leading-tight">
+    <h2 class="text-[2.5rem] font-bold text-white mb-[clamp(2rem,5vh,2.5rem)] leading-tight">
       Vinculá tu cuenta
       <br />
       para empezar a mirar
@@ -139,10 +139,10 @@
 
     <ol class="flex flex-col gap-[clamp(1.25rem,4vh,1.75rem)]">
       <li class="flex gap-[clamp(1rem,2vw,1.25rem)]">
-        <span class="shrink-0 w-[clamp(2rem,3vw,2.25rem)] h-[clamp(2rem,3vw,2.25rem)] rounded-full border border-white/20 flex items-center justify-center text-[clamp(0.75rem,1.1vw,0.875rem)] font-semibold text-white">
+        <span class="shrink-0 w-[clamp(2rem,3vw,2.25rem)] h-[clamp(2rem,3vw,2.25rem)] rounded-full border border-white/20 flex items-center justify-center text-[0.875rem] font-semibold text-white">
           1
         </span>
-        <p class="text-[clamp(1rem,1.45vw,1.125rem)] text-text-secondary pt-[clamp(0.125rem,0.7vh,0.25rem)]">
+        <p class="text-[1.125rem] text-text-secondary pt-[clamp(0.125rem,0.7vh,0.25rem)]">
           Desde tu celular o computadora, entrá a{' '}
           <span class="text-accent-light font-medium">
             {verificationUri || '—'}
@@ -150,10 +150,10 @@
         </p>
       </li>
       <li class="flex gap-[clamp(1rem,2vw,1.25rem)]">
-        <span class="shrink-0 w-[clamp(2rem,3vw,2.25rem)] h-[clamp(2rem,3vw,2.25rem)] rounded-full border border-white/20 flex items-center justify-center text-[clamp(0.75rem,1.1vw,0.875rem)] font-semibold text-white">
+        <span class="shrink-0 w-[clamp(2rem,3vw,2.25rem)] h-[clamp(2rem,3vw,2.25rem)] rounded-full border border-white/20 flex items-center justify-center text-[0.875rem] font-semibold text-white">
           2
         </span>
-        <p class="text-[clamp(1rem,1.45vw,1.125rem)] text-text-secondary pt-[clamp(0.125rem,0.7vh,0.25rem)]">
+        <p class="text-[1.125rem] text-text-secondary pt-[clamp(0.125rem,0.7vh,0.25rem)]">
           Ingresá el código que ves a la derecha, o escaneá el QR directamente
         </p>
       </li>
@@ -172,9 +172,9 @@
           <div class="h-[clamp(1.5rem,3.5vh,2rem)] w-[clamp(8rem,12.5vw,10rem)] rounded bg-surface-elevated animate-pulse-slow"></div>
         {:else if error}
           <div class="w-[clamp(4rem,6.5vw,5rem)] h-[clamp(4rem,6.5vw,5rem)] rounded-full bg-red-500/10 flex items-center justify-center">
-            <span class="text-red-400 text-[clamp(1.5rem,2.4vw,1.875rem)]">!</span>
+            <span class="text-red-400 text-[1.875rem]">!</span>
           </div>
-          <p class="text-red-400 text-[clamp(1rem,1.45vw,1.125rem)]">{error}</p>
+          <p class="text-red-400 text-[1.125rem]">{error}</p>
           <FocusableButton onEnterPress={handleRetry} autoFocus={true} playSound={true}>
             {#snippet children()}
               Reintentar
@@ -189,11 +189,11 @@
             />
           </div>
 
-          <p class="text-[clamp(2.25rem,4vw,3rem)] font-bold tracking-[0.3em] text-white">
+          <p class="text-[3rem] font-bold tracking-[0.3em] text-white">
             {formatUserCode(userCode)}
           </p>
 
-          <p class="text-text-tertiary text-[clamp(0.75rem,1.1vw,0.875rem)]">Código de activación</p>
+          <p class="text-text-tertiary text-[0.875rem]">Código de activación</p>
         {/if}
       {/snippet}
     </Focusable>

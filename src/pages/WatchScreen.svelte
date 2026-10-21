@@ -1027,10 +1027,10 @@ const handleAdComplete = () => {
     </div>
 
     <div class="flex flex-col items-start text-left max-w-3xl">
-      <h1 class="text-white text-[clamp(2rem,3.5vw,3rem)] font-bold mb-4 leading-tight">
+      <h1 class="text-white text-[3rem] font-bold mb-4 leading-tight">
         Límite de transmisiones alcanzado
       </h1>
-      <p class="text-white/75 text-[clamp(0.95rem,1.4vw,1.15rem)] leading-relaxed mb-8 max-w-2xl">
+      <p class="text-white/75 text-[1.15rem] leading-relaxed mb-8 max-w-2xl">
         Ya hay demasiados dispositivos reproduciendo contenido en esta cuenta. Detén la transmisión en otro dispositivo para continuar viendo.
       </p>
 
@@ -1079,10 +1079,10 @@ const handleAdComplete = () => {
     </div>
 
     <div class="flex flex-col items-start text-left max-w-3xl">
-      <h1 class="text-white text-[clamp(2rem,3.5vw,3rem)] font-bold mb-4 leading-tight">
+      <h1 class="text-white text-[3rem] font-bold mb-4 leading-tight">
         Ha ocurrido un error
       </h1>
-      <p class="text-white/75 text-[clamp(0.95rem,1.4vw,1.15rem)] leading-relaxed mb-8 max-w-2xl">
+      <p class="text-white/75 text-[1.15rem] leading-relaxed mb-8 max-w-2xl">
         No podemos reproducir este título en este momento. Inténtalo de nuevo más tarde o selecciona otro título.
       </p>
 

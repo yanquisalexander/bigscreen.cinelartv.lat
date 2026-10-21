@@ -94,7 +94,7 @@ class TVSidebarElement extends HTMLElement {
               padding: 0 clamp(0.75rem, 1.2vw, 1rem);
               height: clamp(2.5rem, 4vh, 3rem);
               border-radius: 0.75rem;
-              font-size: clamp(0.85rem, 1.1vw, 0.95rem);
+              font-size: 0.95rem;
               font-weight: 500;
               color: ${isActive ? '#ffffff' : '#8e8e93'};
               background: transparent;
@@ -122,7 +122,7 @@ class TVSidebarElement extends HTMLElement {
             padding: 0 clamp(0.75rem, 1.2vw, 1rem);
             height: clamp(2.5rem, 4vh, 3rem);
             border-radius: 0.75rem;
-            font-size: clamp(0.85rem, 1.1vw, 0.95rem);
+            font-size: 0.95rem;
             font-weight: 500;
             color: #8e8e93;
             background: transparent;
@@ -141,7 +141,7 @@ class TVSidebarElement extends HTMLElement {
               padding: 0 clamp(0.75rem, 1.2vw, 1rem);
               height: clamp(2.5rem, 4vh, 3rem);
               border-radius: 0.75rem;
-              font-size: clamp(0.85rem, 1.1vw, 0.95rem);
+              font-size: 0.95rem;
               font-weight: 500;
               color: #ffffff;
               background: transparent;
@@ -167,7 +167,7 @@ class TVSidebarElement extends HTMLElement {
           padding: 0 clamp(0.75rem, 1.2vw, 1rem);
           height: clamp(2.5rem, 4vh, 3rem);
           border-radius: 0.75rem;
-          font-size: clamp(0.85rem, 1.1vw, 0.95rem);
+          font-size: 0.95rem;
           font-weight: 500;
           color: #8e8e93;
           background: transparent;

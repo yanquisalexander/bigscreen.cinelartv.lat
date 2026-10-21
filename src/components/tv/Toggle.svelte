@@ -23,9 +23,9 @@
 >
   {#snippet children()}
     <div class="flex flex-col pr-4">
-      <span class="text-white text-[clamp(0.9rem,1.25vw,1.05rem)] font-medium">{label}</span>
+      <span class="text-white text-[1.05rem] font-medium">{label}</span>
       {#if description}
-        <span class="text-text-secondary text-[clamp(0.75rem,1vw,0.85rem)] mt-0.5">{description}</span>
+        <span class="text-text-secondary text-[0.85rem] mt-0.5">{description}</span>
       {/if}
     </div>
 

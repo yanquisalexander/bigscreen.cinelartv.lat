@@ -210,7 +210,7 @@
         />
       {:else}
         <h1
-          class="font-black text-white leading-[0.98] tracking-[-0.03em] text-[clamp(2.5rem,5.2vw,4.25rem)] mb-[clamp(0.75rem,1.5vh,1rem)] max-w-[85%]"
+          class="font-black text-white leading-[0.98] tracking-[-0.03em] text-[4.25rem] mb-[clamp(0.75rem,1.5vh,1rem)] max-w-[85%]"
         >
           {content.title}
         </h1>
@@ -218,7 +218,7 @@
 
       <!-- Metadata inline -->
       {#if metadataParts.length > 0 || genreTags.length > 0}
-        <div class="flex items-center gap-[clamp(0.375rem,0.7vw,0.5rem)] mb-[clamp(0.75rem,1.6vh,1rem)] text-[clamp(0.8125rem,1.05vw,0.9375rem)] text-white/60 flex-wrap">
+        <div class="flex items-center gap-[clamp(0.375rem,0.7vw,0.5rem)] mb-[clamp(0.75rem,1.6vh,1rem)] text-[0.9375rem] text-white/60 flex-wrap">
           {#if contentType}
             <span class="text-white/80 font-medium">{contentType}</span>
             <span class="text-white/25">·</span>
@@ -243,7 +243,7 @@
       <!-- Description -->
       {#if content.description}
         <p
-          class="text-[clamp(0.9375rem,1.3vw,1.125rem)] text-white/70 font-normal max-w-[clamp(30rem,40vw,42rem)] leading-[1.5] mb-[clamp(1.5rem,3.4vh,2.25rem)] line-clamp-3"
+          class="text-[1.125rem] text-white/70 font-normal max-w-[clamp(30rem,40vw,42rem)] leading-[1.5] mb-[clamp(1.5rem,3.4vh,2.25rem)] line-clamp-3"
         >
           {content.description}
         </p>
@@ -257,11 +257,11 @@
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between mb-[0.3125rem]">
-              <span class="text-[clamp(0.6875rem,0.85vw,0.75rem)] text-white/70 font-semibold uppercase tracking-wide">
+              <span class="text-[0.75rem] text-white/70 font-semibold uppercase tracking-wide">
                 {resumeEpisodeTag ? `Reanudar ${resumeEpisodeTag}` : 'Continuar viendo'}
               </span>
               {#if !resumeEpisodeTag}
-                <span class="text-[clamp(0.6875rem,0.85vw,0.75rem)] text-white/90 font-bold">
+                <span class="text-[0.75rem] text-white/90 font-bold">
                   {continuePercent}%
                 </span>
               {/if}

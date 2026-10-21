@@ -53,18 +53,18 @@
       />
     </div>
 
-    <h1 class="text-white font-bold tracking-tight text-[clamp(2rem,4.5vw,2.75rem)] leading-tight mb-[clamp(1.25rem,3vh,2rem)]">
+    <h1 class="text-white font-bold tracking-tight text-[2.75rem] leading-tight mb-[clamp(1.25rem,3vh,2rem)]">
       Contenido no disponible
     </h1>
 
-    <p class="text-text-secondary text-[clamp(1.125rem,1.8vw,1.375rem)] leading-relaxed mb-[clamp(2.5rem,7vh,4rem)]">
+    <p class="text-text-secondary text-[1.375rem] leading-relaxed mb-[clamp(2.5rem,7vh,4rem)]">
       {cfg.message || 'Esta aplicación no está disponible en tu ubicación actual.'}
     </p>
 
     {#if status === 'error'}
       <p
         role="alert"
-        class="text-live text-[clamp(1rem,1.5vw,1.25rem)] mb-[clamp(1.5rem,4vh,2.5rem)]"
+        class="text-live text-[1.25rem] mb-[clamp(1.5rem,4vh,2.5rem)]"
       >
         No pudimos verificar tu ubicación. Inténtalo nuevamente.
       </p>
@@ -73,7 +73,7 @@
     {#if status === 'still-blocked'}
       <p
         role="status"
-        class="text-text-secondary text-[clamp(1rem,1.5vw,1.25rem)] mb-[clamp(1.5rem,4vh,2.5rem)]"
+        class="text-text-secondary text-[1.25rem] mb-[clamp(1.5rem,4vh,2.5rem)]"
       >
         Tu ubicación sigue sin estar disponible. Podés intentar de nuevo.
       </p>
@@ -86,7 +86,7 @@
       autoFocus={true}
       playSound={true}
       focusKey="blocked-retry"
-      class="min-h-[clamp(4rem,7vh,4.5rem)] min-w-[clamp(15rem,24vw,22rem)] !text-[clamp(1.125rem,1.6vw,1.375rem)]"
+      class="min-h-[clamp(4rem,7vh,4.5rem)] min-w-[clamp(15rem,24vw,22rem)] !text-[1.375rem]"
       focusedClass="scale-105 shadow-[0_0_45px_rgba(0,132,240,0.5)]"
     >
       {#snippet children()}
@@ -118,7 +118,7 @@
       {/snippet}
     </FocusableButton>
 
-    <code class="mt-[clamp(3rem,8vh,5rem)] text-text-tertiary text-[clamp(0.75rem,1vw,0.875rem)] tracking-wider">
+    <code class="mt-[clamp(3rem,8vh,5rem)] text-text-tertiary text-[0.875rem] tracking-wider">
       ERR_GEO_BLOCKED
     </code>
   </div>
