@@ -99,17 +99,25 @@
   }
 
   function handleKeyArrow(direction: string, rowIdx: number, row: string[], charIdx: number): boolean {
+    if (direction === 'left' && charIdx === 0) {
+      if (doesFocusableExist('topnav')) {
+        setFocus('topnav');
+        return false;
+      }
+    }
     if (direction === 'up') {
       if (rowIdx > 0) return true;
-      setFocus('topnav');
-      return false;
+      if (doesFocusableExist('topnav')) {
+        setFocus('topnav');
+        return false;
+      }
+      return true;
     }
     if (direction === 'right') {
       if (charIdx < row.length - 1) return true;
       jumpToResults();
       return false;
     }
-    // down / left: let spatial navigation handle the rest
     return true;
   }
 
@@ -127,15 +135,17 @@
   }
 
   function handleAuxArrow(direction: string): boolean {
+    if (direction === 'left' && doesFocusableExist('topnav')) {
+      setFocus('topnav');
+      return false;
+    }
     if (direction === 'up') {
-      // volver a la última fila de letras
       return true;
     }
     if (direction === 'down') {
       jumpToResults();
       return false;
     }
-    // left / right: spatial navigation hacia las letras o el grid de resultados
     return true;
   }
 
@@ -202,7 +212,7 @@
   preferredChildFocusKey="sk-A"
   trackChildren={true}
   saveLastFocusedChild={true}
-  class="w-full h-dvh overflow-hidden bg-bg px-[clamp(2rem,4vw,4rem)] pt-[calc(var(--topnav-h)+1.5rem)] pb-[clamp(1.5rem,3vh,2.5rem)]"
+  class="w-full h-dvh box-border overflow-hidden bg-bg pl-[clamp(5.5rem,7vw,7rem)] pr-[clamp(2rem,4vw,4rem)] pt-[var(--tv-page-top-inset)] pb-[clamp(1.5rem,3vh,2.5rem)]"
 >
   <div class="flex gap-[clamp(2rem,4vw,4rem)] items-start h-full">
     <!-- Left: query bar + compact keyboard -->

@@ -204,12 +204,16 @@
   class="w-full h-dvh bg-bg flex overflow-hidden"
 >
   <!-- Left panel sidebar -->
-  <nav class="flex-shrink-0 min-w-[clamp(140px,25vw,300px)] pt-[calc(var(--topnav-h)+1.5rem)] pb-[clamp(3rem,8vh,4rem)] pl-[clamp(4rem,8vw,6rem)] pr-[clamp(2rem,4vw,3rem)] flex flex-col gap-[clamp(0.25rem,0.4vh,0.35rem)] overflow-y-auto scrollbar-none">
+  <nav class="flex-shrink-0 min-w-[clamp(140px,25vw,300px)] pt-[clamp(2rem,4vh,3rem)] pb-[clamp(3rem,8vh,4rem)] pl-[clamp(5.5rem,7vw,7.5rem)] pr-[clamp(2rem,4vw,3rem)] flex flex-col gap-[clamp(0.25rem,0.4vh,0.35rem)] overflow-y-auto scrollbar-none">
     <!-- Profile card -->
     <Focusable
       focusKey="settings-profile"
       onEnterPress={handleChangeProfile}
       onArrowPress={(direction) => {
+        if (direction === 'left') {
+          setFocus('topnav');
+          return false;
+        }
         if (direction === 'down') {
           setFocus('settings-nav-reproduccion');
           return false;

@@ -1,9 +1,13 @@
 <script lang="ts">
+  import { TV_SCALE_EVENT } from '@/services/tvScale';
   import { push } from 'svelte-spa-router';
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
-  import Focusable from '@/components/tv/Focusable.svelte';
   import VirtualizedShelves from '@/components/home/VirtualizedShelves.svelte';
-  import HeroSection from '@/components/home/HeroSection.svelte';
+  import ContentPresentation from '@/components/home/ContentPresentation.svelte';
+  import DetailActionButton from '@/components/detail/DetailActionButton.svelte';
+  import { Play, Info } from '@lucide/svelte';
+  import { tick } from 'svelte';
+  import { homeBrowseMemory } from '@/stores/homeBrowseMemory';
   import ExitDialog from '@/components/ui/ExitDialog.svelte';
   import { authStore } from '@/stores/authStore';
   import { svelteConfigStore } from '@/stores/configStore';
@@ -19,10 +23,20 @@
   let loading = $state(true);
   let error = $state(false);
   let showExitDialog = $state(false);
-  let heroImmersive = $state(false);
-  const TOP_INSET = 160;
-  let scrollY = $state(0);
+  const profileKey = String(authStore.getState().selectedProfile?.id ?? 'guest');
+  if (homeBrowseMemory.profile !== profileKey) Object.assign(homeBrowseMemory, { profile: profileKey, itemId: '', categoryIndex: 0, focusKey: '', scrollY: 0 });
+  let scrollY = $state(homeBrowseMemory.scrollY);
+  let selectedItem = $state<ContentItem | null>(null);
+  let activeCategoryIndex = $state(homeBrowseMemory.categoryIndex);
+  let previewTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastCardKey = homeBrowseMemory.focusKey;
   let viewportHeight = $state(0);
+  let listFocused = $state(false);
+  let heroFocused = $state(false);
+  let trailerFullscreen = $state(false);
+  let fullscreenSuppressed = $state(false);
+  let remSize = $state(16);
+  let viewportWidth = $state(1920);
 
   const clientEndpoint = $derived($svelteConfigStore.config.CLIENT_ENDPOINT);
 
@@ -119,195 +133,259 @@
     push(`/content/${item.id}`);
   }
 
-  const bannerItems = $derived(data?.banner_content ?? []);
-  const firstRowId = $derived(data?.content?.[0]?.content?.find((c) => c?.id != null)?.id);
-  const firstRowFocusKey = $derived(firstRowId != null ? `home-row-0-item-${firstRowId}` : undefined);
-  const preferredChildFocusKey = $derived(bannerItems.length > 0 ? 'hero-section' : 'home-row-0');
-  const heroHeight = $derived(
-    bannerItems.length > 0
-      ? Math.max(420, Math.min(68 * (viewportHeight / 100), 660))
-      : 0,
+  function handleCardEnter(item: ContentItem) {
+    if (item.content_type === 'LIVETV' || (item as any).contentType === 'LIVETV') {
+      push(`/live/${item.id}`);
+      return;
+    }
+    if (item.continue_watching && (item.continue_watching.progress ?? 0) > 0) {
+      handlePlay(item);
+      return;
+    }
+    handleInfo(item);
+  }
+
+
+  const categories = $derived((data?.content ?? []).filter(category => (category.content?.length ?? 0) > 0));
+  const presentationItem = $derived(selectedItem ?? data?.banner_content?.[0] ?? categories[0]?.content?.[0]);
+  const expandedStageHeight = $derived(Math.max(12 * remSize, Math.min(24 * remSize, viewportHeight - 18 * remSize)));
+  const compactStageHeight = $derived(Math.max(10 * remSize, Math.min(18 * remSize, expandedStageHeight - 3.5 * remSize)));
+  const stageHeight = $derived(trailerFullscreen ? viewportHeight : listFocused ? expandedStageHeight : compactStageHeight);
+  const railViewportHeight = $derived(Math.max(0, viewportHeight - stageHeight));
+
+  const resumeProgress = $derived(
+    presentationItem?.continue_watching?.duration
+      ? Math.max(0, Math.min(100, (presentationItem.continue_watching.progress / presentationItem.continue_watching.duration) * 100))
+      : 0
   );
 
-  const heroOpacity = $derived(
-    heroHeight > 0 ? Math.max(0, 1 - scrollY / heroHeight) : 0,
+  const heroPlayLabel = $derived(
+    presentationItem?.continue_watching
+      ? 'Continuar viendo'
+      
+      : 'Ver ahora'
   );
 
-  const heroFocusable = $derived(heroOpacity > 0.3);
-
-  const heroExpandOffset = $derived(
-    heroImmersive ? Math.max(0, viewportHeight - heroHeight) : 0,
-  );
-
-  function focusTopNav() {
-    setFocus('topnav');
+  function focusNav() {
+    if (doesFocusableExist('topnav')) setFocus('topnav');
     return false;
   }
 
-  function focusHeroFromFirstRow(direction: string) {
-    if (direction !== 'up' || bannerItems.length === 0) return focusTopNav();
-    scrollY = 0;
-    requestAnimationFrame(() => {
-      setFocus('hero-view-more');
-    });
+  function focusCards() {
+    fullscreenSuppressed = true;
+    if (lastCardKey && doesFocusableExist(lastCardKey)) { setFocus(lastCardKey); return false; }
+    const first = categories[0]?.content?.[0];
+    const prefix = categories[0]?.section_kind === 'top_10_by_country' ? 'home-top10-0' : 'home-row-0';
+    const key = first ? prefix + '-item-' + first.id : '';
+    if (key && doesFocusableExist(key)) setFocus(key);
     return false;
+  }
+
+  function handleCardFocus(item: ContentItem, catIdx: number, key: string) {
+    listFocused = true;
+    heroFocused = false;
+    fullscreenSuppressed = false;
+    activeCategoryIndex = catIdx;
+    lastCardKey = key;
+    Object.assign(homeBrowseMemory, { itemId: item.id, categoryIndex: catIdx, focusKey: key });
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => { selectedItem = item; }, 240);
   }
 
   function handleShelfFocusUpdate(catIdx: number, hasFocused: boolean, shelfY: number) {
-    if (hasFocused) {
-      scrollY = Math.max(0, heroHeight + shelfY - TOP_INSET);
-    }
+    if (!hasFocused) return;
+    activeCategoryIndex = catIdx;
+    scrollY = shelfY;
+    homeBrowseMemory.scrollY = shelfY;
   }
 
   $effect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
-      const currentKey = getCurrentFocusKey();
-      if (currentKey && doesFocusableExist(currentKey)) return;
-      e.preventDefault();
-      setFocus(loading || error ? 'topnav' : 'home-root');
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  });
-
-  function isTopNavFocused(): boolean {
-    const key = getCurrentFocusKey();
-    return Boolean(key && (key === 'topnav' || key.startsWith('nav-')));
-  }
-
-  $effect(() => {
-    const handleBack = (e: KeyboardEvent) => {
-      if (isBackKey(e)) {
-        e.preventDefault();
-        if (showExitDialog) {
-          showExitDialog = false;
-          return;
-        }
-        if (isTopNavFocused()) {
-          showExitDialog = true;
-        } else {
-          setFocus('topnav');
-        }
-      }
-    };
-    window.addEventListener('keydown', handleBack);
-    return () => window.removeEventListener('keydown', handleBack);
+    if (!data || loading) return;
+    const remembered = categories[homeBrowseMemory.categoryIndex]?.content?.find(item => item.id === homeBrowseMemory.itemId);
+    if (remembered) selectedItem = remembered;
+    let cancelled = false;
+    void tick().then(() => {
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        const target = remembered && doesFocusableExist(homeBrowseMemory.focusKey) ? homeBrowseMemory.focusKey : 'hero-view-more';
+        if (doesFocusableExist(target)) setFocus(target);
+        else focusNav();
+      });
+    });
+    return () => { cancelled = true; };
   });
 
   $effect(() => {
-    viewportHeight = window.innerHeight;
-    const onResize = () => { viewportHeight = window.innerHeight; };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    const resize = () => {
+      viewportHeight = window.innerHeight;
+      viewportWidth = window.innerWidth;
+      remSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    };
+    resize();
+    const back = (event: KeyboardEvent) => {
+      if (!isBackKey(event)) return;
+      event.preventDefault();
+      if (trailerFullscreen) { fullscreenSuppressed = true; return; }
+      if (showExitDialog) { showExitDialog = false; return; }
+      const key = getCurrentFocusKey();
+      if (key === 'topnav' || key?.startsWith('nav-')) showExitDialog = true;
+      else focusNav();
+    };
+    window.addEventListener(TV_SCALE_EVENT, resize);
+    window.addEventListener('keydown', back);
+    return () => {
+      clearTimeout(previewTimer);
+      window.removeEventListener(TV_SCALE_EVENT, resize);
+      window.removeEventListener('keydown', back);
+    };
+  });
+  $effect(() => {
+    document.body.classList.toggle('playing-inmersive-trailer', trailerFullscreen);
+    return () => document.body.classList.remove('playing-inmersive-trailer');
   });
 </script>
 
-<FocusContainer
-  focusKey="home-root"
-  {preferredChildFocusKey}
-  focusable={false}
-  trackChildren={true}
-  saveLastFocusedChild={true}
-  class="w-full h-dvh overflow-hidden relative hide-scrollbar"
->
+<div style="--tv-screen-width: {viewportWidth / remSize}rem; --tv-screen-height: {viewportHeight / remSize}rem;">
+<FocusContainer focusKey="home-root" preferredChildFocusKey="hero-section" focusable={false} saveLastFocusedChild={true} onUpdateHasFocusedChild={(focused) => { if (!focused) listFocused = false; }} class="browse-home">
   {#if loading}
-    <div class="w-full h-full flex flex-col bg-bg">
-      <div class="relative w-full h-[clamp(420px,68vh,660px)] bg-black overflow-hidden">
-        <div class="absolute inset-0 bg-surface animate-pulse-slow"></div>
-        <div class="absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-transparent"></div>
-        <div class="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/30"></div>
-        <div class="absolute bottom-[clamp(2.5rem,7vh,4.5rem)] left-[clamp(2.5rem,5vw,5rem)] flex flex-col items-start gap-3 z-10">
-          <div class="h-3 w-16 rounded bg-white/10 animate-pulse-slow mt-4"></div>
-          <div class="h-[clamp(2rem,3.2vw,2.8rem)] w-[clamp(14rem,28vw,22rem)] rounded-lg bg-white/10 animate-pulse-slow"></div>
-          <div class="h-3 w-[clamp(16rem,24vw,20rem)] rounded bg-white/10 animate-pulse-slow"></div>
-          <div class="h-3 w-[clamp(12rem,18vw,16rem)] rounded bg-white/10 animate-pulse-slow"></div>
-          <div class="mt-2 h-[clamp(2.5rem,4vh,3rem)] w-[clamp(8rem,10vw,10rem)] rounded-xl bg-white/10 animate-pulse-slow"></div>
-        </div>
-      </div>
-      <div class="relative px-[clamp(3rem,7.5vw,6rem)] pt-[clamp(1rem,2vh,1.5rem)] pb-[clamp(3rem,8vh,4rem)] space-y-[clamp(1.5rem,4vh,2rem)]">
-        {#each [1] as i (i)}
-          <div>
-            <div class="h-[clamp(1.125rem,2.4vh,1.5rem)] w-[clamp(10rem,15vw,12rem)] bg-surface rounded mb-[clamp(0.75rem,2vh,1rem)] animate-pulse-slow"></div>
-            <div class="flex gap-[clamp(0.5rem,1vw,0.75rem)]">
-              {#each [1, 2, 3, 4, 5] as j (j)}
-                <div class="w-[clamp(156px,18vw,230px)] h-[clamp(88px,10.2vw,130px)] bg-surface rounded-xl animate-pulse-slow"></div>
-              {/each}
-            </div>
-          </div>
-        {/each}
-      </div>
-    </div>
+    <div class="loading-state">Cargando tu catálogo…</div>
   {:else if error}
-    <div class="w-full h-full flex flex-col items-center justify-center gap-8 px-8 bg-bg">
-      <p class="text-text-secondary text-[1.25rem] text-center max-w-md">
-        No se pudo cargar el contenido. Verifica tu conexión e intenta de nuevo.
-      </p>
-      <Focusable
-        focusKey="home-retry"
-        onEnterPress={fetchData}
-        focusedClass="!bg-white !text-black scale-105"
-        class="h-[clamp(2.5rem,4vh,3rem)] px-[clamp(2rem,3vw,3rem)] rounded-full bg-surface text-white text-[1rem] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
-        playSound={true}
-      >
-        {#snippet children()}
-          Reintentar
-        {/snippet}
-      </Focusable>
+    <div class="loading-state">
+      <p>No se pudo cargar el catálogo.</p>
+      <DetailActionButton focusKey="home-retry" label="Reintentar" onEnterPress={fetchData} autoFocus={true} />
+    </div>
+  {:else if presentationItem}
+    <div class="immersive-stage" class:trailer-fullscreen={trailerFullscreen} style="--browse-stage-height: {expandedStageHeight / remSize}rem;">
+      <FocusContainer focusKey="hero-section" focusable={false} preferredChildFocusKey="hero-view-more" saveLastFocusedChild={true} onUpdateHasFocusedChild={(focused) => { heroFocused = focused; if (focused) listFocused = false; fullscreenSuppressed = false; }}>
+        <ContentPresentation item={presentationItem} {clientEndpoint} immersive={true} expanded={listFocused} previewEnabled={listFocused || heroFocused} fullscreenEligible={heroFocused && !fullscreenSuppressed} onImmersiveChange={(active) => { trailerFullscreen = active; }}>
+          <div class="hero-action-wrap">
+            <DetailActionButton
+              focusKey="hero-view-more"
+              label={heroPlayLabel}
+              onEnterPress={() => handlePlay(presentationItem!)}
+              onArrowPress={(dir) => (dir === 'down' ? focusCards() : dir === 'left' || dir === 'up' ? focusNav() : true)}
+            >
+              {#snippet icon()}<Play size="1.375rem" class="fill-current" />{/snippet}
+            </DetailActionButton>
+            {#if resumeProgress > 0}
+              <div
+                class="hero-resume-progress"
+                role="progressbar"
+                aria-label="Progreso"
+                aria-valuenow={Math.round(resumeProgress)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <span style="width: {resumeProgress}%;"></span>
+              </div>
+            {/if}
+          </div>
+          <DetailActionButton
+            focusKey="hero-more-info"
+            label="Más información"
+            variant="secondary"
+            onEnterPress={() => handleInfo(presentationItem!)}
+            onArrowPress={(dir) => (dir === 'down' ? focusCards() : dir === 'up' ? focusNav() : true)}
+          >
+            {#snippet icon()}<Info size="1.375rem" />{/snippet}
+          </DetailActionButton>
+        </ContentPresentation>
+      </FocusContainer>
+    </div>
+    <div class="shelf-viewport" style="transform: translateY({stageHeight / remSize}rem) translateZ(0);">
+      <div class="shelf-track" style="transform: translateY({-scrollY / remSize}rem) translateZ(0);">
+        <VirtualizedShelves {categories} {scrollY} viewportHeight={railViewportHeight} {clientEndpoint} {activeCategoryIndex}
+          initialItemId={homeBrowseMemory.itemId}
+          onCardEnterPress={handleCardEnter}
+          onCardFocus={handleCardFocus}
+          onCardArrowPress={(dir, catIdx) => {
+            if (dir === 'left') return focusNav();
+            if (dir === 'up' && catIdx === 0) {
+              clearTimeout(previewTimer);
+              if (doesFocusableExist('hero-view-more')) setFocus('hero-view-more');
+              return false;
+            }
+            return true;
+          }}
+          onShelfFocusUpdate={handleShelfFocusUpdate}
+        />
+      </div>
     </div>
   {:else}
-    <div
-      class="absolute inset-0"
-      style="transform: translateY(-{scrollY}px); transition: transform 200ms ease-out; will-change: transform;"
-    >
-      {#if bannerItems.length > 0}
-        <div
-          class="absolute left-0 right-0"
-          style="top: 0; height: {heroHeight}px;"
-        >
-          <div style="opacity: {heroOpacity}; pointer-events: {heroFocusable ? 'auto' : 'none'}; height: 100%;">
-            <HeroSection
-              items={bannerItems}
-              onPlay={handlePlay}
-              onInfo={handleInfo}
-              {clientEndpoint}
-              {firstRowFocusKey}
-              focusable={heroFocusable}
-              onImmersiveChange={(imm) => { heroImmersive = imm; }}
-              onUpdateHasFocusedChild={(focused) => {
-                if (focused) scrollY = 0;
-              }}
-            />
-          </div>
-        </div>
-      {/if}
-
-      <div
-        class="relative z-10"
-        style="transform: translateY({heroHeight + heroExpandOffset}px); transition: transform 700ms ease-in-out; will-change: transform;"
-      >
-        {#if data?.content}
-          <VirtualizedShelves
-            categories={data.content}
-            scrollY={Math.max(0, scrollY - heroHeight)}
-            {viewportHeight}
-            {clientEndpoint}
-            onCardEnterPress={handleInfo}
-            onCardArrowPress={(direction, catIdx) => {
-              if (catIdx === 0 && direction === 'up') return focusHeroFromFirstRow(direction);
-              return true;
-            }}
-            onShelfFocusUpdate={handleShelfFocusUpdate}
-          />
-        {/if}
-      </div>
-    </div>
+    <div class="loading-state">Todavía no hay títulos disponibles.</div>
   {/if}
 </FocusContainer>
-
+</div>
 {#if showExitDialog}
-  <ExitDialog
-    onConfirm={() => exitApp()}
-    onCancel={() => { showExitDialog = false; }}
-  />
+  <ExitDialog onConfirm={() => exitApp()} onCancel={() => { showExitDialog = false; }} />
 {/if}
+
+<style>
+  :global(.browse-home) {
+    height: 100vh;
+    overflow: hidden;
+    background: #0a0a0a;
+    position: relative;
+    --browse-inset: var(--tv-content-inset);
+  }
+
+  .loading-state {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    font-size: 1.5rem;
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  .hero-action-wrap {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+  }
+
+  .hero-resume-progress {
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: -0.5rem;
+    height: .1875rem;
+    background: rgba(255, 255, 255, 0.22);
+    border-radius: .125rem;
+    overflow: hidden;
+  }
+
+  .hero-resume-progress span {
+    display: block;
+    height: 100%;
+    background: #FFFFFF;
+    border-radius: 2px;
+  }
+
+  .shelf-viewport {
+    position: absolute;
+    z-index: 1;
+    inset: 0 0 auto;
+    height: 100%;
+    overflow: hidden;
+    background: #0a0a0a;
+    transition: transform 180ms ease-out;
+    will-change: transform;
+  }
+
+  .immersive-stage {
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 0;
+    isolation: isolate;
+  }
+
+  .trailer-fullscreen { z-index: 20; }
+
+  .shelf-track {
+    transition: transform 180ms ease-out;
+    will-change: transform;
+  }
+</style>

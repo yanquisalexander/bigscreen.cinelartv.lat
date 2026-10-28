@@ -44,6 +44,7 @@ export interface ContentItem {
   year?: number | null;
   liked?: boolean;
   progress?: number;
+  continue_watching?: ContentContinueWatching;
   duration?: number;
   available?: boolean;
   premium?: boolean;

@@ -172,10 +172,10 @@
   preferredChildFocusKey="live-cat-Todos"
   trackChildren={true}
   saveLastFocusedChild={true}
-  class="w-full h-dvh flex flex-col {isGuideView ? 'bg-[#0f0f0f]' : 'bg-bg'}"
+  class="w-full h-dvh box-border overflow-hidden pt-[var(--tv-page-top-inset)] flex flex-col {isGuideView ? 'bg-[#0f0f0f]' : 'bg-bg'}"
 >
   {#if !nativeSupported}
-    <div class="w-full h-dvh flex flex-col items-center justify-center bg-bg px-[clamp(3rem,7.5vw,6rem)]">
+    <div class="w-full flex-1 min-h-0 flex flex-col items-center justify-center bg-bg px-[clamp(3rem,7.5vw,6rem)]">
       <div class="flex flex-col items-center text-center max-w-[clamp(280px,40vw,500px)]">
         <div class="w-[clamp(4rem,8vw,6rem)] h-[clamp(4rem,8vw,6rem)] rounded-full bg-surface flex items-center justify-center mb-[clamp(1.5rem,3vh,2.5rem)]">
           <Tv class="w-[clamp(1.75rem,3.5vw,2.5rem)] h-[clamp(1.75rem,3.5vw,2.5rem)] text-text-secondary" />
@@ -201,9 +201,9 @@
     </div>
   {:else if loading}
     <!-- Skeletton Loader Omitido por brevedad, usa el tuyo habitual -->
-    <div class="w-full h-dvh flex flex-col place-items-center justify-center uppercase bg-bg">Cargando...</div>
+    <div class="w-full flex-1 min-h-0 flex flex-col place-items-center justify-center uppercase bg-bg">Cargando...</div>
   {:else if error}
-    <div class="w-full h-dvh flex flex-col items-center justify-center bg-bg px-[clamp(3rem,7.5vw,6rem)]">
+    <div class="w-full flex-1 min-h-0 flex flex-col items-center justify-center bg-bg px-[clamp(3rem,7.5vw,6rem)]">
       <p class="text-text-secondary text-[1.125rem] mb-[clamp(1.5rem,3vh,2rem)]">
         {error}
       </p>
@@ -221,14 +221,14 @@
       </Focusable>
     </div>
   {:else if channels.length === 0}
-    <div class="w-full h-dvh flex flex-col items-center justify-center bg-bg">
+    <div class="w-full flex-1 min-h-0 flex flex-col items-center justify-center bg-bg">
       <Tv class="w-16 h-16 text-text-tertiary mb-4" />
       <p class="text-text-secondary text-[1.125rem]">
         No hay canales disponibles en este momento.
       </p>
     </div>
   {:else}
-    <div class="flex items-center gap-4 px-6 pt-[calc(var(--topnav-h)+0.5rem)] pb-1 shrink-0">
+    <div class="flex items-center gap-4 pl-[clamp(5.5rem,7vw,7rem)] pr-6 pb-1 shrink-0">
       <FocusContainer
         focusKey="live-categories"
         focusable={false}
@@ -242,6 +242,12 @@
               focusKey="live-cat-{cat}"
               onEnterPress={() => { activeCategory = cat; }}
               onArrowPress={(direction) => {
+                if (direction === 'left' && idx === 0) {
+                  if (doesFocusableExist('topnav')) {
+                    setFocus('topnav');
+                    return false;
+                  }
+                }
                 if (direction === 'up') {
                   setFocus('topnav');
                   return false;

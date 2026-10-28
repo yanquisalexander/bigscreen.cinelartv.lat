@@ -1,21 +1,13 @@
 <script lang="ts">
+  import { TV_SCALE_EVENT } from '@/services/tvScale';
+  import { tick } from 'svelte';
+  import { setFocus, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import Focusable from '@/components/tv/Focusable.svelte';
   import { svelteConfigStore } from '@/stores/configStore';
   import { resolveEpisodeThumbnail } from '@/utils/helpers';
   import type { Episode } from '@/types/content';
-  import { Lock } from '@lucide/svelte';
-
-  interface Props {
-    episodes: Episode[];
-    seasonIndex: number;
-    focusKey?: string;
-    preferredChildFocusKey?: string;
-    onPlayEpisode: (episodeId: string | number) => void;
-    onFocusEpisode?: (episodeId: string | number) => void;
-    onArrowUp?: (direction: string) => boolean;
-    onArrowLeft?: (direction: string) => boolean;
-  }
+  import { Play } from '@lucide/svelte';
 
   let {
     episodes,
@@ -25,136 +17,235 @@
     onPlayEpisode,
     onFocusEpisode,
     onArrowUp,
+    onArrowDown,
     onArrowLeft,
-  }: Props = $props();
+  }: {
+    episodes: Episode[];
+    seasonIndex: number;
+    focusKey?: string;
+    preferredChildFocusKey?: string;
+    onPlayEpisode: (id: string | number) => void;
+    onFocusEpisode?: (id: string | number) => void;
+    onArrowUp?: (direction: string) => boolean;
+    onArrowDown?: (direction: string) => boolean;
+    onArrowLeft?: (direction: string) => boolean;
+  } = $props();
 
-  let scrollEl = $state<HTMLDivElement | null>(null);
-  let rafId = 0;
-  let currentOffset = 0;
+  let viewport = $state<HTMLDivElement | null>(null);
+  let viewportWidth = $state(1280);
+  let cardWidth = $state(280);
+  let gap = $state(16);
+  let offset = $state(0);
+  let focusRequest = 0;
+  let remSize = $state(16);
+
+  const step = $derived(cardWidth + gap);
+  const start = $derived(Math.max(0, Math.floor(offset / step) - 2));
+  const end = $derived(Math.min(episodes.length, start + Math.ceil(viewportWidth / step) + 4));
+  const visible = $derived(episodes.slice(start, end));
+
+  function reveal(index: number) {
+    const max = Math.max(0, episodes.length * step - gap - viewportWidth);
+    offset = Math.max(0, Math.min(index * step, max));
+  }
+
+  async function move(index: number) {
+    if (index < 0 || index >= episodes.length) return;
+    const request = ++focusRequest;
+    reveal(index);
+    await tick();
+    const key = `detail-episode-${episodes[index].id}`;
+    if (request === focusRequest && doesFocusableExist(key)) {
+      setFocus(key);
+    }
+  }
 
   $effect(() => {
-    const el = scrollEl;
-    if (!el) return;
+    if (!viewport) return;
 
-    const handleScroll = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        const focused = el.querySelector<HTMLElement>('[data-focused="true"]');
-        if (!focused) return;
+    const measure = () => {
+      const dummy = document.createElement('div');
+      dummy.style.cssText =
+        'position:absolute;visibility:hidden;width:19.2rem;height:0;overflow:hidden;';
+      viewport!.appendChild(dummy);
+      cardWidth = dummy.offsetWidth || 280;
+      dummy.remove();
 
-        const containerWidth = el.clientWidth;
-        const cardWidth = focused.clientWidth;
-        const cardLeft = focused.offsetLeft;
-        const padding = 40;
-
-        const cardRelativeLeft = cardLeft - currentOffset;
-        const cardRelativeRight = cardRelativeLeft + cardWidth;
-
-        if (cardRelativeRight > containerWidth - padding) {
-          currentOffset = cardLeft + cardWidth + padding - containerWidth;
-        } else if (cardRelativeLeft < padding) {
-          currentOffset = cardLeft - padding;
-        }
-
-        currentOffset = Math.max(0, currentOffset);
-
-        el.style.transform = `translateX(${-currentOffset}px) translateZ(0px)`;
-      });
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      remSize = rem;
+      viewportWidth = viewport!.clientWidth;
+      gap = 1.25 * rem;
     };
 
-    const observer = new MutationObserver(handleScroll);
-    observer.observe(el, { attributes: true, subtree: true, attributeFilter: ['data-focused'] });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    window.addEventListener(TV_SCALE_EVENT, measure);
 
     return () => {
       observer.disconnect();
-      cancelAnimationFrame(rafId);
+      window.removeEventListener(TV_SCALE_EVENT, measure);
+      focusRequest++;
     };
   });
 </script>
 
 <FocusContainer
   focusKey="{focusKey}-{seasonIndex}"
+  focusable={false}
   {preferredChildFocusKey}
-  trackChildren={true}
   saveLastFocusedChild={true}
 >
-  <div class="relative overflow-x-hidden hide-scrollbar py-[clamp(0.5rem,1vh,0.875rem)]">
+  <div class="episode-viewport" bind:this={viewport}>
     <div
-      bind:this={scrollEl}
-      class="flex gap-[clamp(0.75rem,1.2vw,1.125rem)] px-[clamp(1rem,2vw,2rem)]"
-      style="transition: transform 150ms linear; will-change: transform;"
+      class="episode-track"
+      style="height: calc({cardWidth / remSize * 9 / 16}rem + 5.5rem); transform: translateX({-offset / remSize}rem) translateZ(0);"
     >
-      {#each episodes as episode, idx (episode.id)}
-        {@const clientEndpoint = $svelteConfigStore.config.CLIENT_ENDPOINT}
-        {@const thumbUrl = resolveEpisodeThumbnail(episode.images, episode.thumbnail_resized ?? episode.thumbnail, clientEndpoint)}
-        {@const progress = episode.continue_watching ? Math.round((episode.continue_watching.progress / episode.continue_watching.duration) * 100) : undefined}
-        {@const episodeNum = idx + 1}
-
+      {#each visible as episode, localIndex (episode.id)}
+        {@const index = start + localIndex}
+        {@const thumb = resolveEpisodeThumbnail(
+          episode.images,
+          episode.thumbnail_resized ?? episode.thumbnail,
+          $svelteConfigStore.config.CLIENT_ENDPOINT
+        )}
+        {@const progress = episode.continue_watching?.duration
+          ? Math.max(0, Math.min(100, (episode.continue_watching.progress / episode.continue_watching.duration) * 100))
+          : 0}
         <Focusable
           focusKey="detail-episode-{episode.id}"
+          class="episode-card"
+          style="width: {cardWidth / remSize}rem; transform: translateX({index * step / remSize}rem);"
           onEnterPress={() => onPlayEpisode(episode.id)}
-          onFocus={() => onFocusEpisode?.(episode.id)}
+          onFocus={() => {
+            reveal(index);
+            onFocusEpisode?.(episode.id);
+          }}
           onArrowPress={(dir) => {
-            if (dir === 'up' && onArrowUp) return onArrowUp(dir);
-            if (dir === 'left' && idx === 0 && onArrowLeft) return onArrowLeft(dir);
+            if (dir === 'up') return onArrowUp?.(dir) ?? true;
+            if (dir === 'down') return onArrowDown?.(dir) ?? true;
+            if (dir === 'left') {
+              if (index === 0) return onArrowLeft?.(dir) ?? true;
+              void move(index - 1);
+              return false;
+            }
+            if (dir === 'right') {
+              if (index < episodes.length - 1) void move(index + 1);
+              return false;
+            }
             return true;
           }}
-          focusedClass=""
-          class="tv-no-select relative shrink-0 cursor-pointer w-[clamp(13rem,14vw,18rem)] transition-all duration-200 ease-out will-change-transform"
-          playSound={true}
         >
           {#snippet children({ focused })}
-            <div class="relative w-full aspect-video rounded-xl overflow-hidden {focused ? 'border-2 border-white scale-[1.03]' : 'border-2 border-transparent'}" style="transition: border-color 200ms ease, transform 250ms cubic-bezier(0.4, 0, 0.2, 1);">
-              {#if thumbUrl}
-                <img
-                  src={thumbUrl}
-                  alt={episode.title}
-                  class="absolute inset-0 w-full h-full object-cover"
-                  loading="lazy"
-                />
-              {:else}
-                <div class="absolute inset-0 bg-surface-elevated"></div>
+            <div class="episode-image" class:focused>
+              {#if thumb}
+                <img src={thumb} alt="" loading="lazy" decoding="async" />
               {/if}
-
-              <!-- Light gradient for badge legibility -->
-              <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
-
-              <!-- Episode badge top-left -->
-              <div class="absolute top-[clamp(0.35rem,0.6vh,0.5rem)] left-[clamp(0.35rem,0.6vw,0.5rem)] z-2 flex items-center gap-[0.375em] bg-black/60 rounded-[clamp(0.2rem,0.4vw,0.25rem)] px-[clamp(0.3rem,0.5vw,0.4rem)] py-[clamp(0.1rem,0.2vh,0.15rem)]">
-                {#if episode.premium}
-                  <Lock size={11} class="text-amber-400 shrink-0" />
-                {/if}
-                <span class="text-white text-[0.65rem] font-semibold">
-                  T{seasonIndex + 1} · E{episodeNum}
-                </span>
+              <div class="episode-label">
+                <Play size="1rem" class="fill-current shrink-0" />
+                <span>Episodio {(episode.position ?? index) + 1}</span>
               </div>
-
-              <!-- Progress bar -->
-              {#if progress != null && progress > 0}
-                <div class="absolute bottom-0 left-0 right-0 h-[3px] bg-white/15 z-2">
-                  <div
-                    class="h-full bg-white"
-                    style="width: {Math.min(progress, 100)}%;"
-                  ></div>
+              {#if progress > 0}
+                <div class="progress">
+                  <span style="width: {progress}%;"></span>
                 </div>
               {/if}
             </div>
-
-            <!-- Episode title -->
-            <div class="px-[clamp(0.5rem,1vw,0.75rem)] pt-[clamp(0.4rem,0.8vh,0.6rem)] pb-[clamp(0.25rem,0.5vh,0.375rem)]">
-              <span class="block text-white/90 text-[0.875rem] font-semibold leading-[1.25] overflow-hidden text-ellipsis transition-[white-space] duration-200" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;">
-                {episode.title}
-              </span>
-            </div>
-
-            <div class="px-[clamp(0.5rem,1vw,0.75rem)] pb-[clamp(0.35rem,0.6vh,0.5rem)]">
-              <span class="block {focused ? 'text-white/60' : 'text-white/45'} text-[0.75rem] leading-[1.35] overflow-hidden text-ellipsis transition-colors duration-200" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;">
-                {episode.description || 'Este episodio no tiene descripción disponible.'}
-              </span>
-            </div>
+            <p class="episode-title">{episode.title}</p>
+            <p class="episode-description" style="opacity: {focused ? 1 : 0.7};">
+              {episode.description ?? ''}
+            </p>
           {/snippet}
         </Focusable>
       {/each}
     </div>
   </div>
 </FocusContainer>
+
+<style>
+  .episode-viewport {
+    overflow: hidden;
+    padding: 0.5rem 0;
+  }
+
+  .episode-track {
+    position: relative;
+    transition: transform 150ms linear;
+    will-change: transform;
+  }
+
+  :global(.episode-card) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    cursor: pointer;
+  }
+
+  .episode-image {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #1C1C1E;
+    border: 0.125rem solid transparent;
+    border-radius: 0.5rem;
+    transition: border-color 140ms ease-out, transform 140ms ease-out;
+  }
+
+  .episode-image.focused {
+    border-color: #FFFFFF;
+    transform: scale(1.02);
+  }
+
+  .episode-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .episode-label {
+    position: absolute;
+    inset: auto 0 0;
+    padding: 1.5rem 0.75rem 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: linear-gradient(0deg, rgba(10, 10, 10, 0.9) 0%, transparent 100%);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: clamp(0.85rem, 0.95vw, 1rem);
+    font-weight: 600;
+  }
+
+  .episode-title {
+    margin: 0.5rem 0.15rem 0.15rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: clamp(0.95rem, 1.05vw, 1.125rem);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .episode-description {
+    margin: 0 0.15rem;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: clamp(0.825rem, 0.9vw, 0.95rem);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    transition: opacity 140ms ease-out;
+  }
+
+  .progress {
+    position: absolute;
+    inset: auto 0 0;
+    height: 0.1875rem;
+    background: rgba(255, 255, 255, 0.22);
+  }
+
+  .progress span {
+    display: block;
+    height: 100%;
+    background: #FFFFFF;
+  }
+</style>

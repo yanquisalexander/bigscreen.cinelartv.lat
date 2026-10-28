@@ -27,15 +27,15 @@
   }: Props = $props();
 
   const variantClasses = {
-    primary: 'bg-white !text-black font-bold',
-    secondary: 'bg-surface-elevated text-white font-semibold border border-white/10',
-    ghost: 'bg-transparent text-white/80 font-semibold border border-white/15',
+    primary: 'bg-white !text-black font-bold shadow-md',
+    secondary: 'bg-surface text-text-primary font-semibold border border-white/15',
+    ghost: 'bg-transparent text-text-secondary font-semibold border border-white/15',
   };
 
   const focusedVariantClasses = {
-    primary: 'scale-[1.05] !bg-white ring-2 ring-white/40',
-    secondary: 'scale-[1.05] !bg-white !text-black ring-2 ring-white/40',
-    ghost: 'scale-[1.05] !bg-white/10 !text-white ring-2 ring-white/40',
+    primary: 'scale-[1.04] !bg-white !text-black ring-2 ring-white/60 shadow-lg',
+    secondary: 'scale-[1.04] !bg-white !text-black ring-2 ring-white/60 shadow-lg',
+    ghost: 'scale-[1.04] !bg-white/20 !text-white ring-2 ring-white/60 shadow-lg',
   };
 </script>
 
@@ -46,15 +46,15 @@
   onArrowPress={onArrowPress ? (dir) => onArrowPress(dir) : undefined}
   {onFocus}
   focusedClass={focusedVariantClasses[variant]}
-  class="tv-no-select inline-flex items-center justify-center gap-[clamp(0.625rem,1.2vw,0.875rem)] rounded-full cursor-pointer {variant === 'primary' ? 'px-[clamp(2.5rem,5vw,4rem)] py-[clamp(0.875rem,2vh,1.25rem)] text-[1.25rem]' : 'px-[clamp(1.5rem,3vw,2.25rem)] py-[clamp(0.625rem,1.4vh,0.875rem)] text-[1rem]'} {variantClasses[variant]} {className}"
+  class="tv-no-select inline-flex items-center justify-center gap-[clamp(0.5rem,0.9vw,0.75rem)] rounded-full cursor-pointer transition-transform duration-150 {variant === 'primary' ? 'px-7 py-2 text-[1rem]' : 'px-6 py-2 text-[1rem]'} {variantClasses[variant]} {className}"
   playSound={true}
 >
   {#snippet children()}
     {#if icon}
-      <span class="inline-flex text-[1.1em] leading-none">
+      <span class="inline-flex text-[1.1em] leading-none shrink-0">
         {@render icon()}
       </span>
     {/if}
-    <span>{label}</span>
+    <span class="whitespace-nowrap">{label}</span>
   {/snippet}
 </Focusable>

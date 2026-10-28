@@ -7,13 +7,12 @@ import { navigateBack } from '@/services/appNavigation';
   import DetailSeasonSelector from '@/components/detail/DetailSeasonSelector.svelte';
   import DetailEpisodeRail from '@/components/detail/DetailEpisodeRail.svelte';
   import DetailRecommendations from '@/components/detail/DetailRecommendations.svelte';
-  import { authStore, svelteAuthStore } from '@/stores/authStore';
+  import { svelteAuthStore } from '@/stores/authStore';
   import { svelteConfigStore } from '@/stores/configStore';
-  import { toastStore } from '@/stores/toastStore';
   import { getContentById, prefetchWatchData } from '@/features/content/api';
   import { showPanel, buttonItem, closePanel } from '@/services/overlayPanel';
   import { isBackKey } from '@/utils/helpers';
-  import { setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
+  import { setFocus, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
   import type { ContentDetail } from '@/types/content';
   import { isTVShow } from '@/types/content';
 
@@ -30,6 +29,8 @@ import { navigateBack } from '@/services/appNavigation';
   let loading = $state(true);
   let selectedSeason = $state(0);
   let containerEl = $state<HTMLDivElement | null>(null);
+  let trackEl = $state<HTMLDivElement | null>(null);
+  let detailOffset = $state(0);
   let prefetchTimerId: ReturnType<typeof setTimeout> | null = null;
 
   const tokens = $derived($svelteAuthStore.tokens);
@@ -101,26 +102,18 @@ import { navigateBack } from '@/services/appNavigation';
         if (!focused) return;
 
         if (focused.closest('[data-focus-key^="detail-hero"]')) {
-          el.scrollTo({ top: 0, behavior: 'smooth' });
+          detailOffset = 0;
           return;
         }
 
-        const rect = focused.getBoundingClientRect();
-        const containerRect = el.getBoundingClientRect();
-        const topSafeArea = Math.min(80, window.innerHeight * 0.1);
-        const bottomSafeArea = Math.min(40, window.innerHeight * 0.06);
-
-        if (rect.top < containerRect.top + topSafeArea) {
-          el.scrollBy({
-            top: rect.top - containerRect.top - topSafeArea,
-            behavior: 'smooth',
-          });
-        } else if (rect.bottom > containerRect.bottom - bottomSafeArea) {
-          el.scrollBy({
-            top: rect.bottom - containerRect.bottom + bottomSafeArea,
-            behavior: 'smooth',
-          });
-        }
+        if (!trackEl) return;
+        let top = 0;
+        let node: HTMLElement | null = focused;
+        while (node && node !== trackEl) { top += node.offsetTop; node = node.offsetParent as HTMLElement | null; }
+        const bottom = top + focused.offsetHeight;
+        const safe = Math.min(40, window.innerHeight * .05);
+        if (top < detailOffset + safe) detailOffset = Math.max(0, top - safe);
+        else if (bottom > detailOffset + el.clientHeight - safe) detailOffset = Math.max(0, bottom - el.clientHeight + safe);
       });
     };
 
@@ -134,9 +127,10 @@ import { navigateBack } from '@/services/appNavigation';
   });
 
   $effect(() => {
-    if (content && canPlay) {
+    if (content) {
       const id = requestAnimationFrame(() => {
-        setFocus('detail-hero-play');
+        const target = canPlay ? 'detail-hero-play' : selectedSeasonFocusKey ?? 'topnav';
+        if (doesFocusableExist(target)) setFocus(target);
       });
       return () => cancelAnimationFrame(id);
     }
@@ -210,26 +204,12 @@ import { navigateBack } from '@/services/appNavigation';
     }, 4000);
   }
 
-  function handlePlayTrailer() {
-    const trailerUrl = content?.trailer_sources?.[0]?.url ?? content?.trailer_video_sources?.[0]?.url;
-    if (trailerUrl) {
-      push(`/watch/${content?.id}`);
-    } else {
-      toastStore.getState().show('Tráiler no disponible', 'info', 3000);
-    }
-  }
-
-  function handleToggleList() {
-    toastStore.getState().show('Esta funcionalidad aún no está implementada', 'info', 3000);
-    // TODO: Implement toggle list functionality
-  }
-
   function handleSelectRelated(item: { id: string | number }) {
     push(`/content/${item.id}`);
   }
 
   function focusContentTarget(targetKey?: string) {
-    if (!targetKey) return true;
+    if (!targetKey || !doesFocusableExist(targetKey)) return true;
     setFocus(targetKey);
     return false;
   }
@@ -249,8 +229,39 @@ import { navigateBack } from '@/services/appNavigation';
     return focusContentTarget(selectedSeasonFocusKey ?? 'detail-hero-play');
   }
 
+  function handleSeasonArrowLeft(direction: string) {
+    if (direction !== 'left') return true;
+    if (doesFocusableExist('topnav')) {
+      setFocus('topnav');
+      return false;
+    }
+    return true;
+  }
+
   function handleEpisodeArrowLeft(direction: string) {
     if (direction !== 'left') return true;
+    if (doesFocusableExist('topnav')) {
+      setFocus('topnav');
+      return false;
+    }
+    return true;
+  }
+
+  function handleEpisodeArrowDown(direction: string) {
+    if (direction !== 'down') return true;
+    if (relatedContent.length > 0) {
+      const first = relatedContent[0];
+      if (first) return focusContentTarget('detail-related-' + first.id);
+    }
+    return true;
+  }
+
+  function handleRelatedArrowLeft(direction: string) {
+    if (direction !== 'left') return true;
+    if (doesFocusableExist('topnav')) {
+      setFocus('topnav');
+      return false;
+    }
     return true;
   }
 
@@ -290,16 +301,15 @@ import { navigateBack } from '@/services/appNavigation';
   >
     <div
       bind:this={containerEl}
-      class="w-full h-dvh overflow-y-auto hide-scrollbar bg-bg"
+      class="detail-viewport"
     >
+      <div bind:this={trackEl} class="detail-track" style="transform: translateY({-detailOffset}px) translateZ(0);">
       <!-- Hero -->
       <DetailHero
         {content}
         {clientEndpoint}
         {canPlay}
         onPlay={handlePlay}
-        onPlayTrailer={handlePlayTrailer}
-        onToggleList={handleToggleList}
         onNavigateDown={(dir) => {
           if (dir !== 'down') return true;
           if (seasons.length > 0) {
@@ -307,33 +317,33 @@ import { navigateBack } from '@/services/appNavigation';
           }
           return true;
         }}
-        onNavigateLeft={() => true}
+        onNavigateLeft={() => { if (doesFocusableExist('topnav')) setFocus('topnav'); return false; }}
         onNavigateUp={() => { setFocus('topnav'); return false; }}
         onPlayFocus={handlePlayFocus}
-        {firstEpisodeFocusKey}
-        firstSeasonFocusKey={selectedSeasonFocusKey}
       />
 
       <!-- Content sections -->
-      <div class="px-[clamp(2rem,5vw,6rem)] pb-[clamp(5rem,12vh,7.5rem)] flex flex-col gap-[clamp(2.5rem,6vh,4rem)]">
+      <div class="detail-sections">
         <!-- Seasons & Episodes -->
         {#if seasons.length > 0}
-          <section class="animate-content-in">
-            <h2 class="text-white font-bold tracking-tight text-[1.625rem] mb-[clamp(1.5rem,3.5vh,2.5rem)]">
+          <section class="episode-section">
+            <h2 class="text-white font-bold tracking-tight text-[1.5rem] mb-3">
               Episodios
             </h2>
 
-            <div class="mb-[clamp(1rem,2.5vh,1.5rem)]">
+            <div class="mb-2">
               <DetailSeasonSelector
                 {seasons}
                 selectedIndex={selectedSeason}
                 onSelect={(idx) => { selectedSeason = idx; }}
                 onArrowUp={handleSeasonArrowUp}
                 onArrowDown={handleSeasonArrowDown}
+                onArrowLeft={handleSeasonArrowLeft}
               />
             </div>
 
             {#if currentEpisodes.length > 0}
+              {#key selectedSeason}
               <DetailEpisodeRail
                 episodes={currentEpisodes}
                 seasonIndex={selectedSeason}
@@ -341,15 +351,17 @@ import { navigateBack } from '@/services/appNavigation';
                 onPlayEpisode={handlePlayEpisode}
                 onFocusEpisode={handlePlayEpisodeFocus}
                 onArrowUp={handleEpisodeArrowUp}
+                onArrowDown={handleEpisodeArrowDown}
                 onArrowLeft={handleEpisodeArrowLeft}
               />
+              {/key}
             {/if}
           </section>
         {/if}
 
         <!-- Recommendations -->
         {#if relatedContent.length > 0}
-          <section class="animate-content-in delay-1">
+          <section class="recommendation-section">
             <h2 class="text-white font-bold tracking-tight text-[1.625rem] mb-[clamp(1.5rem,3.5vh,2.5rem)]">
               También te puede gustar
             </h2>
@@ -358,10 +370,35 @@ import { navigateBack } from '@/services/appNavigation';
               items={relatedContent}
               onSelect={handleSelectRelated}
               onArrowUp={handleRelatedArrowUp}
+              onArrowLeft={handleRelatedArrowLeft}
             />
           </section>
         {/if}
       </div>
+      </div>
     </div>
   </FocusContainer>
 {/if}
+
+<style>
+  .detail-viewport {
+    height: 100vh;
+    overflow: hidden;
+    background: #0a0a0a;
+    --browse-inset: var(--tv-content-inset);
+    --browse-stage-height: 23.3333rem;
+  }
+
+  .detail-track {
+    position: relative;
+    transition: transform 180ms ease-out;
+    will-change: transform;
+  }
+
+  .detail-sections {
+    padding: 0 4rem 5rem var(--browse-inset);
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+</style>

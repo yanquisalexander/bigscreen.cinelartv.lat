@@ -1,4 +1,4 @@
-import { init, setKeyMap } from '@noriginmedia/norigin-spatial-navigation-core';
+import { init, setKeyMap, GetBoundingClientRectAdapter } from '@noriginmedia/norigin-spatial-navigation-core';
 
 let initialized = false;
 
@@ -9,6 +9,7 @@ export function initSpatialNavigation() {
   init({
     debug: false,
     throttle: 80,
+    layoutAdapter: GetBoundingClientRectAdapter,
   });
 
   setKeyMap({

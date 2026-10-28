@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { TV_SCALE_EVENT } from '@/services/tvScale';
   import { tick } from 'svelte';
   import { setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
   import { FocusableRegistrar } from '@/components/tv/spatialFocus';
@@ -18,6 +19,8 @@
     onCardArrowPress?: (direction: string, catIdx: number) => boolean;
     onUpdateHasFocusedChild?: (hasFocused: boolean) => void;
     onMeasureHeight?: (height: number) => void;
+    onCardFocus?: (item: ContentItem, catIdx: number, key: string) => void;
+    initialItemId?: string;
   }
 
   let {
@@ -31,6 +34,8 @@
     onCardArrowPress,
     onUpdateHasFocusedChild,
     onMeasureHeight,
+    onCardFocus,
+    initialItemId,
   }: Props = $props();
 
   setFocusContext(focusKey);
@@ -42,13 +47,11 @@
   let viewportEl = $state<HTMLDivElement | null>(null);
   let scrollLeft = $state(0);
   let viewportWidth = $state(0);
-  let itemWidth = $state(0);
-  let itemGap = $state(0);
   let metricsMeasured = false;
 
-  const CARD_W = 180;
-  const CARD_GAP = 40;
-  const POSTER_H = 210;
+  let remSize = $state(16);
+  const CARD_W = $derived(11.25 * remSize);
+  const CARD_GAP = $derived(2.5 * remSize);
 
   function getStep() {
     return CARD_W + CARD_GAP;
@@ -82,16 +85,18 @@
 
   function computeMetrics() {
     if (!viewportEl || metricsMeasured) return;
+    remSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     viewportWidth = viewportEl.clientWidth;
-    itemWidth = CARD_W;
-    itemGap = CARD_GAP;
     metricsMeasured = true;
+    const remembered = items.findIndex(item => item.id === initialItemId);
+    if (remembered >= 0) scrollToCard(remembered);
   }
 
   $effect(() => {
     if (!viewportEl) return;
     const observer = new ResizeObserver(() => {
       if (viewportEl) {
+        remSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
         viewportWidth = viewportEl.clientWidth;
         const shelfEl = viewportEl.closest('.top10-shelf');
         if (shelfEl && onMeasureHeight) {
@@ -103,7 +108,17 @@
       }
     });
     observer.observe(viewportEl);
-    return () => observer.disconnect();
+    const rescale = () => {
+      const index = Math.round(scrollLeft / getStep());
+      metricsMeasured = false;
+      computeMetrics();
+      scrollToCard(index);
+    };
+    window.addEventListener(TV_SCALE_EVENT, rescale);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener(TV_SCALE_EVENT, rescale);
+    };
   });
 
   function scrollToCard(index: number) {
@@ -111,7 +126,7 @@
     if (step <= 0) return;
     const x = index * step;
     const maxS = getMaxScroll();
-    scrollLeft = Math.max(0, Math.min(x - viewportWidth / 2 + CARD_W / 2, maxS));
+    scrollLeft = Math.max(0, Math.min(x, maxS));
   }
 
   async function revealAndFocusCard(index: number) {
@@ -158,7 +173,7 @@
               return onCardArrowPress?.(direction, categoryIndex) ?? true;
             }
             if (direction === 'left') {
-              if (idx === 0) return true;
+              if (idx === 0) return onCardArrowPress?.('left', categoryIndex) ?? true;
               void revealAndFocusCard(idx - 1);
               return false;
             }
@@ -178,6 +193,7 @@
             card.style.zIndex = '2';
             const ambientUrl = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint, 'small');
             useAmbientStore.getState().setBackdropUrl(ambientUrl ?? null);
+            onCardFocus?.(item, categoryIndex, key);
             scrollToCard(idx);
             if (!rowHasFocus) {
               rowHasFocus = true;
@@ -231,7 +247,7 @@
 
 <div class="top10-shelf mb-[clamp(2.5rem,5vh,4rem)]">
   {#if title}
-    <div class="flex items-center gap-[clamp(0.5rem,0.8vw,0.75rem)] px-[clamp(3rem,7.5vw,6rem)] mb-[clamp(0.35rem,0.7vh,0.5rem)]">
+    <div class="flex items-center gap-[clamp(0.5rem,0.8vw,0.75rem)] px-[var(--tv-content-inset)] mb-[clamp(0.35rem,0.7vh,0.5rem)]">
       <h2 class="text-[1.25rem] font-medium text-white/95">
         {title}
       </h2>
@@ -240,7 +256,7 @@
   {/if}
   <div
     bind:this={viewportEl}
-    class="relative overflow-x-hidden pl-[clamp(3rem,7.5vw,6rem)] pr-[clamp(3rem,7.5vw,6rem)] pt-3 pb-3"
+    class="relative overflow-x-hidden pl-[var(--tv-content-inset)] pr-[var(--tv-content-inset)] pt-3 pb-3"
     data-focus-container={focusKey}
     role="row"
     aria-label={title || undefined}
@@ -248,7 +264,7 @@
     <div
       class="relative"
       data-virtual-track
-      style="height: 300px; transform: translateX({-scrollLeft}px) translateZ(0); will-change: transform; transition: transform 150ms linear;"
+      style="height: 18.75rem; transform: translateX({-scrollLeft / remSize}rem) translateZ(0); will-change: transform; transition: transform 150ms linear;"
     >
       {#each visibleItems as { item, index } (item.id)}
         {@const rank = index + 1}
@@ -263,7 +279,7 @@
           role="button"
           tabindex="-1"
           aria-label={item.title}
-          style="--card-x: {index * getStep()}px; --card-w: {CARD_W}px;"
+          style="--card-x: {index * getStep() / remSize}rem; --card-w: {CARD_W / remSize}rem;"
         >
           <!-- Big rank number -->
           <div class="top10-number" class:top10-number--top3={isTop3}>
@@ -312,19 +328,19 @@
   .top10-badge {
     display: inline-flex;
     align-items: center;
-    padding: 2px 8px;
-    border-radius: 4px;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.25rem;
     background: rgba(138, 180, 248, 0.15);
     color: #8AB4F8;
     font-size: 0.65rem;
     font-weight: 900;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.03125rem;
   }
 
   .top10-card {
     position: absolute;
     top: 0;
-    left: var(--card-x, 0px);
+    left: var(--card-x, 0rem);
     width: var(--card-w);
     display: flex;
     flex-direction: column;
@@ -344,8 +360,8 @@
   /* Big number behind the poster */
   .top10-number {
     position: absolute;
-    left: -20px;
-    bottom: 10px;
+    left: -1.25rem;
+    bottom: 0.625rem;
     z-index: 0;
     line-height: 1;
     pointer-events: none;
@@ -357,9 +373,9 @@
     font-size: 9rem;
     font-weight: 900;
     line-height: 0.8;
-    letter-spacing: -6px;
+    letter-spacing: -0.375rem;
     color: #3a3d42;
-    -webkit-text-stroke: 2px #3a3d42;
+    -webkit-text-stroke: 0.125rem #3a3d42;
   }
 
   .top10-number-fill {
@@ -367,7 +383,7 @@
     font-size: 9rem;
     font-weight: 900;
     line-height: 0.8;
-    letter-spacing: -6px;
+    letter-spacing: -0.375rem;
     color: #1a1a1a;
     z-index: 1;
   }
@@ -383,16 +399,16 @@
     aspect-ratio: 2 / 3;
     overflow: hidden;
     background: #141414;
-    border-radius: 8px;
-    border: 2px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.5rem;
+    border: 0.125rem solid rgba(255, 255, 255, 0.08);
     z-index: 1;
-    margin-left: 30px;
+    margin-left: 1.875rem;
     transition: border-color var(--animation-duration) ease;
-    box-shadow: -4px 8px 12px rgba(0, 0, 0, var(--shadow-opacity));
+    box-shadow: -0.25rem 0.5rem 0.75rem rgba(0, 0, 0, var(--shadow-opacity));
   }
 
   .top10-poster--top1 {
-    border-width: 1.5px;
+    border-width: 0.09375rem;
   }
 
   .top10-poster img {
@@ -426,11 +442,11 @@
 
   .top10-crown {
     position: absolute;
-    top: 6px;
-    left: 6px;
-    width: 22px;
-    height: 22px;
-    border-radius: 11px;
+    top: 0.375rem;
+    left: 0.375rem;
+    width: 1.375rem;
+    height: 1.375rem;
+    border-radius: 0.6875rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -445,7 +461,7 @@
 
   .top10-meta {
     padding: clamp(0.5rem, 0.8vw, 0.7rem) clamp(0.1rem, 0.2vw, 0.15rem) 0;
-    margin-left: 30px;
+    margin-left: 1.875rem;
   }
 
   .top10-title {

@@ -8,7 +8,7 @@
   import { resolveBackdrop, resolveLogo, isBackKey } from '@/utils/helpers';
   import { exitApp } from '@/services/NativeBridge';
   import ExitDialog from '@/components/ui/ExitDialog.svelte';
-  import { setFocus, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation-core';
+  import { setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
   import { LogOut } from '@lucide/svelte';
   import type { Profile } from '@/types/api';
   import type { ContentItem } from '@/types/content';
@@ -19,7 +19,6 @@
 
   let selecting = $state<string | null>(null);
   let showExitDialog = $state(false);
-  let lastFocusKey: string | null = null;
   let banners = $state<ContentItem[]>([]);
   let bannerIndex = $state(0);
   let currentUrl = $state<string | null>(null);
@@ -155,14 +154,6 @@
 
   function handleCancelExit() {
     showExitDialog = false;
-    // Restaurar foco al elemento que lo tenía antes del diálogo
-    const restoreKey = lastFocusKey;
-    lastFocusKey = null;
-    if (restoreKey) {
-      setTimeout(() => setFocus(restoreKey), 50);
-    } else if (profiles.length > 0) {
-      setTimeout(() => setFocus(`profile-${profiles[0].id}`), 50);
-    }
   }
 
   // Atrás en /select-profile → cerrar la app (si la plataforma lo permite).
@@ -176,7 +167,6 @@
         handleCancelExit();
         return;
       }
-      lastFocusKey = getCurrentFocusKey() ?? null;
       showExitDialog = true;
     };
     window.addEventListener('keydown', handleBack);
@@ -324,6 +314,7 @@
 
 {#if showExitDialog}
   <ExitDialog
+    fallbackFocusKey={profiles[0] ? `profile-${profiles[0].id}` : 'logout-btn'}
     onConfirm={() => exitApp()}
     onCancel={handleCancelExit}
   />

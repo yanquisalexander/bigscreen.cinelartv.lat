@@ -11,6 +11,7 @@
     onSelect: (item: ContentItem) => void;
     focusKey?: string;
     onArrowUp?: (direction: string) => boolean;
+    onArrowLeft?: (direction: string) => boolean;
   }
 
   let {
@@ -18,6 +19,7 @@
     onSelect,
     focusKey = 'detail-related',
     onArrowUp,
+    onArrowLeft,
   }: Props = $props();
 
   let scrollEl = $state<HTMLDivElement | null>(null);
@@ -62,7 +64,7 @@
       bind:this={scrollEl}
       class="flex gap-[clamp(1rem,2vw,1.5rem)] overflow-x-auto hide-scrollbar py-[clamp(0.5rem,1vh,0.75rem)]"
     >
-      {#each items as item (item.id)}
+      {#each items as item, idx (item.id)}
         {@const clientEndpoint = $svelteConfigStore.config.CLIENT_ENDPOINT}
         {@const coverUrl = resolvePoster(item.images, item.cover_resized ?? item.cover, clientEndpoint)}
         {@const isPremium = Boolean((item as any).premium)}
@@ -71,6 +73,7 @@
           focusKey="detail-related-{item.id}"
           onEnterPress={() => onSelect(item)}
           onArrowPress={(dir) => {
+            if (dir === 'left' && idx === 0 && onArrowLeft) return onArrowLeft(dir);
             if (dir === 'up' && onArrowUp) return onArrowUp(dir);
             return true;
           }}

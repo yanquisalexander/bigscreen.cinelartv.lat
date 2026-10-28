@@ -10,6 +10,10 @@ import { configStore } from '@/stores/configStore';
 import { startTokenScheduler } from '@/features/auth/tokenScheduler';
 import { initAnalytics, trackAppLaunch, trackAppError } from '@/lib/analytics';
 import { initAppNavigation } from '@/services/appNavigation';
+import { initTvScale } from '@/services/tvScale';
+
+let stopTvScale = () => {};
+if (import.meta.hot) import.meta.hot.dispose(() => stopTvScale());
 
 
 // ── Initialize stores immediately ───────────────────────────────────────────
@@ -42,6 +46,10 @@ $body?.classList.add(`app-quality-${appQuality.toLowerCase().replaceAll('_', '-'
 
 // ── Wait for splash animation to finish before mounting Svelte ──────────────
 function mountApp() {
+  // The splash temporarily scales <html> and restores it before this runs.
+  // Take ownership only now, so restoreRoot() cannot overwrite the app scale.
+  stopTvScale();
+  stopTvScale = initTvScale();
   mount(App, { target: document.getElementById('root')! });
   document.getElementById('loading-screen')?.remove();
   document.getElementById('animation')?.remove();

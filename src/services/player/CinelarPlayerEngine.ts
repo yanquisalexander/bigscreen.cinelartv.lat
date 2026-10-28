@@ -1022,13 +1022,13 @@ export class CinelarPlayerEngine {
           this.emit('error', error);
         });
         this.player.addEventListener('trackschanged', () => {
-          // 🛡️ GUARD: Si hay ≤1 variante de video, deshabilitar ABR (no hay nada que adaptar)
+          // A single-height manifest needs no adaptation. Keep Shaka's ABR state
+          // intact so a later multi-variant load still starts in automatic mode.
           try {
             const variants = this.player?.getVariantTracks?.() ?? [];
             const uniqueHeights = new Set(variants.filter((v: any) => v.height).map((v: any) => v.height));
             if (uniqueHeights.size <= 1) {
-              this.player?.configure?.({ abr: { enabled: false } });
-              pdbg('engine.trackschanged', `Single variant detected (${uniqueHeights.size} height(s)), ABR disabled`);
+              pdbg('engine.trackschanged', `Single variant detected (${uniqueHeights.size} height(s)); ABR remains unchanged`);
             }
           } catch { }
           this.emit('trackschanged');

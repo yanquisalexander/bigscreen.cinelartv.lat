@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { TV_SCALE_EVENT } from '@/services/tvScale';
   import { tick } from 'svelte';
-  import { SpatialNavigation, setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
+  import { setFocus, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
   import { FocusableRegistrar } from '@/components/tv/spatialFocus';
   import { setFocusContext } from '@/lib/spatial/spatialContext';
   import { useAmbientStore } from '@/stores/ambientStore';
@@ -26,6 +27,8 @@
     onCardArrowPress?: (direction: string, catIdx: number) => boolean;
     onUpdateHasFocusedChild?: (hasFocused: boolean) => void;
     onMeasureHeight?: (height: number) => void;
+    onCardFocus?: (item: ContentItem, catIdx: number, key: string) => void;
+    initialItemId?: string;
   }
 
   let {
@@ -40,6 +43,8 @@
     onCardArrowPress,
     onUpdateHasFocusedChild,
     onMeasureHeight,
+    onCardFocus,
+    initialItemId,
   }: Props = $props();
 
   setFocusContext(focusKey);
@@ -54,6 +59,7 @@
   let itemWidth = $state(0);
   let itemGap = $state(0);
   let metricsMeasured = false;
+  let remSize = $state(16);
 
   function getStep() {
     return itemWidth + itemGap;
@@ -86,26 +92,31 @@
   );
 
   function computeMetrics() {
-    if (!viewportEl || metricsMeasured) return;
+    if (!viewportEl) return;
+    const firstMeasurement = !metricsMeasured;
+    remSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 
     const temp = document.createElement('div');
     temp.style.cssText =
-      'position:absolute;visibility:hidden;width:clamp(13rem,14vw,18rem);height:0;overflow:hidden;';
+      'position:absolute;visibility:hidden;width:var(--tv-browse-card-width);height:0;overflow:hidden;';
     viewportEl.appendChild(temp);
     itemWidth = temp.offsetWidth;
     temp.remove();
 
-    viewportWidth = viewportEl.clientWidth;
+    const padding = getComputedStyle(viewportEl);
+    viewportWidth = viewportEl.clientWidth - parseFloat(padding.paddingLeft) - parseFloat(padding.paddingRight);
 
     const track = viewportEl.querySelector<HTMLElement>('[data-virtual-track]');
-    itemGap = track ? parseFloat(getComputedStyle(track).gap) || 16 : 16;
+    itemGap = track ? parseFloat(getComputedStyle(track).columnGap) || 1.25 * remSize : 1.25 * remSize;
 
     metricsMeasured = true;
+    const remembered = items.findIndex(item => item.id === initialItemId);
+    if (firstMeasurement && remembered >= 0) scrollToCard(remembered);
 
     if (onMeasureHeight) {
       const shelfEl = viewportEl?.closest('.home-shelf');
       if (shelfEl) {
-        onMeasureHeight(shelfEl.getBoundingClientRect().height);
+        onMeasureHeight(shelfEl.getBoundingClientRect().height + (parseFloat(getComputedStyle(shelfEl).marginBottom) || 0));
       } else {
         const thumbH = Math.round(itemWidth * 9 / 16);
         const titleH = 36;
@@ -120,7 +131,7 @@
     if (step <= 0) return;
     const x = index * step;
     const maxS = getMaxScroll();
-    scrollLeft = Math.max(0, Math.min(x - viewportWidth / 2 + itemWidth / 2, maxS));
+    scrollLeft = Math.max(0, Math.min(x, maxS));
   }
 
   async function revealAndFocusCard(index: number) {
@@ -135,7 +146,7 @@
 
     const key = `home-row-${categoryIndex}-item-${item.id}`;
     try {
-      setFocus(key);
+      if (doesFocusableExist(key)) setFocus(key);
     } catch {
       /* noop */
     }
@@ -144,38 +155,47 @@
   let rowHasFocus = false;
 
   function syncFocusables() {
-    for (const key of renderedKeys) {
-      registrar.unregister(key);
+    if (!viewportEl) {
+      for (const key of renderedKeys) registrar.unregister(key);
+      renderedKeys = [];
+      return;
     }
-    renderedKeys = [];
 
-    if (!viewportEl) return;
-
+    const previousKeys = new Set(renderedKeys);
+    const nextKeys = new Set<string>();
     const cards = viewportEl.querySelectorAll<HTMLElement>('.home-card');
     cards.forEach((card) => {
       const idx = parseInt(card.getAttribute('data-card-index') ?? '-1', 10);
       if (idx < 0 || idx >= items.length) return;
       const item = items[idx];
-      const key = `home-row-${categoryIndex}-item-${item.id}`;
+      const itemId = item.id;
+      const key = `home-row-${categoryIndex}-item-${itemId}`;
+      nextKeys.add(key);
+      if (previousKeys.has(key)) return;
 
       registrar.register([
         {
           focusKey: key,
           node: card,
           parentFocusKey,
-          onEnterPress: () => onCardEnterPress(item),
+          onEnterPress: () => {
+            const currentItem = items.find((candidate) => candidate.id === itemId);
+            if (currentItem) onCardEnterPress(currentItem);
+          },
           onArrowPress: (direction: string) => {
+            const currentIndex = items.findIndex((candidate) => candidate.id === itemId);
+            if (currentIndex < 0) return true;
             if (direction === 'up' || direction === 'down') {
               return onCardArrowPress?.(direction, categoryIndex) ?? true;
             }
             if (direction === 'left') {
-              if (idx === 0) return true;
-              void revealAndFocusCard(idx - 1);
+              if (currentIndex === 0) return onCardArrowPress?.('left', categoryIndex) ?? true;
+              void revealAndFocusCard(currentIndex - 1);
               return false;
             }
             if (direction === 'right') {
-              if (idx === items.length - 1) return true;
-              void revealAndFocusCard(idx + 1);
+              if (currentIndex === items.length - 1) return true;
+              void revealAndFocusCard(currentIndex + 1);
               return false;
             }
             return true;
@@ -194,9 +214,13 @@
               desc.style.transform = 'translateY(0)';
             }
             card.style.zIndex = '2';
-            const ambientUrl = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint, 'small');
+            const currentIndex = items.findIndex((candidate) => candidate.id === itemId);
+            const currentItem = currentIndex >= 0 ? items[currentIndex] : undefined;
+            if (!currentItem) return;
+            const ambientUrl = resolveBackdrop(currentItem.images, currentItem.banner_resized ?? currentItem.banner, clientEndpoint, 'small');
             useAmbientStore.getState().setBackdropUrl(ambientUrl ?? null);
-            scrollToCard(idx);
+            onCardFocus?.(currentItem, categoryIndex, key);
+            scrollToCard(currentIndex);
             if (!rowHasFocus) {
               rowHasFocus = true;
               onUpdateHasFocusedChild?.(true);
@@ -225,8 +249,12 @@
           },
         },
       ]);
-      renderedKeys.push(key);
     });
+
+    for (const key of previousKeys) {
+      if (!nextKeys.has(key)) registrar.unregister(key);
+    }
+    renderedKeys = Array.from(nextKeys);
   }
 
   function progressPercent(item: ContentItem): number {
@@ -277,11 +305,12 @@
     if (!viewportEl) return;
     const observer = new ResizeObserver(() => {
       if (viewportEl) {
-        viewportWidth = viewportEl.clientWidth;
+        computeMetrics();
       }
     });
     observer.observe(viewportEl);
-    return () => observer.disconnect();
+    window.addEventListener(TV_SCALE_EVENT, computeMetrics);
+    return () => { observer.disconnect(); window.removeEventListener(TV_SCALE_EVENT, computeMetrics); };
   });
 
   $effect(() => {
@@ -299,14 +328,14 @@
 <div class="home-shelf mb-[clamp(0.5rem,1.2vh,1rem)]">
   {#if title}
     <h2
-      class="text-[1.25rem] font-medium text-white/95 mb-[clamp(0.35rem,0.7vh,0.5rem)] px-[clamp(3rem,7.5vw,6rem)]"
+      class="text-[1.25rem] font-medium text-white/95 mb-[clamp(0.35rem,0.7vh,0.5rem)] px-[var(--tv-content-inset)]"
     >
       {title}
     </h2>
   {/if}
   <div
     bind:this={viewportEl}
-    class="relative overflow-hidden pl-[clamp(3rem,7.5vw,6rem)] pr-[clamp(3rem,7.5vw,6rem)]"
+    class="home-row-viewport relative overflow-hidden"
     data-focus-container={focusKey}
     role="row"
     aria-label={title || undefined}
@@ -314,7 +343,7 @@
     <div
       class="relative"
       data-virtual-track
-      style="height: clamp(12.5rem,13vw,14.5rem); transform: translateX({-scrollLeft}px) translateZ(0); will-change: transform; transition: transform 150ms linear;"
+      style="height: calc(var(--tv-browse-card-width) * 0.5625 + 4rem); column-gap: var(--tv-card-gap); transform: translateX({-scrollLeft / remSize}rem) translateZ(0); will-change: transform; transition: transform 150ms linear;"
     >
       {#each visibleItems as { item, index } (item.id)}
         {@const x = index * getStep()}
@@ -336,7 +365,7 @@
           role="button"
           tabindex="-1"
           aria-label={item.title}
-          style="width: clamp(13rem,14vw,18rem); --card-x: {x}px;"
+          style="width: var(--tv-browse-card-width); --card-x: {x / remSize}rem;"
         >
           <div class="home-card-thumb">
             {#if thumbImage}
@@ -374,6 +403,11 @@
 </div>
 
 <style>
+  .home-row-viewport {
+    margin-left: calc(var(--tv-content-inset) - .25rem);
+    padding-left: .25rem;
+    padding-right: var(--tv-content-inset);
+  }
   .home-card {
     position: absolute;
     top: 0;
@@ -381,12 +415,12 @@
     display: block;
     box-sizing: border-box;
     margin: 0;
-    padding: 4px 0 0 0;
+    padding: 0.25rem 0 0 0;
     outline: 0;
     color: #fff;
     text-align: left;
     cursor: pointer;
-    transform: translateX(var(--card-x, 0px));
+    transform: translateX(var(--card-x, 0rem));
     border: none;
     transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -402,7 +436,7 @@
     overflow: hidden;
     background: #262626;
     border-radius: clamp(0.5rem, 0.7vw, 0.625rem);
-    border: 2px solid transparent;
+    border: 0.125rem solid transparent;
     transition: border-color 200ms ease, transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
     will-change: transform;
   }
@@ -455,7 +489,7 @@
   }
 
   .home-card-sub {
-    margin: 2px 0 0 0;
+    margin: 0.125rem 0 0 0;
     font-size: 0.75rem;
     font-weight: 400;
     line-height: 1.35;
@@ -483,7 +517,7 @@
     bottom: 0;
     left: 0;
     right: 0;
-    height: 3px;
+    height: 0.1875rem;
     background: rgba(255, 255, 255, 0.15);
     z-index: 3;
   }

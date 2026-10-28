@@ -21,9 +21,15 @@
 }
 
 :root {
-  /* Scale rem-based UI with the TV viewport, using a 1920px design width. */
-  font-size: clamp(16px, 0.833333vw, 32px);
+  /* 1280px design canvas: 80rem at a browser default of 16px. */
+  font-size: 100%;
   --topnav-h: 4rem;
+  --tv-page-top-inset: calc(var(--topnav-h) + 1.5rem);
+  --tv-screen-width: 80rem;
+  --tv-screen-height: 45rem;
+  --tv-content-inset: 4rem;
+  --tv-card-gap: 1.25rem;
+  --tv-browse-card-width: calc((var(--tv-screen-width) - var(--tv-content-inset) - var(--tv-content-inset) - 5rem) / 4.6);
 }
 
 @keyframes fade-in {
