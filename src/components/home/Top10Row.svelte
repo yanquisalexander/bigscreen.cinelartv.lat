@@ -264,7 +264,7 @@
     <div
       class="relative"
       data-virtual-track
-      style="height: 18.75rem; transform: translateX({-scrollLeft / remSize}rem) translateZ(0); will-change: transform; transition: transform 150ms linear;"
+      style="height: 18rem; transform: translateX({-scrollLeft / remSize}rem) translateZ(0); will-change: transform; transition: transform 150ms linear;"
     >
       {#each visibleItems as { item, index } (item.id)}
         {@const rank = index + 1}
@@ -281,34 +281,36 @@
           aria-label={item.title}
           style="--card-x: {index * getStep() / remSize}rem; --card-w: {CARD_W / remSize}rem;"
         >
-          <!-- Big rank number -->
-          <div class="top10-number" class:top10-number--top3={isTop3}>
-            <span class="top10-number-stroke">{rank}</span>
-            <span class="top10-number-fill" class:top10-number-glow={isTop3} style={isTop3 ? `text-shadow: 0 0 20px ${rankConfig?.glow}` : ''}>{rank}</span>
-          </div>
+          <div class="top10-art">
+            <!-- Big rank number (anchored to the poster, not the title) -->
+            <div class="top10-number" class:top10-number--top3={isTop3}>
+              <span class="top10-number-stroke">{rank}</span>
+              <span class="top10-number-fill" class:top10-number-glow={isTop3} style={isTop3 ? `text-shadow: 0 0 20px ${rankConfig?.glow}` : ''}>{rank}</span>
+            </div>
 
-          <!-- Poster -->
-          <div
-            class="top10-poster"
-            class:top10-poster--top1={rank === 1}
-            style={rank === 1 ? `border-color: ${rankConfig?.color}; box-shadow: 0 0 16px ${rankConfig?.glow}` : ''}
-          >
-            {#if posterImage}
-              <img
-                src={posterImage}
-                alt={item.title}
-                loading="lazy"
-                decoding="async"
-              />
-            {:else}
-              <div class="top10-fallback">{(item.title ?? '?').charAt(0)}</div>
-            {/if}
-            <div class="top10-gradient"></div>
-            {#if rank === 1}
-              <div class="top10-crown" style="background-color: {rankConfig?.color}">
-                <span class="top10-crown-text">1</span>
-              </div>
-            {/if}
+            <!-- Poster -->
+            <div
+              class="top10-poster"
+              class:top10-poster--top1={rank === 1}
+              style={rank === 1 ? `border-color: ${rankConfig?.color}; box-shadow: 0 0 16px ${rankConfig?.glow}` : ''}
+            >
+              {#if posterImage}
+                <img
+                  src={posterImage}
+                  alt={item.title}
+                  loading="lazy"
+                  decoding="async"
+                />
+              {:else}
+                <div class="top10-fallback">{(item.title ?? '?').charAt(0)}</div>
+              {/if}
+              <div class="top10-gradient"></div>
+              {#if rank === 1}
+                <div class="top10-crown" style="background-color: {rankConfig?.color}">
+                  <span class="top10-crown-text">1</span>
+                </div>
+              {/if}
+            </div>
           </div>
 
           <div class="top10-meta">
@@ -357,6 +359,11 @@
     outline: none;
   }
 
+  /* Art area: rank number + poster (title lives outside so it can't shift these) */
+  .top10-art {
+    position: relative;
+  }
+
   /* Big number behind the poster */
   .top10-number {
     position: absolute;
@@ -396,7 +403,7 @@
   .top10-poster {
     position: relative;
     width: 100%;
-    aspect-ratio: 2 / 3;
+    aspect-ratio: 3 / 4;
     overflow: hidden;
     background: #141414;
     border-radius: 0.5rem;
@@ -469,9 +476,14 @@
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.25;
+    /* Reserve two full lines so short titles don't collapse the row height */
+    min-height: 2.1875rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
     color: rgba(255, 255, 255, 0.9);
   }
 </style>
