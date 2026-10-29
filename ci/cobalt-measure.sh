@@ -77,6 +77,7 @@ EOF
 cp .gclient "$REPORT/gclient.txt"
 echo dependencies-sync > "$REPORT/stage"
 gclient sync --no-history --shallow --nohooks --jobs=4 --revision src@28c0cce964f326ae24fd4e4d74dc95f50a853762 2>&1 | tee "$REPORT/sync.log"
+"$WORK/src/third_party/depot_tools/ensure_bootstrap"
 snapshot source-and-dependencies
 cd "$WORK/src"
 echo system-build-dependencies > "$REPORT/stage"
@@ -85,6 +86,8 @@ snapshot system-dependencies-installed
 echo hooks > "$REPORT/stage"
 gclient runhooks 2>&1 | tee "$REPORT/hooks.log"
 snapshot hooks-complete
+"$WORK/depot_tools/ensure_bootstrap"
+"$WORK/src/third_party/depot_tools/ensure_bootstrap"
 echo gn-gold > "$REPORT/stage"
 python3 cobalt/build/gn.py -p android-arm64 -c gold --no-rbe 2>&1 | tee "$REPORT/gn.log"
 cp out/android-arm64_gold/args.gn "$REPORT/args.gn"
