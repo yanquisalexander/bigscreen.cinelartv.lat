@@ -88,6 +88,7 @@ gclient runhooks 2>&1 | tee "$REPORT/hooks.log"
 snapshot hooks-complete
 "$WORK/depot_tools/ensure_bootstrap"
 "$WORK/src/third_party/depot_tools/ensure_bootstrap"
+python3 build/linux/sysroot_scripts/install-sysroot.py --arch=amd64 2>&1 | tee "$REPORT/host-sysroot.log"
 echo gn-gold > "$REPORT/stage"
 python3 cobalt/build/gn.py -p android-arm64 -c gold --no-rbe 2>&1 | tee "$REPORT/gn.log"
 cp out/android-arm64_gold/args.gn "$REPORT/args.gn"
