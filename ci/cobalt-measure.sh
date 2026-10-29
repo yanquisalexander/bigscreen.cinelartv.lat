@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export DEPOT_TOOLS_UPDATE=0 DEPOT_TOOLS_METRICS=0 DEPOT_TOOLS_COLLECT_METRICS=0
-export DEPOT_TOOLS_REPORT_BUILD=0 VPYTHON_BYPASS='manually managed python not supported by chrome operations'
+export DEPOT_TOOLS_REPORT_BUILD=0
 export CI=1
 REPORT="$GITHUB_WORKSPACE/measurement"
 WORK="$GITHUB_WORKSPACE/cobalt-work"
