@@ -1,0 +1,40 @@
+name: Measure Cobalt disk usage
+on:
+  push:
+    branches: [diagnostics/cobalt-disk-measurement]
+    paths: ['.github/workflows/cobalt-disk-measurement.yml', 'ci/cobalt-measure.sh']
+permissions:
+  contents: read
+concurrency:
+  group: cobalt-disk-measurement
+  cancel-in-progress: false
+jobs:
+  measure:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - name: Measure public Cobalt ARM64 gold
+        run: bash ci/cobalt-measure.sh
+      - name: Write measurement summary
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          p=pathlib.Path('measurement')
+          rows=[json.loads(s) for s in (p/'snapshots.jsonl').read_text().splitlines()] if (p/'snapshots.jsonl').exists() else []
+          samples=[json.loads(s) for s in (p/'disk-samples.jsonl').read_text().splitlines()] if (p/'disk-samples.jsonl').exists() else []
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+            f.write('# Cobalt ARM64 gold disk measurement\n\nAll units below are GiB (2^30 bytes). No compiler cache. Shallow public checkout.\n\n')
+            f.write('| Stage | Workspace | Disk used | Disk free |\n|---|---:|---:|---:|\n')
+            for r in rows:
+              f.write(f"| {r['stage']} | {r['allocated_bytes'].get('workspace',0)/2**30:.2f} | {r['used_bytes']/2**30:.2f} | {r['free_bytes']/2**30:.2f} |\n")
+            if samples: f.write(f"\nPeak sampled disk used: {max(r['used_bytes'] for r in samples)/2**30:.2f} GiB.\n")
+            f.write('\nA failed sync/build is a partial measurement, not a completed build size.\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cobalt-disk-measurement
+          path: measurement/
+          retention-days: 7
