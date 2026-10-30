@@ -89,7 +89,8 @@ solutions = [{
   },
 }]
 target_os = ['android']
-target_os_only = True
+# GN also evaluates host toolchains: keep Linux host dependencies enabled.
+target_os_only = False
 EOF
 cp .gclient "$REPORT/gclient.txt"
 echo dependencies-sync > "$REPORT/stage"
