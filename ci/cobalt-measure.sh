@@ -32,11 +32,7 @@ finish() {
   exit "$result"
 }
 trap finish EXIT
-snapshot runner-before-cleanup
-# Only disposable, preinstalled SDKs on this ephemeral Linux VM; no user files.
-sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL
-sudo docker image prune -af || true
-snapshot runner-after-cleanup
+start_monitor() {
 python3 -u - "$WORK" "$REPORT" <<'PY' &
 import json, shutil, sys, time
 work, report=sys.argv[1:]
@@ -47,6 +43,27 @@ while True:
     time.sleep(10)
 PY
 MONITOR_PID=$!
+}
+compile() {
+  cd "$WORK/src"
+  echo compile-gold > "$REPORT/stage"
+  snapshot compile-start
+  /usr/bin/time -v -o "$REPORT/build-time.txt" timeout --signal=INT --kill-after=60s 4h autoninja -C out/android-arm64_gold -j 4 cobalt/android:cobalt_apk 2>&1 | tee "$REPORT/build.log"
+  snapshot build-complete
+  find out/android-arm64_gold/apks -maxdepth 1 -name '*.apk' -printf '%f %s bytes\n' > "$REPORT/apk-sizes.txt"
+}
+if [[ "${1:-all}" == compile ]]; then
+  export PATH="$WORK/depot_tools:$PATH"
+  start_monitor
+  compile
+  exit 0
+fi
+snapshot runner-before-cleanup
+# Only disposable, preinstalled SDKs on this ephemeral Linux VM; no user files.
+sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+sudo docker image prune -af || true
+snapshot runner-after-cleanup
+start_monitor
 git clone --depth=1 https://chromium.googlesource.com/chromium/tools/depot_tools.git "$WORK/depot_tools"
 export PATH="$WORK/depot_tools:$PATH"
 git -C "$WORK/depot_tools" rev-parse HEAD > "$REPORT/depot-tools-sha"
@@ -89,11 +106,11 @@ snapshot hooks-complete
 "$WORK/depot_tools/ensure_bootstrap"
 "$WORK/src/third_party/depot_tools/ensure_bootstrap"
 python3 build/linux/sysroot_scripts/install-sysroot.py --arch=amd64 2>&1 | tee "$REPORT/host-sysroot.log"
+python3 build/linux/sysroot_scripts/install-sysroot.py --arch=i386 2>&1 | tee "$REPORT/host-sysroot-i386.log"
 echo gn-gold > "$REPORT/stage"
 python3 cobalt/build/gn.py -p android-arm64 -c gold --no-rbe 2>&1 | tee "$REPORT/gn.log"
 cp out/android-arm64_gold/args.gn "$REPORT/args.gn"
 snapshot gn-complete
-echo compile-gold > "$REPORT/stage"
-/usr/bin/time -v -o "$REPORT/build-time.txt" autoninja -C out/android-arm64_gold -j 4 cobalt/android:cobalt_apk 2>&1 | tee "$REPORT/build.log"
-snapshot build-complete
-find out/android-arm64_gold/apks -maxdepth 1 -name '*.apk' -printf '%f %s bytes\n' > "$REPORT/apk-sizes.txt"
+if [[ "${1:-all}" != prepare ]]; then
+  compile
+fi

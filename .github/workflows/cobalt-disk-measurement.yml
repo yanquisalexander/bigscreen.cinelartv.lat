@@ -13,12 +13,20 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 330
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      - name: Measure public Cobalt ARM64 gold
-        run: bash ci/cobalt-measure.sh
+      - name: Prepare sources, dependencies and GN ARM64 gold
+        run: bash ci/cobalt-measure.sh prepare
+      - name: Save preparation measurements
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobalt-preparation-measurement
+          path: measurement/
+          retention-days: 7
+      - name: Compile Cobalt ARM64 gold and measure peak disk
+        run: bash ci/cobalt-measure.sh compile
       - name: Write measurement summary
         if: always()
         run: |
