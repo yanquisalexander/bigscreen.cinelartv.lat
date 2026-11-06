@@ -31,8 +31,8 @@ export class PlayerSeekbarElement extends LitElement {
       display: flex;
       align-items: center;
       gap: clamp(0.75rem, 1.5vw, 1rem);
-      height: clamp(2.25rem, 3.5vh, 2.75rem);
-      max-height: clamp(2.25rem, 3.5vh, 2.75rem);
+      height: clamp(2.5rem, 3.75vh, 3.1rem);
+      max-height: clamp(2.5rem, 3.75vh, 3.1rem);
       flex-shrink: 0;
       transition: opacity 250ms ease;
       pointer-events: auto;
@@ -42,16 +42,16 @@ export class PlayerSeekbarElement extends LitElement {
 
     .seekbar-time {
       color: rgba(255,255,255,0.9);
-      font-size: 0.9rem;
+      font-size: 1rem;
       font-variant-numeric: tabular-nums;
-      width: clamp(2.5rem, 4vw, 3rem);
+      width: clamp(2.75rem, 4.5vw, 3.375rem);
       text-align: right;
     }
 
     .seekbar-track {
       position: relative;
       flex: 1;
-      height: clamp(1.5rem, 3vh, 2rem);
+      height: clamp(1.75rem, 3.25vh, 2.25rem);
       display: flex;
       align-items: center;
       cursor: pointer;
@@ -69,13 +69,13 @@ export class PlayerSeekbarElement extends LitElement {
     }
 
     .seekbar-focus[data-focused="true"] .seekbar-track-bg {
-      height: 0.5rem;
-      border-radius: 0.5rem;
+      height: 0.5625rem;
+      border-radius: 0.5625rem;
     }
 
     .seekbar-track:hover .seekbar-track-bg {
-      height: 0.5rem;
-      border-radius: 0.5rem;
+      height: 0.5625rem;
+      border-radius: 0.5625rem;
     }
 
     .seekbar-track-bg {
@@ -83,9 +83,9 @@ export class PlayerSeekbarElement extends LitElement {
       inset: 0;
       margin: auto;
       width: 100%;
-      height: 0.375rem;
+      height: 0.4375rem;
       background: rgba(255,255,255,0.3);
-      border-radius: 0.375rem;
+      border-radius: 0.4375rem;
       transition: height 200ms cubic-bezier(.05, 0, .3, 1), border-radius 200ms cubic-bezier(.05, 0, .3, 1);
       overflow: hidden;
     }
@@ -121,8 +121,8 @@ export class PlayerSeekbarElement extends LitElement {
       position: absolute;
       top: 50%;
       left: 0;
-      width: 1rem;
-      height: 1rem;
+      width: 1.15rem;
+      height: 1.15rem;
       border: none;
       background: #f1f1f1;
       border-radius: 50%;
@@ -132,19 +132,19 @@ export class PlayerSeekbarElement extends LitElement {
 
     .seekbar-focus[data-focused="true"] .seekbar-thumb {
       display: block;
-      transform: translateX(calc(var(--thumb-x, 0px) - 0.5rem)) translateY(-50%) scale(1.25);
+      transform: translateX(calc(var(--thumb-x, 0px) - 0.575rem)) translateY(-50%) scale(1.25);
     }
 
     .seekbar-track:hover .seekbar-thumb {
       display: block;
-      transform: translateX(calc(var(--thumb-x, 0px) - 0.5rem)) translateY(-50%) scale(1.25);
+      transform: translateX(calc(var(--thumb-x, 0px) - 0.575rem)) translateY(-50%) scale(1.25);
     }
 
     .seekbar-time-end {
       color: rgba(255,255,255,0.7);
-      font-size: 0.9rem;
+      font-size: 1rem;
       font-variant-numeric: tabular-nums;
-      width: clamp(2.5rem, 4vw, 3rem);
+      width: clamp(2.75rem, 4.5vw, 3.375rem);
       text-align: right;
     }
   `;

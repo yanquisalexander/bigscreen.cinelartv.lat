@@ -76,7 +76,7 @@ export class PlayerControlsElement extends LitElement {
       right: clamp(2rem, 4vw, 3rem);
       z-index: 2;
       color: #fff;
-      font-size: 1.2rem;
+      font-size: 1.35rem;
       font-weight: 500;
       letter-spacing: 0.02em;
       opacity: 1;
@@ -94,10 +94,10 @@ export class PlayerControlsElement extends LitElement {
       opacity: 0;
       transform: translateX(1em);
       transition: opacity 500ms ease, transform 500ms cubic-bezier(0.4, 0, 0.2, 1);
-      font-size: 0.75rem;
+      font-size: 0.85rem;
       font-weight: 400;
       line-height: 1.3;
-      max-width: 14rem;
+      max-width: 15rem;
       text-align: right;
     }
 
@@ -131,8 +131,8 @@ export class PlayerControlsElement extends LitElement {
     :host([rail-expanded]) .top-scrim { opacity: 0; }
 
     .top-title { margin-top: clamp(1rem, 3vh, 1.75rem); max-width: 60vw; }
-    .top-title h1 { color: #ffffff; font-weight: 700; font-size: 2.2rem; line-height: 1.2; }
-    .top-title p { color: rgba(255,255,255,0.3); font-size: 0.9375rem; font-weight: 500; margin-top: 0.25rem; }
+    .top-title h1 { color: #ffffff; font-weight: 700; font-size: 2.45rem; line-height: 1.2; }
+    .top-title p { color: rgba(255,255,255,0.3); font-size: 1.05rem; font-weight: 500; margin-top: 0.25rem; }
 
     .controls-row {
       display: flex;
@@ -141,7 +141,7 @@ export class PlayerControlsElement extends LitElement {
       width: 100%;
       margin-top: clamp(0.25rem, 0.6vh, 0.5rem);
       flex-shrink: 0;
-      max-height: clamp(3.5rem, 6vw, 4rem);
+      max-height: clamp(3.75rem, 6.5vw, 4.5rem);
     }
 
     .controls-row-left, .controls-row-right { display: flex; align-items: center; gap: clamp(0.5rem, 1vw, 0.75rem); flex: 1; }
@@ -166,15 +166,15 @@ export class PlayerControlsElement extends LitElement {
       color: #0f0f0f;
     }
 
-    .circle-btn { width: 3rem; height: 3rem; border-radius: 1.5rem; }
-    .play-pause-btn { width: 4rem; height: 4rem; border-radius: 2rem; }
-    .pill-btn { padding: 0 1rem; height: 2.25rem; border-radius: 1.125rem; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.01em; gap: 0.35rem; }
+    .circle-btn { width: 3.4rem; height: 3.4rem; border-radius: 1.7rem; }
+    .play-pause-btn { width: 4.5rem; height: 4.5rem; border-radius: 2.25rem; }
+    .pill-btn { padding: 0 1.125rem; height: 2.5rem; border-radius: 1.25rem; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.01em; gap: 0.4rem; }
 
     .pill-group {
       display: inline-flex;
       align-items: center;
       background-color: rgba(255, 255, 255, 0.1);
-      border-radius: 1.125rem;
+      border-radius: 1.25rem;
       vertical-align: middle;
       position: relative;
       margin-left: 0;
@@ -184,14 +184,14 @@ export class PlayerControlsElement extends LitElement {
     .pill-group .control-btn {
       background-color: transparent;
       color: #f1f1f1;
-      border-radius: 1.125rem;
-      height: 2.25rem;
-      line-height: 2.25rem;
+      border-radius: 1.25rem;
+      height: 2.5rem;
+      line-height: 2.5rem;
       box-shadow: none;
     }
 
     .pill-group .control-btn.icon-only {
-      width: 2.25rem;
+      width: 2.5rem;
       padding: 0;
       display: inline-flex;
       align-items: center;
@@ -203,8 +203,8 @@ export class PlayerControlsElement extends LitElement {
       color: #0f0f0f;
     }
 
-    .control-btn .ctv-icon { font-size: 1.3rem; line-height: 1; color: inherit; }
-    .control-btn.play-pause-btn .ctv-icon { font-size: 1.5rem; }
+    .control-btn .ctv-icon { font-size: 1.5rem; line-height: 1; color: inherit; }
+    .control-btn.play-pause-btn .ctv-icon { font-size: 1.7rem; }
 
     .bottom-scrim {
       width: 100%;
@@ -226,8 +226,8 @@ export class PlayerControlsElement extends LitElement {
     }
 
     .buffering-spinner {
-      width: clamp(2.5rem, 5vw, 3.5rem);
-      height: clamp(2.5rem, 5vw, 3.5rem);
+      width: clamp(3rem, 5.5vw, 4rem);
+      height: clamp(3rem, 5.5vw, 4rem);
       border: 2px solid rgba(255,255,255,0.3);
       border-top-color: #ffffff;
       border-radius: 50%;
@@ -255,17 +255,17 @@ export class PlayerControlsElement extends LitElement {
       align-items: center;
       gap: 0.5rem;
       background: rgba(0, 0, 0, 0.85);
-      border-radius: 1rem;
-      padding: 0.75rem 1.5rem;
+      border-radius: 1.125rem;
+      padding: 0.875rem 1.75rem;
       color: #fff;
-      font-size: 2rem;
+      font-size: 2.25rem;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
       letter-spacing: 0.02em;
     }
 
     .seek-preview-badge .ctv-icon {
-      font-size: 1.6rem;
+      font-size: 1.8rem;
       color: #f03;
     }
   `;
@@ -548,7 +548,7 @@ export class PlayerControlsElement extends LitElement {
                   ${this.supportsPip ? html`
                     <tv-focusable id="pip-btn" focus-key="watch-pip" parent-focus-key="watch-root" data-focused="false" class="control-btn pill-btn icon-only"
                       focusable=${this.showControls ? 'true' : 'false'}>
-                      <svg class="ctv-icon" viewBox="0 0 24 24" width="1.3rem" height="1.3rem" fill="currentColor">
+                      <svg class="ctv-icon" viewBox="0 0 24 24" width="1.5rem" height="1.5rem" fill="currentColor">
                         <path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z"/>
                       </svg>
                     </tv-focusable>

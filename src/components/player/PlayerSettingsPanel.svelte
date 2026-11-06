@@ -127,9 +127,9 @@
 
 {#if open}
   <div
-    class="absolute top-[clamp(4.5rem,9vh,6rem)] right-[clamp(2rem,4vw,3rem)] w-[clamp(280px,25vw,400px)] max-h-[70vh] bg-surface rounded-[clamp(1rem,2vw,1.5rem)] shadow-2xl z-50 flex flex-col overflow-hidden"
+    class="absolute top-[clamp(4.5rem,9vh,6rem)] right-[clamp(2rem,4vw,3rem)] w-[clamp(320px,27vw,440px)] max-h-[70vh] bg-surface rounded-[clamp(1rem,2vw,1.5rem)] shadow-2xl z-50 flex flex-col overflow-hidden"
   >
-    <h2 class="shrink-0 px-4 pt-4 pb-2 text-white text-[1.25rem] font-semibold border-b border-white/10">
+    <h2 class="shrink-0 px-4 pt-4 pb-2 text-white text-[1.4rem] font-semibold border-b border-white/10">
       Configuración
     </h2>
 
@@ -141,7 +141,7 @@
       class="flex-1 overflow-y-auto p-4"
     >
       <div bind:this={panelBodyEl}>
-        <div class="text-[#8e8e93] text-[0.85rem] font-bold uppercase tracking-wider mb-2 px-2">
+        <div class="text-[#8e8e93] text-[0.95rem] font-bold uppercase tracking-wider mb-2 px-2">
           Calidad
         </div>
 
@@ -160,9 +160,9 @@
               {#snippet children()}
                 <div class="flex items-center gap-4 text-white">
                   <div class="text-[#8e8e93]">
-                    <Monitor class="w-5 h-5" />
+                    <Monitor class="w-6 h-6" />
                   </div>
-                  <span class="text-[1rem] font-medium">Auto</span>
+                  <span class="text-[1.125rem] font-medium">Auto</span>
                 </div>
                 {#if quality && quality.auto}
                   {@const activeTrack = quality.tracks.find(t => t.height === quality.activeHeight)}
@@ -171,7 +171,7 @@
                       {getQualityLabel(activeTrack.height)}
                     </span>
                   {/if}
-                  <Check class="w-4 h-4 text-white" />
+                  <Check class="w-5 h-5 text-white" />
                 {/if}
               {/snippet}
           </Focusable>
@@ -191,10 +191,10 @@
               {#snippet children()}
                 <div class="flex items-center gap-4 text-white">
                   <div class="text-[#8e8e93]">
-                    <Monitor class="w-5 h-5" />
+                    <Monitor class="w-6 h-6" />
                   </div>
                   <div class="flex flex-col min-w-0 flex-1">
-                    <span class="text-[1rem] font-medium">
+                    <span class="text-[1.125rem] font-medium">
                       {getQualityLabel(t.height)}
                     </span>
                     <span class="text-[0.65rem] text-[#8e8e93] mt-0.5">
@@ -203,7 +203,7 @@
                   </div>
                 </div>
                 {#if quality && quality.activeHeight === t.height && !quality.auto}
-                  <Check class="w-4 h-4 text-white" />
+                  <Check class="w-5 h-5 text-white" />
                 {/if}
               {/snippet}
             </Focusable>
@@ -212,7 +212,7 @@
           <div class="px-4 py-2 text-[#8e8e93] text-sm">Sin opciones de calidad</div>
         {/if}
 
-        <div class="text-[#8e8e93] text-[0.85rem] font-bold uppercase tracking-wider mb-2 px-2 mt-4">
+        <div class="text-[#8e8e93] text-[0.95rem] font-bold uppercase tracking-wider mb-2 px-2 mt-4">
           Audio
         </div>
 
@@ -232,12 +232,12 @@
               {#snippet children()}
                 <div class="flex items-center gap-4 text-white">
                   <div class="text-[#8e8e93]">
-                    <Volume2 class="w-5 h-5" />
+                    <Volume2 class="w-6 h-6" />
                   </div>
-                  <span class="text-[1rem] font-medium">{a.label}</span>
+                  <span class="text-[1.125rem] font-medium">{a.label}</span>
                 </div>
                 {#if a.active}
-                  <Check class="w-4 h-4 text-white" />
+                  <Check class="w-5 h-5 text-white" />
                 {/if}
               {/snippet}
             </Focusable>
@@ -248,7 +248,7 @@
 
         <!-- ── Protección de contenido ───────────────────────────────────── -->
         {#if debugMode}
-          <div class="text-[#8e8e93] text-[0.85rem] font-bold uppercase tracking-wider mb-2 px-2 mt-4">
+          <div class="text-[#8e8e93] text-[0.95rem] font-bold uppercase tracking-wider mb-2 px-2 mt-4">
             Protección
           </div>
 

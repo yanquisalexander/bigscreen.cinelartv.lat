@@ -24,8 +24,8 @@ export class PlayerNextCardElement extends LitElement {
       border-radius: clamp(0.75rem, 1.5vw, 1rem);
       box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
       border: 1px solid rgba(255, 255, 255, 0.06);
-      padding: clamp(0.75rem, 1.5vw, 1rem);
-      min-width: clamp(280px, 40vw, 360px);
+      padding: clamp(0.875rem, 1.75vw, 1.125rem);
+      min-width: clamp(300px, 42vw, 400px);
       transition: opacity 350ms ease, transform 350ms ease;
       pointer-events: auto;
     }
@@ -33,16 +33,16 @@ export class PlayerNextCardElement extends LitElement {
     .next-card.hidden { opacity: 0; transform: translateY(12px); pointer-events: none; }
 
     .next-card img {
-      width: clamp(4rem, 7vw, 5rem);
-      height: clamp(2.75rem, 5vw, 3.5rem);
+      width: clamp(4.5rem, 7.5vw, 5.625rem);
+      height: clamp(3.125rem, 5.5vw, 3.9375rem);
       border-radius: clamp(0.5rem, 1vw, 0.75rem);
       object-fit: cover;
       flex-shrink: 0;
     }
 
     .next-card .placeholder-thumb {
-      width: clamp(4rem, 7vw, 5rem);
-      height: clamp(2.75rem, 5vw, 3.5rem);
+      width: clamp(4.5rem, 7.5vw, 5.625rem);
+      height: clamp(3.125rem, 5.5vw, 3.9375rem);
       border-radius: clamp(0.5rem, 1vw, 0.75rem);
       background: rgba(255,255,255,0.08);
       display: flex;
@@ -52,14 +52,14 @@ export class PlayerNextCardElement extends LitElement {
     }
 
     .next-card .content { flex: 1; min-width: 0; }
-    .next-card .label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); }
-    .next-card .title { color: #ffffff; font-size: 1rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .next-card .label { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); }
+    .next-card .title { color: #ffffff; font-size: 1.125rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .next-card .actions { display: flex; align-items: center; gap: clamp(0.5rem, 1vw, 0.75rem); }
-    .next-card .countdown { color: rgba(255,255,255,0.7); font-size: 0.875rem; font-variant-numeric: tabular-nums; background: rgba(255,255,255,0.08); padding: clamp(0.25rem, 0.5vw, 0.375rem) clamp(0.5rem, 1vw, 0.75rem); border-radius: clamp(0.25rem, 0.5vw, 0.375rem); }
+    .next-card .countdown { color: rgba(255,255,255,0.7); font-size: 1rem; font-variant-numeric: tabular-nums; background: rgba(255,255,255,0.08); padding: clamp(0.25rem, 0.5vw, 0.375rem) clamp(0.5rem, 1vw, 0.75rem); border-radius: clamp(0.25rem, 0.5vw, 0.375rem); }
 
     .next-card .play-btn {
-      width: clamp(2.25rem, 4vw, 2.5rem);
-      height: clamp(2.25rem, 4vw, 2.5rem);
+      width: clamp(2.5rem, 4.5vw, 2.875rem);
+      height: clamp(2.5rem, 4.5vw, 2.875rem);
       border-radius: clamp(0.5rem, 1vw, 0.75rem);
       background: #ffffff;
       display: flex;
@@ -74,8 +74,8 @@ export class PlayerNextCardElement extends LitElement {
     .next-card .play-btn[data-focused="true"] { scale: 1.1; box-shadow: 0 0 0 4px #ffffff; }
 
     .next-card .cancel-btn {
-      width: clamp(2.25rem, 4vw, 2.5rem);
-      height: clamp(2.25rem, 4vw, 2.5rem);
+      width: clamp(2.5rem, 4.5vw, 2.875rem);
+      height: clamp(2.5rem, 4.5vw, 2.875rem);
       border-radius: clamp(0.5rem, 1vw, 0.75rem);
       background: rgba(255,255,255,0.08);
       display: flex;
@@ -125,7 +125,7 @@ export class PlayerNextCardElement extends LitElement {
           <img src=${resolveEpisodeThumbnail(this.episode.images, this.episode.thumbnail_resized ?? this.episode.thumbnail, this.clientEndpoint) || ''} />
         ` : html`
           <div class="placeholder-thumb">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polygon points="5 3 19 12 5 21 5 3"></polygon>
             </svg>
           </div>
@@ -137,12 +137,12 @@ export class PlayerNextCardElement extends LitElement {
         <div class="actions">
           <span class="countdown" data-next-countdown>${this._countdown}s</span>
           <tv-focusable focus-key="watch-next-play" parent-focus-key="watch-root" data-focused="false" class="play-btn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0">
               <polygon points="6 4v16l12-8z"></polygon>
             </svg>
           </tv-focusable>
           <tv-focusable focus-key="watch-next-cancel" parent-focus-key="watch-root" data-focused="false" class="cancel-btn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>

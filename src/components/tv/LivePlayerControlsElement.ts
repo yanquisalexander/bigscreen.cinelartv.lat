@@ -44,7 +44,7 @@ export class LivePlayerControlsElement extends LitElement {
       right: clamp(2rem, 4vw, 3rem);
       z-index: 2;
       color: #fff;
-      font-size: 1.2rem;
+      font-size: 1.35rem;
       font-weight: 500;
       letter-spacing: 0.02em;
       opacity: 1;
@@ -78,8 +78,8 @@ export class LivePlayerControlsElement extends LitElement {
     }
 
     .top-title { margin-top: clamp(1rem, 3vh, 1.75rem); max-width: 60vw; }
-    .top-title h1 { color: #ffffff; font-weight: 700; font-size: 2.2rem; line-height: 1.2; }
-    .top-title p { color: rgba(255,255,255,0.3); font-size: 0.9375rem; font-weight: 500; margin-top: 0.25rem; }
+    .top-title h1 { color: #ffffff; font-weight: 700; font-size: 2.45rem; line-height: 1.2; }
+    .top-title p { color: rgba(255,255,255,0.3); font-size: 1.05rem; font-weight: 500; margin-top: 0.25rem; }
 
     .live-badge {
       display: inline-flex;
@@ -111,7 +111,7 @@ export class LivePlayerControlsElement extends LitElement {
       width: 100%;
       margin-top: clamp(0.25rem, 0.6vh, 0.5rem);
       flex-shrink: 0;
-      max-height: clamp(3.5rem, 6vw, 4rem);
+      max-height: clamp(3.75rem, 6.5vw, 4.5rem);
     }
 
     .controls-row-left, .controls-row-right { display: flex; align-items: center; gap: clamp(0.5rem, 1vw, 0.75rem); flex: 1; }
@@ -136,15 +136,15 @@ export class LivePlayerControlsElement extends LitElement {
       color: #0f0f0f;
     }
 
-    .circle-btn { width: 3rem; height: 3rem; border-radius: 1.5rem; }
-    .play-pause-btn { width: 4rem; height: 4rem; border-radius: 2rem; }
-    .pill-btn { padding: 0 1rem; height: 2.25rem; border-radius: 1.125rem; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.01em; gap: 0.35rem; }
+    .circle-btn { width: 3.4rem; height: 3.4rem; border-radius: 1.7rem; }
+    .play-pause-btn { width: 4.5rem; height: 4.5rem; border-radius: 2.25rem; }
+    .pill-btn { padding: 0 1.125rem; height: 2.5rem; border-radius: 1.25rem; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.01em; gap: 0.4rem; }
 
     .pill-group {
       display: inline-flex;
       align-items: center;
       background-color: rgba(255, 255, 255, 0.1);
-      border-radius: 1.125rem;
+      border-radius: 1.25rem;
       vertical-align: middle;
       position: relative;
       margin-left: 0;
@@ -154,14 +154,14 @@ export class LivePlayerControlsElement extends LitElement {
     .pill-group .control-btn {
       background-color: transparent;
       color: #f1f1f1;
-      border-radius: 1.125rem;
-      height: 2.25rem;
-      line-height: 2.25rem;
+      border-radius: 1.25rem;
+      height: 2.5rem;
+      line-height: 2.5rem;
       box-shadow: none;
     }
 
     .pill-group .control-btn.icon-only {
-      width: 2.25rem;
+      width: 2.5rem;
       padding: 0;
       display: inline-flex;
       align-items: center;
@@ -173,8 +173,8 @@ export class LivePlayerControlsElement extends LitElement {
       color: #0f0f0f;
     }
 
-    .control-btn .ctv-icon { font-size: 1.3rem; line-height: 1; color: inherit; }
-    .control-btn.play-pause-btn .ctv-icon { font-size: 1.5rem; }
+    .control-btn .ctv-icon { font-size: 1.5rem; line-height: 1; color: inherit; }
+    .control-btn.play-pause-btn .ctv-icon { font-size: 1.7rem; }
 
     .bottom-scrim {
       width: 100%;
@@ -196,8 +196,8 @@ export class LivePlayerControlsElement extends LitElement {
     }
 
     .buffering-spinner {
-      width: clamp(2.5rem, 5vw, 3.5rem);
-      height: clamp(2.5rem, 5vw, 3.5rem);
+      width: clamp(3rem, 5.5vw, 4rem);
+      height: clamp(3rem, 5.5vw, 4rem);
       border: 2px solid rgba(255,255,255,0.3);
       border-top-color: #ffffff;
       border-radius: 50%;

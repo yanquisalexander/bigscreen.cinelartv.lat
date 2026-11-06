@@ -20,12 +20,12 @@ export class PlayerSkipButtonElement extends LitElement {
       display: flex;
       align-items: center;
       gap: clamp(0.5rem, 1vw, 0.75rem);
-      padding: clamp(0.625rem, 1.2vw, 0.75rem) clamp(1rem, 2vw, 1.5rem);
+      padding: clamp(0.75rem, 1.4vw, 0.875rem) clamp(1.125rem, 2.25vw, 1.75rem);
       background: rgba(255,255,255,0.92);
       backdrop-filter: blur(12px);
-      border-radius: clamp(0.75rem, 1.5vw, 1rem);
+      border-radius: clamp(0.875rem, 1.75vw, 1.125rem);
       color: #000000;
-      font-size: 1rem;
+      font-size: 1.125rem;
       font-weight: 600;
       cursor: pointer;
       outline: none;
@@ -38,8 +38,8 @@ export class PlayerSkipButtonElement extends LitElement {
     }
 
     .skip-btn .chevron {
-      width: clamp(1rem, 1.5vw, 1.25rem);
-      height: clamp(1rem, 1.5vw, 1.25rem);
+      width: clamp(1.125rem, 1.75vw, 1.5rem);
+      height: clamp(1.125rem, 1.75vw, 1.5rem);
     }
   `;
 
