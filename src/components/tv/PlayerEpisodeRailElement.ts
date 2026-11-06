@@ -222,6 +222,8 @@ export class PlayerEpisodeRailElement extends LitElement {
     const vpW = this._virtualViewportWidth || (typeof window !== 'undefined' ? window.innerWidth : 1280);
     const isPartial = x < this._virtualScrollLeft || x + itemW > this._virtualScrollLeft + vpW;
     const epDescription = (episode as any).description || 'Este episodio no tiene descripción disponible.';
+    // position viene 1-based de la API; el +1 solo aplica al fallback por índice
+    const epNumber = episode.position ?? (index + 1);
 
     return html`
       <div class="episode-card"
@@ -232,11 +234,11 @@ export class PlayerEpisodeRailElement extends LitElement {
            style="width: ${itemW}px; --ep-x: ${x}px;"
            role="button"
            tabindex="-1"
-           aria-label="Episodio ${index + 1}: ${episode.title}"
+           aria-label="Episodio ${epNumber}: ${episode.title}"
            @click=${this._handleEpisodeCardClick}>
         <span class="episode-thumb">
           ${imageUrl ? html`<img src=${imageUrl} alt="" loading="lazy" />` : ''}
-          <span class="episode-badge">${hasMultipleSeasons ? `T${episode.seasonNumber} · ` : ''}E${index + 1}</span>
+          <span class="episode-badge">${hasMultipleSeasons ? `T${episode.seasonNumber} · ` : ''}E${epNumber}</span>
           ${isCurrent ? html`<span class="episode-playing-label">Reproduciendo</span>` : ''}
         </span>
         <span class="episode-card-title">

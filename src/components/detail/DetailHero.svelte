@@ -34,7 +34,7 @@
     for (const [si, season] of (content.seasons ?? []).entries()) {
       const ei = season.episodes.findIndex((episode) => episode.id === id);
       if (ei >= 0) {
-        return `T${si + 1} E${(season.episodes[ei].position ?? ei) + 1}`;
+        return `T${si + 1} E${season.episodes[ei].position ?? (ei + 1)}`;
       }
     }
     return '';

@@ -142,7 +142,7 @@
               {/if}
               <div class="episode-label">
                 <Play size="1rem" class="fill-current shrink-0" />
-                <span>Episodio {(episode.position ?? index) + 1}</span>
+                <span>Episodio {episode.position ?? (index + 1)}</span>
               </div>
               {#if progress > 0}
                 <div class="progress">

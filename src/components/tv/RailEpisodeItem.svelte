@@ -97,7 +97,7 @@
 
     <!-- Episode number badge -->
     <div class="absolute top-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded-md text-[10px] font-semibold text-white/80 tabular-nums">
-      {showSeasonEyebrow ? `T${ep.seasonNumber} · ` : ''}E{index + 1}
+      {showSeasonEyebrow ? `T${ep.seasonNumber} · ` : ''}E{ep.position ?? (index + 1)}
     </div>
   </div>
 

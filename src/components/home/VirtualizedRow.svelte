@@ -274,7 +274,8 @@
     const ep = getEpisode(item);
     if (!ep) return null;
     if (ep.title) return ep.title;
-    if (typeof ep.position === 'number') return `Episodio ${ep.position + 1}`;
+    // position viene 1-based de la API (Episodio 1 -> position: 1): no sumar +1
+    if (typeof ep.position === 'number') return `Episodio ${ep.position}`;
     return null;
   }
 

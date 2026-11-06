@@ -169,8 +169,9 @@
   const allEpisodes = $derived.by(() => {
     if (!watchData?.seasons) return [];
     const result: FlatEpisode[] = [];
-    for (const season of watchData.seasons) {
-      const seasonNum = (season.position ?? 1);
+    for (const [seasonIndex, season] of watchData.seasons.entries()) {
+      // season.position también es 1-based; sin él, el índice +1
+      const seasonNum = (season.position ?? (seasonIndex + 1));
       for (const ep of season.episodes ?? []) {
         result.push({ ...ep, seasonNumber: seasonNum });
       }
@@ -186,7 +187,7 @@
   const currentSeasonNumber = $derived.by(() => {
     if (!watchData?.episode?.season_id || !watchData?.seasons) return null;
     const idx = watchData.seasons.findIndex((s) => s.id === watchData.episode!.season_id);
-    return idx >= 0 ? (watchData.seasons[idx].position ?? idx) : null;
+    return idx >= 0 ? (watchData.seasons[idx].position ?? (idx + 1)) : null;
   });
 
   const nextEpisode = $derived.by(() => {
