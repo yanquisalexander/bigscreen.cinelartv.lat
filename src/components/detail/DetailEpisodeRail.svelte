@@ -65,8 +65,10 @@
 
     const measure = () => {
       const dummy = document.createElement('div');
+      // 14.5rem: en línea con las cards del home (~13.3rem); 19.2rem las hacía
+      // verse excesivamente grandes en el overview del detalle.
       dummy.style.cssText =
-        'position:absolute;visibility:hidden;width:19.2rem;height:0;overflow:hidden;';
+        'position:absolute;visibility:hidden;width:14.5rem;height:0;overflow:hidden;';
       viewport!.appendChild(dummy);
       cardWidth = dummy.offsetWidth || 280;
       dummy.remove();
