@@ -46,7 +46,7 @@
   function getShelfHeight(catIdx: number, hasTitle: boolean): number {
     if (shelfMeasuredHeights[catIdx]) return shelfMeasuredHeights[catIdx];
     const titleH = hasTitle ? TITLE_H : 0;
-    const contentHeight = categories[catIdx]?.section_kind === 'top_10_by_country' ? 21.75 : THUMB_H + META_H;
+    const contentHeight = categories[catIdx]?.section_kind === 'top_10_by_country' ? 18.5 : THUMB_H + META_H;
     return (titleH + contentHeight + SHELF_PAD) * remSize;
   }
 

@@ -148,12 +148,13 @@
 
   const categories = $derived((data?.content ?? []).filter(category => (category.content?.length ?? 0) > 0));
   const presentationItem = $derived(selectedItem ?? data?.banner_content?.[0] ?? categories[0]?.content?.[0]);
-  // Hero más presente: la fila superior empieza ~62% abajo y el backdrop
-  // se extiende HERO_OVERLAP por detrás de las filas, fundiéndose sobre
-  // ellas en vez de cortarse en seco contra un fondo opaco.
-  const HERO_OVERLAP_REM = 6;
+  // Hero presente pero sin comerse las filas: la fila superior empieza
+  // ~54% abajo (una fila alta como Top 10 entra entera en el resto) y el
+  // backdrop se extiende HERO_OVERLAP por detrás de las filas, fundiéndose
+  // sobre ellas en vez de cortarse en seco contra un fondo opaco.
+  const HERO_OVERLAP_REM = 5;
   const HERO_CREEP_REM = 2.5;
-  const expandedStageHeight = $derived(Math.max(13 * remSize, Math.min(26 * remSize, viewportHeight - 16 * remSize)));
+  const expandedStageHeight = $derived(Math.max(13 * remSize, Math.min(22.5 * remSize, viewportHeight - 18 * remSize)));
   const heroStageHeight = $derived(expandedStageHeight + HERO_OVERLAP_REM * remSize);
   const compactStageHeight = $derived(Math.max(11 * remSize, expandedStageHeight - HERO_CREEP_REM * remSize));
   const stageHeight = $derived(trailerFullscreen ? viewportHeight : listFocused ? expandedStageHeight : compactStageHeight);

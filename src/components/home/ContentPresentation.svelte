@@ -160,7 +160,7 @@
   $effect(() => () => { onImmersiveChange?.(false); });
 </script>
 
-<section class="presentation" class:immersive class:fullscreen class:compact={immersive && !expanded} aria-label={item.title}>
+<section class="presentation" class:immersive class:fullscreen class:trailer={showTrailer} class:compact={immersive && !expanded} aria-label={item.title}>
   {#if displayedBackdrop}
     <img
       class="artwork"
@@ -249,10 +249,24 @@
   }
   .artwork { object-fit: cover; object-position: right 30%; opacity: 0; transition: opacity 450ms ease-out; }
   .artwork.loaded { opacity: 1; }
-  .trailer-canvas { width: var(--tv-screen-width, 80rem); height: var(--tv-screen-height, 45rem); transform-origin: right top; transform: scale(.72); z-index: 1; pointer-events: none; transition: transform 280ms ease-out; }
+  /* Con tráiler, el backdrop se oculta: si quedaba debajo del video, el
+     video se veía "fusionado"/semitransparente sobre la imagen. */
+  .trailer .artwork.loaded { opacity: 0; }
+  .trailer-canvas {
+    width: var(--tv-screen-width, 80rem); height: var(--tv-screen-height, 45rem); transform-origin: right top; transform: scale(.72); z-index: 1; pointer-events: none; transition: transform 280ms ease-out;
+    /* El video NO hereda el fundido largo del backdrop: interior opaco y
+       solo un borde suave en el lado izquierdo/inferior, para que se lea
+       como video y no como una imagen translúcida. */
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 7%), linear-gradient(to top, transparent 0%, black 10%);
+    -webkit-mask-composite: destination-in;
+    mask-image: linear-gradient(to right, transparent 0%, black 7%), linear-gradient(to top, transparent 0%, black 10%);
+    mask-composite: intersect;
+  }
   .trailer-video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: right top; opacity: 0; transition: opacity 320ms ease-out; }
   .trailer-video.playing { opacity: 1; }
-  .shade { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(90deg, #0a0a0a 0%, rgba(10,10,10,.94) 26%, rgba(10,10,10,.75) 42%, rgba(10,10,10,.15) 68%, transparent), linear-gradient(0deg, #0a0a0a 0%, rgba(10,10,10,.85) 16%, rgba(10,10,10,.45) 36%, rgba(10,10,10,.12) 52%, transparent 68%); }
+  .shade { position: absolute; inset: 0; z-index: 2; pointer-events: none; transition: opacity 320ms ease-out; background: linear-gradient(90deg, #0a0a0a 0%, rgba(10,10,10,.94) 26%, rgba(10,10,10,.75) 42%, rgba(10,10,10,.15) 68%, transparent), linear-gradient(0deg, #0a0a0a 0%, rgba(10,10,10,.85) 16%, rgba(10,10,10,.45) 36%, rgba(10,10,10,.12) 52%, transparent 68%); }
+  /* El shade también oscurecía el video; al reproducir se atenúa. */
+  .trailer:not(.fullscreen) .shade { opacity: .35; }
   /* Texto anclado abajo, justo encima de la primera fila: el hero se lee
      como una sola superficie (arte + título + CTAs) y no como un banner
      con la mitad inferior vacía. En Home, --hero-overlap/--hero-shelf-creep

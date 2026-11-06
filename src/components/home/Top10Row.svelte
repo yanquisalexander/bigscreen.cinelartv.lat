@@ -50,8 +50,8 @@
   let metricsMeasured = false;
 
   let remSize = $state(16);
-  const CARD_W = $derived(11.25 * remSize);
-  const CARD_GAP = $derived(2.5 * remSize);
+  const CARD_W = $derived(10 * remSize);
+  const CARD_GAP = $derived(2.25 * remSize);
 
   function getStep() {
     return CARD_W + CARD_GAP;
@@ -245,7 +245,7 @@
   });
 </script>
 
-<div class="top10-shelf mb-[clamp(2.5rem,5vh,4rem)]">
+<div class="top10-shelf mb-[clamp(1rem,2vh,1.5rem)]">
   {#if title}
     <div class="flex items-center gap-[clamp(0.5rem,0.8vw,0.75rem)] px-[var(--tv-content-inset)] mb-[clamp(0.35rem,0.7vh,0.5rem)]">
       <h2 class="text-[1.25rem] font-medium text-white/95">
@@ -256,7 +256,7 @@
   {/if}
   <div
     bind:this={viewportEl}
-    class="relative overflow-x-hidden pl-[var(--tv-content-inset)] pr-[var(--tv-content-inset)] pt-3 pb-3"
+    class="relative overflow-x-hidden pl-[var(--tv-content-inset)] pr-[var(--tv-content-inset)] pt-2 pb-2"
     data-focus-container={focusKey}
     role="row"
     aria-label={title || undefined}
@@ -264,7 +264,7 @@
     <div
       class="relative"
       data-virtual-track
-      style="height: 18rem; transform: translateX({-scrollLeft / remSize}rem) translateZ(0); will-change: transform; transition: transform 150ms linear;"
+      style="height: 16.25rem; transform: translateX({-scrollLeft / remSize}rem) translateZ(0); will-change: transform; transition: transform 150ms linear;"
     >
       {#each visibleItems as { item, index } (item.id)}
         {@const rank = index + 1}
@@ -377,20 +377,20 @@
 
   .top10-number-stroke {
     position: absolute;
-    font-size: 9rem;
+    font-size: 8rem;
     font-weight: 900;
     line-height: 0.8;
-    letter-spacing: -0.375rem;
+    letter-spacing: -0.33rem;
     color: #3a3d42;
     -webkit-text-stroke: 0.125rem #3a3d42;
   }
 
   .top10-number-fill {
     position: relative;
-    font-size: 9rem;
+    font-size: 8rem;
     font-weight: 900;
     line-height: 0.8;
-    letter-spacing: -0.375rem;
+    letter-spacing: -0.33rem;
     color: #1a1a1a;
     z-index: 1;
   }
@@ -409,7 +409,7 @@
     border-radius: 0.5rem;
     border: 0.125rem solid rgba(255, 255, 255, 0.08);
     z-index: 1;
-    margin-left: 1.875rem;
+    margin-left: 1.5rem;
     transition: border-color var(--animation-duration) ease;
     box-shadow: -0.25rem 0.5rem 0.75rem rgba(0, 0, 0, var(--shadow-opacity));
   }
@@ -468,7 +468,7 @@
 
   .top10-meta {
     padding: clamp(0.5rem, 0.8vw, 0.7rem) clamp(0.1rem, 0.2vw, 0.15rem) 0;
-    margin-left: 1.875rem;
+    margin-left: 1.5rem;
   }
 
   .top10-title {
