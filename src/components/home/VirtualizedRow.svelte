@@ -53,13 +53,51 @@
   const registrar = new FocusableRegistrar();
   let renderedKeys: string[] = [];
 
+  // ── Métricas predichas para el primer render ─────────────────────────────
+  // Antes itemWidth/itemGap arrancaban en 0: todas las cards se montaban
+  // apiladas en x=0 y, al medirse en el efecto, se "desagrupaban" de golpe
+  // (con transición de 250ms, un salto raro). Como el ancho de card es una
+  // fórmula cerrada sobre variables CSS (.tv-browse-card-width sobre
+  // --tv-screen-width/--tv-content-inset/--tv-card-gap, ya aplicadas por
+  // initTvScale antes de montar), lo predecimos aquí y computeMetrics()
+  // solo ajusta después si la medición real difiere unos píxeles.
+  function getPredictedMetrics() {
+    const fallback = { rem: 16, itemWidth: 0, itemGap: 0, viewportWidth: 0 };
+    if (typeof document === 'undefined' || typeof window === 'undefined') return fallback;
+    const rootStyle = getComputedStyle(document.documentElement);
+    const rem = parseFloat(rootStyle.fontSize) || 16;
+    const screenWRem = parseFloat(rootStyle.getPropertyValue('--tv-screen-width')) || window.innerWidth / rem;
+    const insetRem = parseFloat(rootStyle.getPropertyValue('--tv-content-inset')) || 4;
+    const gapRem = parseFloat(rootStyle.getPropertyValue('--tv-card-gap')) || 1.25;
+    const cardWRem = (screenWRem - insetRem * 2 - 5) / 4.6;
+    return {
+      rem,
+      itemWidth: cardWRem * rem,
+      itemGap: gapRem * rem,
+      // viewportWidth = clientWidth - paddingL - paddingR, ver computeMetrics()
+      viewportWidth: window.innerWidth - insetRem * 2 * rem,
+    };
+  }
+
+  const predicted = getPredictedMetrics();
+  const predictedStep = predicted.itemWidth + predicted.itemGap;
+  const rememberedIndex = initialItemId ? items.findIndex((item) => item.id === initialItemId) : -1;
+  const predictedMaxScroll = Math.max(
+    0,
+    items.length * predictedStep - predicted.itemGap - predicted.viewportWidth + predicted.viewportWidth * 0.4,
+  );
+
   let viewportEl = $state<HTMLDivElement | null>(null);
-  let scrollLeft = $state(0);
-  let viewportWidth = $state(0);
-  let itemWidth = $state(0);
-  let itemGap = $state(0);
+  let scrollLeft = $state(
+    rememberedIndex >= 0 && predictedStep > 0
+      ? Math.max(0, Math.min(rememberedIndex * predictedStep, predictedMaxScroll))
+      : 0,
+  );
+  let viewportWidth = $state(predicted.viewportWidth);
+  let itemWidth = $state(predicted.itemWidth);
+  let itemGap = $state(predicted.itemGap);
   let metricsMeasured = false;
-  let remSize = $state(16);
+  let remSize = $state(predicted.rem);
 
   function getStep() {
     return itemWidth + itemGap;

@@ -39,7 +39,12 @@
   const SHELF_PAD = 1.5;
 
   let hostEl = $state<HTMLDivElement | null>(null);
-  let remSize = $state(16);
+  // Predicho desde el primer render (initTvScale ya aplicó el font-size):
+  // con 16 fijo, los offsets de los shelves nacían ~35% más chicos en 1080p
+  // y saltaban al medirse en el ResizeObserver.
+  let remSize = $state(
+    typeof document === 'undefined' ? 16 : parseFloat(getComputedStyle(document.documentElement).fontSize) || 16,
+  );
 
   let shelfMeasuredHeights = $state<Record<number, number>>({});
 
