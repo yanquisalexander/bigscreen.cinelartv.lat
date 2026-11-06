@@ -638,6 +638,12 @@ body.app-quality-lite .glass {
   -webkit-backdrop-filter: none;
 }
 
+/* En LITE los paneles aparecen al instante, sin animación de entrada */
+body.app-quality-lite .animate-panel-in,
+body.app-quality-lite .animate-panel-out {
+  animation: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

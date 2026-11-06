@@ -1,9 +1,10 @@
 <script lang="ts">
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import Focusable from '@/components/tv/Focusable.svelte';
-  import { setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
-  import { Monitor, Volume2, Check, ShieldCheck, ShieldAlert, ShieldOff } from '@lucide/svelte';
+  import { setFocus, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
+  import { Monitor, Volume2, Check, ChevronLeft, ChevronRight, ShieldCheck, ShieldAlert, ShieldOff } from '@lucide/svelte';
   import { svelteSettingsStore } from '@/stores/settingsStore';
+  import { untrack } from 'svelte';
 
   interface QualityInfo {
     auto: boolean;
@@ -30,9 +31,28 @@
     getAudioTracksInfo(): AudioInfo[] | null;
     selectQuality(option: number | 'auto'): void;
     selectAudioTrack(language: string, role?: string, index?: number): void;
-    onTracksChanged?: (fn: () => void) => () => void;
+    onTracksChanged?: (fn: () => void) => void;
     getProfile(): { drm?: DrmInfo } | null;
   }
+
+  type SettingsCategory = 'quality' | 'audio' | 'protection';
+
+  interface Props {
+    engine: EngineLike | null;
+    open: boolean;
+    category: SettingsCategory | null;
+    onCategoryChange?: (category: SettingsCategory | null) => void;
+  }
+
+  let { engine, open, category, onCategoryChange }: Props = $props();
+
+  let quality = $state<QualityInfo | null>(null);
+  let audio = $state<AudioInfo[] | null>(null);
+  let drm = $state<DrmInfo | null>(null);
+  let panelBodyEl = $state<HTMLDivElement | null>(null);
+  let lastCategory = $state<SettingsCategory | null>(null);
+  const debugMode = $derived($svelteSettingsStore.debugMode);
+  let _scrollObserver: MutationObserver | null = null;
 
   const formatGbPerHour = (bps: number): string => {
     const gb = (bps * 3600) / (8 * 1024 * 1024 * 1024);
@@ -47,27 +67,64 @@
     return 'Básica';
   };
 
-  interface Props {
-    engine: EngineLike | null;
-    open: boolean;
-  }
-
-  let { engine, open }: Props = $props();
-
-  let quality = $state<QualityInfo | null>(null);
-  let audio = $state<AudioInfo[] | null>(null);
-  let drm = $state<DrmInfo | null>(null);
-  let panelBodyEl = $state<HTMLDivElement | null>(null);
-  let didFocus = false;
-  const debugMode = $derived($svelteSettingsStore.debugMode);
-  let _scrollObserver: MutationObserver | null = null;
-
   function refresh() {
     if (!engine) return;
     quality = engine.getVariantTracksInfo();
     audio = engine.getAudioTracksInfo();
     drm = engine.getProfile()?.drm ?? null;
   }
+
+  const hasQuality = $derived(Boolean(quality && quality.tracks.length > 0));
+  const hasAudio = $derived(Boolean(audio && audio.length > 0));
+
+  const qualityValue = $derived.by(() => {
+    if (!quality) return 'No disponible';
+    if (quality.auto) return quality.activeHeight ? `Automática (${quality.activeHeight}p)` : 'Automática';
+    return quality.activeHeight ? `${quality.activeHeight}p` : 'Manual';
+  });
+
+  const audioValue = $derived.by(() => {
+    const active = audio?.find((a) => a.active);
+    if (active) return active.label;
+    return hasAudio ? 'Seleccionar' : 'No disponible';
+  });
+
+  const protectionValue = $derived.by(() => {
+    if (!drm) return 'Detectando…';
+    return drm.primary !== 'none' ? drm.primary : drm.widevine !== 'unsupported' ? drm.widevine : 'Sin DRM';
+  });
+
+  const categoryTitle = $derived(
+    category === 'quality' ? 'Calidad' : category === 'audio' ? 'Audio' : 'Protección',
+  );
+
+  const firstEnabledCategoryKey = $derived(
+    hasQuality
+      ? 'player-settings-category-quality'
+      : hasAudio
+        ? 'player-settings-category-audio'
+        : debugMode
+          ? 'player-settings-category-protection'
+          : null,
+  );
+
+  // Foco inicial al abrir y al cambiar de nivel (sin re-enfocar por cambios
+  // de tracks, que solo actualizan los valores visibles).
+  const focusTarget = $derived.by(() => {
+    if (!category) return `player-settings-category-${lastCategory ?? 'quality'}`;
+    if (category === 'quality') {
+      return quality?.auto
+        ? 'player-settings-quality-auto'
+        : quality?.activeHeight
+          ? `player-settings-quality-${quality.activeHeight}`
+          : 'player-settings-quality-auto';
+    }
+    if (category === 'audio') {
+      const activeIndex = audio?.findIndex((a) => a.active) ?? -1;
+      return `player-settings-audio-${activeIndex >= 0 ? activeIndex : 0}`;
+    }
+    return 'player-settings-back';
+  });
 
   function scrollToFocused() {
     const container = panelBodyEl;
@@ -90,10 +147,17 @@
     setTimeout(() => { observer.disconnect(); _scrollObserver = null; }, 1000);
   }
 
+  function selectCategory(next: SettingsCategory | null) {
+    onCategoryChange?.(next);
+  }
+
+  function goBack() {
+    onCategoryChange?.(null);
+  }
+
   $effect(() => {
     if (open) {
       refresh();
-      didFocus = false;
     }
   });
 
@@ -106,220 +170,343 @@
   });
 
   $effect(() => {
-    if (!open || didFocus) return;
-    const activeKey = quality
-      ? quality.auto
-        ? 'player-settings-quality-auto'
-        : quality.activeHeight
-          ? `player-settings-quality-${quality.activeHeight}`
-          : 'player-settings-quality-auto'
-      : audio && audio.length
-        ? `player-settings-audio-0`
-        : null;
-    if (!activeKey) return;
-    didFocus = true;
+    if (category) lastCategory = category;
+  });
+
+  $effect(() => {
+    void open;
+    void category;
+    if (!open) return;
+    const target = untrack(() => focusTarget);
+    const fallback = untrack(() => firstEnabledCategoryKey);
     setTimeout(() => {
-      setFocus(activeKey);
+      const key = target && doesFocusableExist(target) ? target : fallback;
+      if (key && doesFocusableExist(key)) setFocus(key);
       scrollToFocused();
     }, 50);
   });
+
+  const rowClass =
+    'settings-row flex items-center gap-4 w-full p-4 my-1.5 rounded-2xl cursor-pointer transition-colors duration-150 text-white bg-white/[0.07]';
+  const rowFocusedClass = '!bg-white !text-black';
+
+  function categoryArrows(next: SettingsCategory) {
+    return (direction: string) => {
+      if (direction === 'right') {
+        selectCategory(next);
+        return false;
+      }
+      if (direction === 'left') return false;
+      return true;
+    };
+  }
+
+  function backArrows() {
+    return (direction: string) => {
+      if (direction === 'left') {
+        goBack();
+        return false;
+      }
+      return true;
+    };
+  }
 </script>
 
 {#if open}
-  <div
-    class="absolute top-[clamp(4.5rem,9vh,6rem)] right-[clamp(2rem,4vw,3rem)] w-[clamp(320px,27vw,440px)] max-h-[70vh] bg-surface rounded-[clamp(1rem,2vw,1.5rem)] shadow-2xl z-50 flex flex-col overflow-hidden"
-  >
-    <h2 class="shrink-0 px-4 pt-4 pb-2 text-white text-[1.4rem] font-semibold border-b border-white/10">
-      Configuración
-    </h2>
+  <aside class="settings-dock animate-panel-in" data-settings-panel>
+    <div class="settings-header">
+      <h2>Configuración</h2>
+    </div>
 
     <FocusContainer
       focusKey="player-settings"
       focusable={false}
       isFocusBoundary={true}
       trackChildren={true}
-      class="flex-1 overflow-y-auto p-4"
+      class="flex-1 overflow-y-auto px-4 pb-6"
     >
-      <div bind:this={panelBodyEl}>
-        <div class="text-[#8e8e93] text-[0.95rem] font-bold uppercase tracking-wider mb-2 px-2">
-          Calidad
-        </div>
+      <div bind:this={panelBodyEl} class="settings-list">
+        {#if !category}
+          <!-- ── Nivel 1: categorías ─────────────────────────────────── -->
+          {#if hasQuality}
+            <Focusable
+              focusKey="player-settings-category-quality"
+              focusedClass={rowFocusedClass}
+              class={rowClass}
+              onEnterPress={() => selectCategory('quality')}
+              onArrowPress={categoryArrows('quality')}
+              playSound={true}
+            >
+              {#snippet children()}
+                <span class="opacity-60 shrink-0"><Monitor class="w-6 h-6" /></span>
+                <span class="flex-1 min-w-0 text-left">
+                  <span class="block text-[1.125rem] font-semibold leading-tight">Calidad</span>
+                  <span class="block text-[0.875rem] opacity-65 tabular-nums">{qualityValue}</span>
+                </span>
+                <span class="opacity-50 shrink-0"><ChevronRight class="w-5 h-5" /></span>
+              {/snippet}
+            </Focusable>
+          {:else}
+            <div class="{rowClass} opacity-40 pointer-events-none">
+              <span class="opacity-60 shrink-0"><Monitor class="w-6 h-6" /></span>
+              <span class="flex-1 min-w-0 text-left">
+                <span class="block text-[1.125rem] font-semibold leading-tight">Calidad</span>
+                <span class="block text-[0.875rem] opacity-65">No disponible</span>
+              </span>
+            </div>
+          {/if}
 
-        {#if quality}
+          {#if hasAudio}
+            <Focusable
+              focusKey="player-settings-category-audio"
+              focusedClass={rowFocusedClass}
+              class={rowClass}
+              onEnterPress={() => selectCategory('audio')}
+              onArrowPress={categoryArrows('audio')}
+              playSound={true}
+            >
+              {#snippet children()}
+                <span class="opacity-60 shrink-0"><Volume2 class="w-6 h-6" /></span>
+                <span class="flex-1 min-w-0 text-left">
+                  <span class="block text-[1.125rem] font-semibold leading-tight">Audio</span>
+                  <span class="block text-[0.875rem] opacity-65">{audioValue}</span>
+                </span>
+                <span class="opacity-50 shrink-0"><ChevronRight class="w-5 h-5" /></span>
+              {/snippet}
+            </Focusable>
+          {:else}
+            <div class="{rowClass} opacity-40 pointer-events-none">
+              <span class="opacity-60 shrink-0"><Volume2 class="w-6 h-6" /></span>
+              <span class="flex-1 min-w-0 text-left">
+                <span class="block text-[1.125rem] font-semibold leading-tight">Audio</span>
+                <span class="block text-[0.875rem] opacity-65">No disponible</span>
+              </span>
+            </div>
+          {/if}
+
+          {#if debugMode}
+            <Focusable
+              focusKey="player-settings-category-protection"
+              focusedClass={rowFocusedClass}
+              class={rowClass}
+              onEnterPress={() => selectCategory('protection')}
+              onArrowPress={categoryArrows('protection')}
+              playSound={true}
+            >
+              {#snippet children()}
+                <span class="opacity-60 shrink-0"><ShieldCheck class="w-6 h-6" /></span>
+                <span class="flex-1 min-w-0 text-left">
+                  <span class="block text-[1.125rem] font-semibold leading-tight">Protección</span>
+                  <span class="block text-[0.875rem] opacity-65 uppercase">{protectionValue}</span>
+                </span>
+                <span class="opacity-50 shrink-0"><ChevronRight class="w-5 h-5" /></span>
+              {/snippet}
+            </Focusable>
+          {/if}
+        {:else}
+          <!-- ── Nivel 2: opciones de la categoría ───────────────────── -->
           <Focusable
-            focusKey="player-settings-quality-auto"
-            onEnterPress={() => {
-              engine?.selectQuality('auto');
-              refresh();
-            }}
-            onFocus={scrollToFocused}
-            focusedClass="bg-white/10 scale-105"
-            class="flex items-center justify-between p-3 my-1 rounded-xl cursor-pointer transition-colors duration-200"
+            focusKey="player-settings-back"
+            focusedClass={rowFocusedClass}
+            class={rowClass}
+            onEnterPress={goBack}
+            onArrowPress={backArrows()}
             playSound={true}
           >
-              {#snippet children()}
-                <div class="flex items-center gap-4 text-white">
-                  <div class="text-[#8e8e93]">
-                    <Monitor class="w-6 h-6" />
-                  </div>
-                  <span class="text-[1.125rem] font-medium">Auto</span>
-                </div>
-                {#if quality && quality.auto}
-                  {@const activeTrack = quality.tracks.find(t => t.height === quality.activeHeight)}
-                  {#if activeTrack}
-                    <span class="text-[0.65rem] tabular-nums text-[#8e8e93]">
-                      {getQualityLabel(activeTrack.height)}
-                    </span>
-                  {/if}
-                  <Check class="w-5 h-5 text-white" />
-                {/if}
-              {/snippet}
+            {#snippet children()}
+              <span class="opacity-60 shrink-0"><ChevronLeft class="w-6 h-6" /></span>
+              <span class="flex-1 min-w-0 text-left text-[1.125rem] font-semibold">{categoryTitle}</span>
+            {/snippet}
           </Focusable>
 
-          {#each quality.tracks as t (t.height)}
+          {#if category === 'quality' && quality}
             <Focusable
-              focusKey={`player-settings-quality-${t.height}`}
+              focusKey="player-settings-quality-auto"
+              focusedClass={rowFocusedClass}
+              class={rowClass}
               onEnterPress={() => {
-                engine?.selectQuality(t.height);
+                engine?.selectQuality('auto');
                 refresh();
               }}
               onFocus={scrollToFocused}
-              focusedClass="bg-white/10 scale-105"
-              class="flex items-center justify-between p-3 my-1 rounded-xl cursor-pointer transition-colors duration-200"
+              onArrowPress={backArrows()}
               playSound={true}
             >
               {#snippet children()}
-                <div class="flex items-center gap-4 text-white">
-                  <div class="text-[#8e8e93]">
-                    <Monitor class="w-6 h-6" />
-                  </div>
-                  <div class="flex flex-col min-w-0 flex-1">
-                    <span class="text-[1.125rem] font-medium">
-                      {getQualityLabel(t.height)}
-                    </span>
-                    <span class="text-[0.65rem] text-[#8e8e93] mt-0.5">
-                      ~{formatGbPerHour(t.bandwidth)}
-                    </span>
-                  </div>
-                </div>
-                {#if quality && quality.activeHeight === t.height && !quality.auto}
-                  <Check class="w-5 h-5 text-white" />
-                {/if}
-              {/snippet}
-            </Focusable>
-          {/each}
-        {:else}
-          <div class="px-4 py-2 text-[#8e8e93] text-sm">Sin opciones de calidad</div>
-        {/if}
-
-        <div class="text-[#8e8e93] text-[0.95rem] font-bold uppercase tracking-wider mb-2 px-2 mt-4">
-          Audio
-        </div>
-
-        {#if audio && audio.length > 0}
-          {#each audio as a, ai (`${a.language}-${a.role}-${ai}`)}
-            <Focusable
-              focusKey={`player-settings-audio-${ai}`}
-              onEnterPress={() => {
-                engine?.selectAudioTrack(a.language, a.role || undefined, ai);
-                refresh();
-              }}
-              onFocus={scrollToFocused}
-              focusedClass="bg-white/10 scale-105"
-              class="flex items-center justify-between p-3 my-1 rounded-xl cursor-pointer transition-colors duration-200"
-              playSound={true}
-            >
-              {#snippet children()}
-                <div class="flex items-center gap-4 text-white">
-                  <div class="text-[#8e8e93]">
-                    <Volume2 class="w-6 h-6" />
-                  </div>
-                  <span class="text-[1.125rem] font-medium">{a.label}</span>
-                </div>
-                {#if a.active}
-                  <Check class="w-5 h-5 text-white" />
-                {/if}
-              {/snippet}
-            </Focusable>
-          {/each}
-        {:else}
-          <div class="px-4 py-2 text-[#8e8e93] text-sm">Sin pistas de audio</div>
-        {/if}
-
-        <!-- ── Protección de contenido ───────────────────────────────────── -->
-        {#if debugMode}
-          <div class="text-[#8e8e93] text-[0.95rem] font-bold uppercase tracking-wider mb-2 px-2 mt-4">
-            Protección
-          </div>
-
-          <div class="px-3 py-2 my-1 rounded-xl bg-white/[0.03] space-y-2">
-            <!-- Widevine -->
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                {#if drm?.widevine === 'L1'}
-                  <ShieldCheck class="w-4 h-4 text-[#4ade80]" />
-                {:else if drm?.widevine === 'L3'}
-                  <ShieldAlert class="w-4 h-4 text-[#fbbf24]" />
-                {:else}
-                  <ShieldOff class="w-4 h-4 text-[#6b7280]" />
-                {/if}
-                <span class="text-white/70 text-[0.875rem]">Widevine</span>
-              </div>
-              <span class="text-[0.8rem] font-mono
-                {drm?.widevine === 'L1' ? 'text-[#4ade80]' :
-                 drm?.widevine === 'L3' ? 'text-[#fbbf24]' :
-                 'text-[#6b7280]'}">
-                {drm?.widevine === 'unsupported' ? 'No soportado' : (drm?.widevine ?? '—')}
-              </span>
-            </div>
-
-            <!-- PlayReady -->
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                {#if drm?.playready}
-                  <ShieldCheck class="w-4 h-4 text-[#4ade80]" />
-                {:else}
-                  <ShieldOff class="w-4 h-4 text-[#6b7280]" />
-                {/if}
-                <span class="text-white/70 text-[0.875rem]">PlayReady</span>
-              </div>
-              <span class="text-[0.8rem] font-mono {drm?.playready ? 'text-[#4ade80]' : 'text-[#6b7280]'}">
-                {drm?.playready ? 'Disponible' : 'No soportado'}
-              </span>
-            </div>
-
-            <!-- FairPlay -->
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                {#if drm?.fairplay}
-                  <ShieldCheck class="w-4 h-4 text-[#4ade80]" />
-                {:else}
-                  <ShieldOff class="w-4 h-4 text-[#6b7280]" />
-                {/if}
-                <span class="text-white/70 text-[0.875rem]">FairPlay</span>
-              </div>
-              <span class="text-[0.8rem] font-mono {drm?.fairplay ? 'text-[#4ade80]' : 'text-[#6b7280]'}">
-                {drm?.fairplay ? 'Disponible' : 'No soportado'}
-              </span>
-            </div>
-
-            <!-- DRM primario activo -->
-            {#if drm?.primary && drm.primary !== 'none'}
-              <div class="flex items-center justify-between pt-1 border-t border-white/5">
-                <span class="text-white/40 text-[0.75rem]">Activo</span>
-                <span class="text-white/60 text-[0.75rem] font-mono uppercase tracking-wide">
-                  {drm.primary}
-                  {#if drm.primary === 'widevine' && drm.widevine !== 'unsupported'}
-                    · {drm.widevine}
+                <span class="opacity-60 shrink-0"><Monitor class="w-6 h-6" /></span>
+                <span class="flex-1 min-w-0 text-left">
+                  <span class="block text-[1.125rem] font-semibold leading-tight">Automática</span>
+                  {#if quality.auto && quality.activeHeight}
+                    {@const activeTrack = quality.tracks.find((t) => t.height === quality.activeHeight)}
+                    {#if activeTrack}
+                      <span class="block text-[0.875rem] opacity-65 tabular-nums">{getQualityLabel(activeTrack.height)}</span>
+                    {/if}
                   {/if}
                 </span>
+                {#if quality.auto}
+                  <Check class="w-5 h-5 shrink-0" />
+                {/if}
+              {/snippet}
+            </Focusable>
+
+            {#each quality.tracks as t (t.height)}
+              <Focusable
+                focusKey={`player-settings-quality-${t.height}`}
+                focusedClass={rowFocusedClass}
+                class={rowClass}
+                onEnterPress={() => {
+                  engine?.selectQuality(t.height);
+                  refresh();
+                }}
+                onFocus={scrollToFocused}
+                onArrowPress={backArrows()}
+                playSound={true}
+              >
+                {#snippet children()}
+                  <span class="opacity-60 shrink-0"><Monitor class="w-6 h-6" /></span>
+                  <span class="flex-1 min-w-0 text-left">
+                    <span class="block text-[1.125rem] font-semibold leading-tight">{getQualityLabel(t.height)}</span>
+                    <span class="block text-[0.875rem] opacity-65 tabular-nums">~{formatGbPerHour(t.bandwidth)}</span>
+                  </span>
+                  {#if quality.activeHeight === t.height && !quality.auto}
+                    <Check class="w-5 h-5 shrink-0" />
+                  {/if}
+                {/snippet}
+              </Focusable>
+            {/each}
+          {:else if category === 'audio' && audio}
+            {#each audio as a, ai (`${a.language}-${a.role}-${ai}`)}
+              <Focusable
+                focusKey={`player-settings-audio-${ai}`}
+                focusedClass={rowFocusedClass}
+                class={rowClass}
+                onEnterPress={() => {
+                  engine?.selectAudioTrack(a.language, a.role || undefined, ai);
+                  refresh();
+                }}
+                onFocus={scrollToFocused}
+                onArrowPress={backArrows()}
+                playSound={true}
+              >
+                {#snippet children()}
+                  <span class="opacity-60 shrink-0"><Volume2 class="w-6 h-6" /></span>
+                  <span class="flex-1 min-w-0 text-left text-[1.125rem] font-semibold">{a.label}</span>
+                  {#if a.active}
+                    <Check class="w-5 h-5 shrink-0" />
+                  {/if}
+                {/snippet}
+              </Focusable>
+            {/each}
+          {:else if category === 'protection'}
+            <div class="settings-info">
+              <div class="settings-info-row">
+                <span class="flex items-center gap-3">
+                  {#if drm?.widevine === 'L1'}
+                    <ShieldCheck class="w-5 h-5 text-[#4ade80]" />
+                  {:else if drm?.widevine === 'L3'}
+                    <ShieldAlert class="w-5 h-5 text-[#fbbf24]" />
+                  {:else}
+                    <ShieldOff class="w-5 h-5 text-[#6b7280]" />
+                  {/if}
+                  <span class="text-white/80 text-[1rem]">Widevine</span>
+                </span>
+                <span class="text-[0.875rem] font-mono {drm?.widevine === 'L1' ? 'text-[#4ade80]' : drm?.widevine === 'L3' ? 'text-[#fbbf24]' : 'text-[#6b7280]'}">
+                  {drm?.widevine === 'unsupported' ? 'No soportado' : (drm?.widevine ?? '—')}
+                </span>
               </div>
-            {:else if !drm}
-              <div class="text-white/30 text-[0.75rem] text-center py-1">Detectando…</div>
-            {/if}
-          </div>
+              <div class="settings-info-row">
+                <span class="flex items-center gap-3">
+                  {#if drm?.playready}
+                    <ShieldCheck class="w-5 h-5 text-[#4ade80]" />
+                  {:else}
+                    <ShieldOff class="w-5 h-5 text-[#6b7280]" />
+                  {/if}
+                  <span class="text-white/80 text-[1rem]">PlayReady</span>
+                </span>
+                <span class="text-[0.875rem] font-mono {drm?.playready ? 'text-[#4ade80]' : 'text-[#6b7280]'}">
+                  {drm?.playready ? 'Disponible' : 'No soportado'}
+                </span>
+              </div>
+              <div class="settings-info-row">
+                <span class="flex items-center gap-3">
+                  {#if drm?.fairplay}
+                    <ShieldCheck class="w-5 h-5 text-[#4ade80]" />
+                  {:else}
+                    <ShieldOff class="w-5 h-5 text-[#6b7280]" />
+                  {/if}
+                  <span class="text-white/80 text-[1rem]">FairPlay</span>
+                </span>
+                <span class="text-[0.875rem] font-mono {drm?.fairplay ? 'text-[#4ade80]' : 'text-[#6b7280]'}">
+                  {drm?.fairplay ? 'Disponible' : 'No soportado'}
+                </span>
+              </div>
+              {#if drm?.primary && drm.primary !== 'none'}
+                <div class="settings-info-row settings-info-row--last">
+                  <span class="text-white/50 text-[0.875rem]">Activo</span>
+                  <span class="text-white/70 text-[0.875rem] font-mono uppercase">
+                    {drm.primary}{drm.primary === 'widevine' && drm.widevine !== 'unsupported' ? ` · ${drm.widevine}` : ''}
+                  </span>
+                </div>
+              {:else if !drm}
+                <p class="text-white/40 text-[0.875rem] text-center py-2">Detectando…</p>
+              {/if}
+            </div>
+          {/if}
         {/if}
       </div>
     </FocusContainer>
-  </div>
+  </aside>
 {/if}
+
+<style>
+  .settings-dock {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: clamp(24rem, 32vw, 32rem);
+    /* Mismo fondo que el home y que el área del video achicado: sin
+       bordes ni sombras que separen el dock del resto. */
+    background: var(--color-bg);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .settings-header {
+    padding: 1.5rem 1.5rem 1rem;
+    flex-shrink: 0;
+  }
+
+  .settings-header h2 {
+    margin: 0;
+    color: #ffffff;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .settings-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .settings-info {
+    margin-top: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .settings-info-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+  }
+
+  .settings-info-row--last {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+</style>

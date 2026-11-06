@@ -4,6 +4,7 @@
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import VirtualizedShelves from '@/components/home/VirtualizedShelves.svelte';
   import ContentPresentation from '@/components/home/ContentPresentation.svelte';
+  import HomeLoadingPlaceholder from '@/components/home/HomeLoadingPlaceholder.svelte';
   import DetailActionButton from '@/components/detail/DetailActionButton.svelte';
   import { Play, Info } from '@lucide/svelte';
   import { tick } from 'svelte';
@@ -255,7 +256,12 @@
 <div style="--tv-screen-width: {viewportWidth / remSize}rem; --tv-screen-height: {viewportHeight / remSize}rem;">
 <FocusContainer focusKey="home-root" preferredChildFocusKey="hero-section" focusable={false} saveLastFocusedChild={true} onUpdateHasFocusedChild={(focused) => { if (!focused) listFocused = false; }} class="browse-home">
   {#if loading}
-    <div class="loading-state">Cargando tu catálogo…</div>
+    <HomeLoadingPlaceholder
+      heroHeightRem={heroStageHeight / remSize}
+      shelfOffsetRem={stageHeight / remSize}
+      overlapRem={HERO_OVERLAP_REM}
+      creepRem={HERO_CREEP_REM}
+    />
   {:else if error}
     <div class="loading-state">
       <p>No se pudo cargar el catálogo.</p>

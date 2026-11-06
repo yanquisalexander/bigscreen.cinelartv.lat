@@ -83,6 +83,8 @@
   let adPhase = $state<"none" | "preroll" | "midroll" | "postroll">("none");
   let prerollChecked = $state(false);
   let settingsOpen = $state(false);
+  // Categoría abierta del dock de configuración (null = lista principal)
+  let settingsCategory = $state<'quality' | 'audio' | 'protection' | null>(null);
   let debugVisible = $state(false);
   $effect(() => { debugVisible = $svelteSettingsStore.debugMode; });
 
@@ -694,8 +696,15 @@
 
     const handleSettingsToggle = (e: CustomEvent) => {
       const open = Boolean(e.detail.open);
+      // Durante un anuncio no se entra al dock: el overlay de ads es
+      // full-screen y no se achica junto con el contenido.
+      if (open && currentAd) {
+        if (controlsEl) controlsEl.settingsOpen = false;
+        return;
+      }
       settingsOpen = open;
       if (!open) {
+        settingsCategory = null;
         requestAnimationFrame(() => {
           if (doesFocusableExist("watch-settings")) setFocus("watch-settings");
           else if (doesFocusableExist("watch-root")) setFocus("watch-root");
@@ -932,6 +941,11 @@ const handleAdComplete = () => {
         return;
       }
       if (settingsOpen) {
+        // Back en nivel 2 vuelve a la lista de categorías; en nivel 1 cierra
+        if (settingsCategory) {
+          settingsCategory = null;
+          return;
+        }
         if (controlsEl) controlsEl.settingsOpen = false;
         return;
       }
@@ -1184,8 +1198,8 @@ const handleAdComplete = () => {
     <!-- YouTube TV Compositor Layer: All player elements wrapped in a single
          position:relative + translateZ(0) container. Forces Chromium to composite
          video + overlays as one stable GPU layer, preventing reflows on UI updates. -->
-    <div class="player-compositor">
-      <PlayerStage bind:videoEl={videoEl} />
+    <div class="player-compositor" class:settings-mode={settingsOpen}>
+      <PlayerStage bind:videoEl={videoEl} settingsMode={settingsOpen} />
 
       {#if scrimMounted}
         <div
@@ -1218,7 +1232,12 @@ const handleAdComplete = () => {
         ></tv-player-controls>
       {/if}
 
-      <PlayerSettingsPanel engine={engineInstance} open={settingsOpen} />
+      <PlayerSettingsPanel
+        engine={engineInstance}
+        open={settingsOpen}
+        category={settingsCategory}
+        onCategoryChange={(category) => { settingsCategory = category; }}
+      />
 
       {#if currentAd}
         <tv-ad-overlay bind:this={adOverlayEl}></tv-ad-overlay>
@@ -1255,5 +1274,21 @@ const handleAdComplete = () => {
   .player-scrim {
     background-image: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.4));
     transition: opacity var(--animation-duration, 150ms) ease;
+  }
+
+  /* Modo settings (dock estilo YouTube TV): sin controles ni scrim sobre el
+     video achicado ni sobre el menú. Igual que pip-mode en index.css.
+     Todo el fondo unificado al mismo #0a0a0a del home, sin bordes ni
+     esquinas de otro color. */
+  .settings-mode {
+    background: #0a0a0a;
+  }
+
+  .settings-mode .player-scrim {
+    opacity: 0 !important;
+  }
+
+  .settings-mode tv-player-controls {
+    display: none !important;
   }
 </style>
