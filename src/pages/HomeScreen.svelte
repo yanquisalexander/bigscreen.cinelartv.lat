@@ -148,8 +148,14 @@
 
   const categories = $derived((data?.content ?? []).filter(category => (category.content?.length ?? 0) > 0));
   const presentationItem = $derived(selectedItem ?? data?.banner_content?.[0] ?? categories[0]?.content?.[0]);
-  const expandedStageHeight = $derived(Math.max(12 * remSize, Math.min(24 * remSize, viewportHeight - 18 * remSize)));
-  const compactStageHeight = $derived(Math.max(10 * remSize, Math.min(18 * remSize, expandedStageHeight - 3.5 * remSize)));
+  // Hero más presente: la fila superior empieza ~62% abajo y el backdrop
+  // se extiende HERO_OVERLAP por detrás de las filas, fundiéndose sobre
+  // ellas en vez de cortarse en seco contra un fondo opaco.
+  const HERO_OVERLAP_REM = 6;
+  const HERO_CREEP_REM = 2.5;
+  const expandedStageHeight = $derived(Math.max(13 * remSize, Math.min(26 * remSize, viewportHeight - 16 * remSize)));
+  const heroStageHeight = $derived(expandedStageHeight + HERO_OVERLAP_REM * remSize);
+  const compactStageHeight = $derived(Math.max(11 * remSize, expandedStageHeight - HERO_CREEP_REM * remSize));
   const stageHeight = $derived(trailerFullscreen ? viewportHeight : listFocused ? expandedStageHeight : compactStageHeight);
   const railViewportHeight = $derived(Math.max(0, viewportHeight - stageHeight));
 
@@ -255,7 +261,7 @@
       <DetailActionButton focusKey="home-retry" label="Reintentar" onEnterPress={fetchData} autoFocus={true} />
     </div>
   {:else if presentationItem}
-    <div class="immersive-stage" class:trailer-fullscreen={trailerFullscreen} style="--browse-stage-height: {expandedStageHeight / remSize}rem;">
+    <div class="immersive-stage" class:trailer-fullscreen={trailerFullscreen} style="--browse-stage-height: {heroStageHeight / remSize}rem; --hero-overlap: {HERO_OVERLAP_REM}rem; --hero-shelf-creep: {HERO_CREEP_REM}rem;">
       <FocusContainer focusKey="hero-section" focusable={false} preferredChildFocusKey="hero-view-more" saveLastFocusedChild={true} onUpdateHasFocusedChild={(focused) => { heroFocused = focused; if (focused) listFocused = false; fullscreenSuppressed = false; }}>
         <ContentPresentation item={presentationItem} {clientEndpoint} immersive={true} expanded={listFocused} previewEnabled={listFocused || heroFocused} fullscreenEligible={heroFocused && !fullscreenSuppressed} onImmersiveChange={(active) => { trailerFullscreen = active; }}>
           <div class="hero-action-wrap">
@@ -370,7 +376,10 @@
     inset: 0 0 auto;
     height: 100%;
     overflow: hidden;
-    background: #0a0a0a;
+    /* Transparente a propósito: el backdrop del hero sigue visible detrás
+       de la primera fila y se funde a #0a0a0a con su propio degradado.
+       Un fondo opaco aquí era lo que cortaba el hero en seco. */
+    background: transparent;
     transition: transform 180ms ease-out;
     will-change: transform;
   }

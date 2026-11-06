@@ -35,13 +35,15 @@
       ? String((item.content_rating as { code?: string }).code ?? '')
       : ''
   );
+  // Los banners no siempre traen content_type: sin tipo/duración conocidos
+  // no se muestra nada (antes caía a "Película" por defecto, incorrecto).
   const duration = $derived.by(() => {
     if (isTVShow(item)) {
       return item.seasons_count
         ? `${item.seasons_count} ${item.seasons_count === 1 ? 'temporada' : 'temporadas'}`
         : 'Serie';
     }
-    if (!item.duration) return 'Película';
+    if (!item.duration) return '';
     const minutes = Math.round(item.duration / 60);
     return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
   });
@@ -213,12 +215,12 @@
       {#if item.year}
         <span>{item.year}</span>
       {/if}
-      {#if item.year && duration}
-        <span class="sep">•</span>
+      {#if duration}
+        {#if item.year}<span class="sep">•</span>{/if}
+        <span>{duration}</span>
       {/if}
-      <span>{duration}</span>
-      {#each genres as genre}
-        <span class="sep">•</span>
+      {#each genres as genre, genreIndex}
+        {#if item.year || duration || genreIndex > 0}<span class="sep">•</span>{/if}
         <span>{genre}</span>
       {/each}
       {#if rating}
@@ -236,29 +238,36 @@
   .presentation { position: relative; isolation: isolate; height: var(--browse-stage-height, 23.3333rem); min-height: 13.3333rem; background: var(--color-bg); overflow: hidden; }
   .artwork, .trailer-canvas {
     position: absolute; top: 0; right: 0;
-    width: 51.3333rem; height: 100%;
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.4) 8%, black 22%), linear-gradient(to top, transparent 0%, rgba(0,0,0,.6) 12%, black 30%);
+    width: 58rem; height: 100%;
+    /* Fundidos largos en ambos ejes: el arte entra desde la derecha y se
+       disuelve hacia abajo durante más de la mitad del alto, para que no
+       se lea como un panel recortado contra el fondo. */
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.35) 9%, black 26%), linear-gradient(to top, transparent 0%, rgba(0,0,0,.35) 16%, rgba(0,0,0,.78) 36%, black 58%);
     -webkit-mask-composite: destination-in;
-    mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.4) 8%, black 22%), linear-gradient(to top, transparent 0%, rgba(0,0,0,.6) 12%, black 30%);
+    mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.35) 9%, black 26%), linear-gradient(to top, transparent 0%, rgba(0,0,0,.35) 16%, rgba(0,0,0,.78) 36%, black 58%);
     mask-composite: intersect;
   }
-  .artwork { object-fit: cover; object-position: right 25%; opacity: 0; transition: opacity 180ms ease-out; }
+  .artwork { object-fit: cover; object-position: right 30%; opacity: 0; transition: opacity 450ms ease-out; }
   .artwork.loaded { opacity: 1; }
   .trailer-canvas { width: var(--tv-screen-width, 80rem); height: var(--tv-screen-height, 45rem); transform-origin: right top; transform: scale(.72); z-index: 1; pointer-events: none; transition: transform 280ms ease-out; }
-  .trailer-video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: right top; opacity: 0; transition: opacity 180ms ease-out; }
+  .trailer-video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: right top; opacity: 0; transition: opacity 320ms ease-out; }
   .trailer-video.playing { opacity: 1; }
-  .shade { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(90deg, #0a0a0a 0%, rgba(10,10,10,.94) 26%, rgba(10,10,10,.75) 42%, rgba(10,10,10,.15) 68%, transparent), linear-gradient(0deg, #0a0a0a, rgba(10,10,10,.5) 20%, transparent 50%); }
-  .information { position: relative; z-index: 3; height: 100%; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: calc(var(--topnav-h) + 0.6667rem) 0 1rem var(--browse-inset, var(--tv-content-inset)); max-width: 32rem; width: 100%; box-sizing: border-box; transition: transform 240ms ease-out; }
-  .identity { height: 4rem; flex: 0 0 4rem; display: flex; align-items: center; margin-bottom: .50rem; width: 100%; overflow: hidden; }
-  .title-logo { display: block; width: 17.3333rem; max-width: 100%; height: 100%; object-fit: contain; object-position: left center; }
-  h1 { font-size: 1.8rem; font-weight: 700; line-height: 1.1; letter-spacing: -.02em; margin: 0; color: rgba(255,255,255,.9); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .shade { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(90deg, #0a0a0a 0%, rgba(10,10,10,.94) 26%, rgba(10,10,10,.75) 42%, rgba(10,10,10,.15) 68%, transparent), linear-gradient(0deg, #0a0a0a 0%, rgba(10,10,10,.85) 16%, rgba(10,10,10,.45) 36%, rgba(10,10,10,.12) 52%, transparent 68%); }
+  /* Texto anclado abajo, justo encima de la primera fila: el hero se lee
+     como una sola superficie (arte + título + CTAs) y no como un banner
+     con la mitad inferior vacía. En Home, --hero-overlap/--hero-shelf-creep
+     reservan el espacio que las filas ocupan por delante del backdrop. */
+  .information { position: relative; z-index: 3; height: 100%; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; padding: calc(var(--topnav-h) + 0.6667rem) 0 calc(1.25rem + var(--hero-overlap, 0rem)) var(--browse-inset, var(--tv-content-inset)); max-width: 34rem; width: 100%; box-sizing: border-box; transition: transform 240ms ease-out; }
+  .compact .information { padding-bottom: calc(1.25rem + var(--hero-overlap, 0rem) + var(--hero-shelf-creep, 0rem)); }
+  .identity { height: 4.5rem; flex: 0 0 4.5rem; display: flex; align-items: center; margin-bottom: .60rem; width: 100%; overflow: hidden; }
+  .title-logo { display: block; width: 19rem; max-width: 100%; height: 100%; object-fit: contain; object-position: left bottom; }
+  h1 { font-size: 2.1rem; font-weight: 700; line-height: 1.08; letter-spacing: -.02em; margin: 0; color: rgba(255,255,255,.94); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .badge { margin: 0 0 0.3333rem; color: var(--color-gold); font-size: 0.6667rem; font-weight: 600; }
-  .metadata { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4667rem; color: rgba(255,255,255,.6); font-size: 0.75rem; font-weight: 500; }
+  .metadata { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4667rem; color: rgba(255,255,255,.62); font-size: 0.8125rem; font-weight: 500; }
   .sep { opacity: .4; }
   .rating { background: var(--color-surface); border: 0.0417rem solid rgba(255,255,255,.22); color: rgba(255,255,255,.9); padding: 0.0667rem .30rem; border-radius: 0.1667rem; font-size: 0.5833rem; font-weight: 600; line-height: 1; }
-  .synopsis { color: rgba(243,244,245,.82); font-size: 0.8333rem; line-height: 1.45; margin: 0.6667rem 0 1rem; max-width: 28.6667rem; min-height: 2.1333rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .synopsis { color: rgba(243,244,245,.85); font-size: 0.9rem; line-height: 1.5; margin: 0.6667rem 0 1rem; max-width: 30rem; min-height: 2.1333rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.8333rem; }
-  .immersive .information { justify-content: flex-start; }
   .compact .synopsis { display: none; }
   .compact .actions { margin-top: 0.6667rem; }
   .immersive .synopsis { -webkit-line-clamp: 2; min-height: 0; }
@@ -266,7 +275,9 @@
   .fullscreen .trailer-canvas { transform: scale(1); -webkit-mask-image: none; mask-image: none; }
   .fullscreen .trailer-video { object-fit: contain; background: #000; }
   .fullscreen .shade { height: var(--tv-screen-height, 45rem); background: linear-gradient(0deg, rgba(0,0,0,.85), rgba(0,0,0,.2) 24%, transparent 45%); }
-  .fullscreen .information { transform: translateY(calc(var(--tv-screen-height, 45rem) - var(--topnav-h) - 9.3333rem)); }
+  /* Con el contenido anclado abajo, el desplazamiento en fullscreen lleva
+     los CTAs al pie de la pantalla conservando el margen inferior. */
+  .fullscreen .information { transform: translateY(calc(var(--tv-screen-height, 45rem) - var(--browse-stage-height, 23.3333rem) + var(--hero-overlap, 0rem) + var(--hero-shelf-creep, 0rem))); }
   .fullscreen .metadata, .fullscreen .synopsis, .fullscreen .badge { display: none; }
   .fullscreen .actions { margin-top: 0.6667rem; }
 </style>
