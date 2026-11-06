@@ -187,6 +187,57 @@ import { navigateBack } from '@/services/appNavigation';
       controlsEl.isBuffering = engine.isBuffering;
     }
   });
+
+  /* Scrim: montado solo con controles visibles (libera capa GPU si no).
+     Fade con --animation-duration (STANDARD 150ms/FULL 220ms/LITE 0ms). */
+  let scrimMounted = $state(true);
+  let scrimVisible = $state(true);
+  let scrimTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const getScrimDuration = () => {
+    try {
+      const v = getComputedStyle(document.body).getPropertyValue('--animation-duration').trim();
+      const ms = parseFloat(v);
+      return Number.isFinite(ms) ? ms : 150;
+    } catch {
+      return 150;
+    }
+  };
+
+  const setScrimVisible = (visible: boolean) => {
+    if (scrimTimer) { clearTimeout(scrimTimer); scrimTimer = null; }
+    if (visible) {
+      if (!scrimMounted) {
+        scrimMounted = true;
+        scrimVisible = false;
+        requestAnimationFrame(() => requestAnimationFrame(() => { scrimVisible = true; }));
+      } else {
+        scrimVisible = true;
+      }
+      return;
+    }
+    const dur = getScrimDuration();
+    if (dur <= 0) {
+      scrimVisible = false;
+      scrimMounted = false;
+      return;
+    }
+    scrimVisible = false;
+    scrimTimer = setTimeout(() => {
+      if (!scrimVisible) scrimMounted = false;
+      scrimTimer = null;
+    }, dur);
+  };
+
+  $effect(() => {
+    const el = controlsEl;
+    if (!el) return;
+    const sync = () => setScrimVisible(!el.classList.contains('controls-hidden'));
+    sync();
+    const obs = new MutationObserver(sync);
+    obs.observe(el, { attributes: true, attributeFilter: ['class', 'show-controls'] });
+    return () => { obs.disconnect(); if (scrimTimer) { clearTimeout(scrimTimer); scrimTimer = null; } };
+  });
 </script>
 
 <div class="fixed inset-0 w-screen h-screen bg-black -z-10"></div>
@@ -245,10 +296,13 @@ import { navigateBack } from '@/services/appNavigation';
 {:else}
   <PlayerStage bind:videoEl />
 
-  <div
-    class="absolute inset-0 z-[2] pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40 opacity-60"
-    style="contain: paint;"
-  ></div>
+  {#if scrimMounted}
+    <div
+      class="player-scrim absolute inset-0 z-[2] pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/40"
+      style:opacity={scrimVisible ? '0.6' : '0'}
+      style:contain="paint"
+    ></div>
+  {/if}
 
   <FocusContainer
     focusKey="live-root"
@@ -276,3 +330,10 @@ import { navigateBack } from '@/services/appNavigation';
     {/if}
   </FocusContainer>
 {/if}
+
+<style>
+  .player-scrim {
+    background-image: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.4));
+    transition: opacity var(--animation-duration, 150ms) ease;
+  }
+</style>
