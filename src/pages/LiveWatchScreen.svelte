@@ -8,6 +8,7 @@ import { navigateBack } from '@/services/appNavigation';
   import { consumeLiveChannel } from '@/stores/liveChannelStore';
   import { getChannelGuide } from '@/api/live';
   import { pdbg } from '@/services/player/playerDebug';
+  import { prewarmStreamNetwork } from '@/features/content/prebuffer';
   import { inputManager } from '@/services/InputManager';
   import { setFocus, doesFocusableExist, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation-core';
   import PlayerStage from '@/components/player/PlayerStage.svelte';
@@ -47,6 +48,12 @@ import { navigateBack } from '@/services/appNavigation';
 
   $effect(() => {
     return () => {
+      engine.destroy();
+    };
+  });
+
+  $effect(() => {
+    return () => {
       const key = getCurrentFocusKey();
       if (key && !doesFocusableExist(key)) setFocus('topnav');
     };
@@ -58,6 +65,7 @@ import { navigateBack } from '@/services/appNavigation';
     if (ch) {
       streamUrl = ch.url;
       channelName = ch.name;
+      prewarmStreamNetwork(ch.url);
       pdbg('livewatch.init', 'channel from store', { id: ch.id, name: ch.name });
     } else if (!streamUrl) {
       replace('/live');

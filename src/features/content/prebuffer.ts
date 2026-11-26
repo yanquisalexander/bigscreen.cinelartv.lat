@@ -19,6 +19,28 @@ function isAdaptiveManifest(url: string): boolean {
   return pathname.endsWith('.m3u8') || pathname.endsWith('.mpd');
 }
 
+const PRECONNECT_ATTR = 'data-stream-preconnect';
+
+/**
+ * Precalienta DNS/TLS del CDN del stream sin abrir un segundo reproductor.
+ * Los manifests adaptativos no pueden compartir el buffer MSE, pero sí se
+ * benefician de tener la conexión resuelta cuando Shaka pide el primer
+ * segmento. Esto reduce el primer `waiting` en WebViews de TV.
+ */
+export function prewarmStreamNetwork(streamUrl: string): void {
+  try {
+    const origin = new URL(streamUrl, window.location.href).origin;
+    if (!origin || origin === window.location.origin) return;
+    if (document.querySelector(`link[${PRECONNECT_ATTR}="${origin}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'preconnect';
+    link.crossOrigin = 'anonymous';
+    link.href = origin;
+    link.setAttribute(PRECONNECT_ATTR, origin);
+    document.head.appendChild(link);
+  } catch { /* URL inválida o sin DOM */ }
+}
+
 function cleanup() {
   if (discardTimer) {
     clearTimeout(discardTimer);

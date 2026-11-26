@@ -1,4 +1,5 @@
 import { pdbg } from './playerDebug';
+import { getRuntimeConfig } from '@/runtime';
 import shaka from 'shaka-player'; // ✅ Importación estática limpia
 
 type PlayerEvent =
@@ -41,6 +42,8 @@ export interface DrmInfo {
 
 export interface TvPlayerProfile {
   platform: TvPlatform;
+  /** Cualquier plataforma de TV (Tizen, webOS, VIDAA, Android TV, FireTV, Chromecast, Cobalt). */
+  isTv: boolean;
   displayMaxHeight: number;
   decoderMaxHeight: number;
   maxFps: number;
@@ -75,6 +78,8 @@ export interface BufferHealthScore {
   dropRate: number;
   effectiveRate: number;
   stallFrequency: number;
+  /** Frames caídos sin corrupción = sobrecarga del compositor, no del decoder. */
+  compositorOverload?: boolean;
   recommendation: 'maintain' | 'downgrade' | 'upgrade';
   timestamp: number;
 }
@@ -89,6 +94,12 @@ export interface PlaybackSessionSummary {
   sessionDurationMs: number;
   recoveryAttempts: number;
   recoverySuccesses: number;
+  // Telemetría específica de TVs para validar las optimizaciones anti-stall.
+  platform?: TvPlatform;
+  isTv?: boolean;
+  effectiveMaxHeight?: number;
+  timeToFirstFrameMs?: number;
+  earlyStallRetries?: number;
 }
 
 const PERF_STORAGE_KEY = 'cinelar_player_perf';
@@ -146,10 +157,21 @@ export class CinelarPlayerEngine {
   // ─── MSE ERROR RECOVERY ───
   private _mseRecoveryAttempts = 0;
   private _maxMseRecoveryAttempts = 3;
+  private _lastMseRecoveryAt = 0;
 
   // ─── SOURCEBUFFER BACKPRESSURE ───
   private _backpressureActive = false;
   private _originalBufferingGoal = 20;
+  private _baselineRebufferingGoal = 2;
+
+  // ─── STALL RECOVERY / WARMUP ───
+  private _waitingSince = 0;
+  private _earlyStallRetryAt = 0;
+  private _earlyStallRetries = 0;
+  private _healthWarmupUntil = 0;
+  private _rebufferBoostTimer: ReturnType<typeof setTimeout> | null = null;
+  private _loadStartedAt = 0;
+  private _firstFrameAt = 0;
 
   // ─── DRIFT RECOVERY LEGACY (Para compatibilidad) ───
   private driftRecoveryMs: number | null = null;
@@ -267,48 +289,93 @@ export class CinelarPlayerEngine {
     return result;
   }
 
+  /**
+   * decodingInfo() sólo con `supported` no basta en TVs: AV1/VP9/HEVC suelen
+   * reportarse soportados pero decodificarse por software, que es una de las
+   * causas principales de stalls. Exigimos además smooth y powerEfficient
+   * cuando el navegador expone esos campos (si no los expone, no penalizamos).
+   */
+  private async probeDecode(
+    contentType: string,
+    width: number,
+    height: number,
+    bitrate: number,
+    framerate: number,
+  ): Promise<{ supported: boolean; efficient: boolean }> {
+    try {
+      const mc = (navigator as any).mediaCapabilities;
+      if (!mc?.decodingInfo) return { supported: true, efficient: true };
+      const info = await mc.decodingInfo({
+        type: 'media-source',
+        video: { contentType, width, height, bitrate, framerate },
+      });
+      return {
+        supported: !!info?.supported,
+        efficient: info?.smooth !== false && info?.powerEfficient !== false,
+      };
+    } catch {
+      // Navegador sin decodingInfo o implementación parcial: no bloquear.
+      return { supported: true, efficient: true };
+    }
+  }
+
   private async detectTvProfile(): Promise<TvPlayerProfile> {
     const platform = this.detectTvPlatform();
     const stored = this.getStoredPerformance();
+    // El host nativo indica el tipo de dispositivo en el UA (CinelarTV/AndroidTV,
+    // Tizen, webOS, VIDAA, ...). getRuntimeConfig ya lo normaliza en device.family.
+    let runtimeFamily = '';
+    try { runtimeFamily = getRuntimeConfig().device.family; } catch { /* no-init */ }
+    const isTv = platform !== 'generic' || (runtimeFamily !== '' && runtimeFamily !== 'desktop');
 
-    const codecs = {
-      h264: typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported('video/mp4; codecs="avc1.640028"'),
-      hevc: typeof MediaSource !== 'undefined' && (MediaSource.isTypeSupported('video/mp4; codecs="hvc1.2.4.L150.B0"') || MediaSource.isTypeSupported('video/mp4; codecs="hev1.1.6.L150.B0"')),
-      vp9: typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported('video/webm; codecs="vp09.00.10.08"'),
-      av1: typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported('video/mp4; codecs="av01.0.08M.08"'),
+    const hasMediaSource = typeof MediaSource !== 'undefined';
+    const baseCodecs = {
+      h264: hasMediaSource && MediaSource.isTypeSupported('video/mp4; codecs="avc1.640028"'),
+      hevc: hasMediaSource && (MediaSource.isTypeSupported('video/mp4; codecs="hvc1.2.4.L150.B0"') || MediaSource.isTypeSupported('video/mp4; codecs="hev1.1.6.L150.B0"')),
+      vp9: hasMediaSource && MediaSource.isTypeSupported('video/webm; codecs="vp09.00.10.08"'),
+      av1: hasMediaSource && MediaSource.isTypeSupported('video/mp4; codecs="av01.0.08M.08"'),
     };
 
+    const h264Type = 'video/mp4; codecs="avc1.640028"';
     let decoderMaxHeight = 1080;
     let maxFps = 30;
 
-    // Ejecutar detección de capacidades y DRM en paralelo
-    const [drmInfo] = await Promise.all([
-      this.detectDrm(),
-      (async () => {
-        try {
-          const mc = (navigator as any).mediaCapabilities;
-          if (mc?.decodingInfo) {
-            const res4k60 = await mc.decodingInfo({ type: 'media-source', video: { contentType: 'video/mp4; codecs="avc1.640028"', width: 3840, height: 2160, bitrate: 20000000, framerate: 60 } });
-            if (res4k60?.supported) {
-              decoderMaxHeight = 2160;
-              maxFps = 60;
-            } else {
-              const res4k30 = await mc.decodingInfo({ type: 'media-source', video: { contentType: 'video/mp4; codecs="avc1.640028"', width: 3840, height: 2160, bitrate: 15000000, framerate: 30 } });
-              if (res4k30?.supported) {
-                decoderMaxHeight = 2160;
-                maxFps = 30;
-              } else {
-                const res1080p60 = await mc.decodingInfo({ type: 'media-source', video: { contentType: 'video/mp4; codecs="avc1.640028"', width: 1920, height: 1080, bitrate: 8000000, framerate: 60 } });
-                if (res1080p60?.supported) {
-                  decoderMaxHeight = 1080;
-                  maxFps = 60;
-                }
-              }
-            }
-          }
-        } catch { }
-      })(),
-    ]);
+    // Techo conservador: probamos de mayor a menor y exigimos decodificación eficiente.
+    const decodeProbes = [
+      { height: 2160, framerate: 60, bitrate: 20_000_000 },
+      { height: 2160, framerate: 30, bitrate: 15_000_000 },
+      { height: 1080, framerate: 60, bitrate: 8_000_000 },
+      { height: 1080, framerate: 30, bitrate: 5_000_000 },
+    ];
+    for (const probe of decodeProbes) {
+      const result = await this.probeDecode(
+        h264Type, 16 / 9 * probe.height, probe.height, probe.bitrate, probe.framerate,
+      );
+      if (result.supported && result.efficient) {
+        decoderMaxHeight = probe.height;
+        maxFps = probe.framerate;
+        break;
+      }
+    }
+
+    // Codecs alternativos: only si además son eficientes en la resolución objetivo.
+    const targetHeight = Math.min(decoderMaxHeight, 1080);
+    const codecTypes: Record<keyof typeof baseCodecs, string> = {
+      h264: h264Type,
+      hevc: 'video/mp4; codecs="hvc1.2.4.L150.B0"',
+      vp9: 'video/webm; codecs="vp09.00.10.08"',
+      av1: 'video/mp4; codecs="av01.0.08M.08"',
+    };
+    const codecs = { ...baseCodecs };
+    for (const key of ['hevc', 'vp9', 'av1'] as const) {
+      if (!baseCodecs[key]) { codecs[key] = false; continue; }
+      const result = await this.probeDecode(
+        codecTypes[key], Math.round(16 / 9 * targetHeight), targetHeight, 5_000_000, 30,
+      );
+      codecs[key] = result.supported && result.efficient;
+    }
+
+    const drmInfo = await this.detectDrm();
 
     const screenH = typeof screen !== 'undefined' ? Math.max(screen.height, screen.width) : 1080;
     let displayMaxHeight = 720;
@@ -318,18 +385,20 @@ export class CinelarPlayerEngine {
 
     const cores = navigator.hardwareConcurrency ?? 2;
     const memory = (navigator as any).deviceMemory ?? 2;
-    const isTvPlatform = platform !== 'generic';
-    const isLowEndDevice = isTvPlatform || cores <= 2 || memory <= 2 || decoderMaxHeight < 1080;
+    const isLowEndDevice = isTv || cores <= 2 || memory <= 2 || decoderMaxHeight < 1080;
 
     // En plataformas de TV con chips muy limitados (Tizen, webOS), el slewing de playbackRate provoca micro-saltos de audio
-    const supportsPlaybackRateSlewing = !isTvPlatform || platform === 'androidtv' || platform === 'firetv';
+    const supportsPlaybackRateSlewing = !isTv || platform === 'androidtv' || platform === 'firetv';
 
-    const bandwidthEstimate = stored?.bandwidth && stored.bandwidth > 1_000_000
+    const rawBandwidth = stored?.bandwidth && stored.bandwidth > 1_000_000
       ? stored.bandwidth
       : (isLowEndDevice ? 5_000_000 : 10_000_000);
+    // Un valor persistido de otra red no debe hacer arrancar una TV en 4K.
+    const bandwidthEstimate = isTv ? Math.min(rawBandwidth, 5_000_000) : rawBandwidth;
 
     const prof: TvPlayerProfile = {
       platform,
+      isTv,
       displayMaxHeight,
       decoderMaxHeight,
       maxFps,
@@ -378,11 +447,34 @@ export class CinelarPlayerEngine {
 
   private reduceQualityForInstability(reason: string) {
     const now = performance.now();
-    if (now - this.lastStallRecoveryAt < 30_000) return;
+    const isTv = !!this.profile?.isTv;
+    // En TVs el cooldown es más largo: reaccionar demasiado rápido provoca
+    // una cascada de bajadas y nuevas búsquedas de segmentos (más stalls).
+    if (now - this.lastStallRecoveryAt < (isTv ? 90_000 : 30_000)) return;
     const effective = this.getEffectiveMaxHeight();
-    if (effective <= 720) return;
+    if (effective <= 480) return;
     this.lastStallRecoveryAt = now;
-    this.applyPerformanceCap(effective > 1080 ? 1080 : 720, reason);
+    const next = effective > 1080 ? 1080 : effective > 720 ? 720 : 480;
+    this.applyPerformanceCap(next, reason);
+
+    if (isTv && this.player && next <= 720) {
+      // Durante la recuperación damos más colchón de rebuffer para romper el
+      // ciclo freeze → 2s → freeze. Se restaura automáticamente tras 60s.
+      const boosted = Math.min(6, this._baselineRebufferingGoal + 2);
+      try {
+        this.player.configure({ streaming: { rebufferingGoal: boosted } });
+        pdbg('engine.stall', `Rebuffer boost ${boosted}s por ${reason}`);
+      } catch { }
+      if (this._rebufferBoostTimer) clearTimeout(this._rebufferBoostTimer);
+      this._rebufferBoostTimer = setTimeout(() => {
+        this._rebufferBoostTimer = null;
+        try {
+          this.player?.configure({
+            streaming: { rebufferingGoal: this._liveMode ? 3 : this._baselineRebufferingGoal },
+          });
+        } catch { }
+      }, 60_000);
+    }
   }
 
   private getBufferAhead(): number {
@@ -434,6 +526,36 @@ export class CinelarPlayerEngine {
       }
       this.driftRecoveryMs = null;
     }
+  }
+
+  // ═══════════════════════════════════════════════
+  // RECUPERACIÓN TEMPRANA DE STALL (TVs)
+  // ═══════════════════════════════════════════════
+
+  /**
+   * Shaka detecta stalls con su propio temporizador, que en WebViews de TV
+   * puede tardar demasiado. Si llevamos >4s en `waiting` y el buffer sigue
+   * por debajo del goal, forzamos un retryStreaming() acotado.
+   */
+  private checkStallRecovery() {
+    if (!this.profile?.isTv || !this.player || !this._bufferingState || !this._waitingSince) return;
+    const now = performance.now();
+    if (now - this._waitingSince < 4_000) return;
+    if (now - this._earlyStallRetryAt < 10_000) return;
+    if (this._earlyStallRetries >= 3) return;
+
+    let goal = this._baselineRebufferingGoal;
+    try { goal = this.player.getConfiguration()?.streaming?.rebufferingGoal ?? goal; } catch { }
+    if (this.getBufferAhead() >= goal) return;
+
+    this._earlyStallRetryAt = now;
+    this._earlyStallRetries++;
+    pdbg('engine.stall', `Early stall retry ${this._earlyStallRetries}/3`, {
+      waitingMs: Math.round(now - this._waitingSince),
+      bufferAhead: this.getBufferAhead(),
+      goal,
+    });
+    try { this.player.retryStreaming(); } catch { }
   }
 
   // ═══════════════════════════════════════════════
@@ -489,7 +611,9 @@ export class CinelarPlayerEngine {
 
     // 4. Buffer Health Score (cada chequeo)
     const health = this.calculateBufferHealthScore();
-    if (health.recommendation === 'downgrade') {
+    // Durante el llenado inicial el buffer está bajo por definición: un
+    // downgrade ahí es un falso positivo que empeora el stall.
+    if (health.recommendation === 'downgrade' && now >= this._healthWarmupUntil) {
       this.reduceQualityForInstability(`health_score_${health.overall}`);
     }
     this.emit('healthchange', health);
@@ -586,6 +710,7 @@ export class CinelarPlayerEngine {
         } else if (droppedSinceLastCheck > 10 && corruptedDelta === 0) {
           // Drops without corruption = compositor/GPU overload (UI too heavy)
           pdbg('engine.health', 'Compositor overload suspected', { dropped: droppedSinceLastCheck, corrupted: 0 });
+          if (this._lastBufferHealth) this._lastBufferHealth.compositorOverload = true;
           this.emit('healthchange', { ...this._lastBufferHealth, compositorOverload: true });
         }
 
@@ -601,12 +726,19 @@ export class CinelarPlayerEngine {
             const newStreak = (stored.stabilityStreakMs || 0) + 5000;
             this.saveStoredPerformance({ stabilityStreakMs: newStreak });
             if (newStreak > 300000) {
-              const nextTestCap = this.profile.performanceCap.maxHeight >= 1080 ? 2160 : 1080;
+              // Nunca probar por encima del techo real del dispositivo.
+              const ceiling = Math.min(this.profile.displayMaxHeight, this.profile.decoderMaxHeight);
+              const desired = this.profile.performanceCap.maxHeight >= 1080 ? 2160 : 1080;
+              const nextTestCap = Math.min(ceiling, desired);
+              if (nextTestCap <= this.profile.performanceCap.maxHeight) {
+                this.saveStoredPerformance({ stabilityStreakMs: 0 });
+                return;
+              }
               pdbg('engine.cap', `Probando resolución superior: ${nextTestCap}p tras estabilidad`);
               this.noteQualityChange(this.profile.performanceCap.maxHeight, nextTestCap);
               this.profile.performanceCap = { maxHeight: nextTestCap, reason: 'stability_recovery_test' };
               this.saveStoredPerformance({ performanceCapHeight: nextTestCap, performanceCapReason: 'stability_recovery_test', stabilityStreakMs: 0 });
-              this.player?.configure({ abr: { restrictions: { maxHeight: nextTestCap } } });
+              this.player?.configure({ abr: { restrictions: { maxHeight: this.getEffectiveMaxHeight() } } });
             }
           }
         }
@@ -633,6 +765,9 @@ export class CinelarPlayerEngine {
     const bufferAhead = this.getBufferAhead();
     const dropRate = this.lastDropRatio;
     const effectiveRate = this.lastEffectiveRate;
+    // checkDroppedFramesAndEvaluate() lo marca antes de este cálculo; hay que
+    // conservarlo para que evaluateBackpressure() pueda usarlo.
+    const compositorOverload = !!this._lastBufferHealth?.compositorOverload;
 
     // Stall frequency: stalls per minute
     const now = performance.now();
@@ -641,8 +776,11 @@ export class CinelarPlayerEngine {
 
     // ── Sub-scores (0-100) ──
 
-    // Buffer score: 0s = 0, 20s+ = 100
-    const bufferScore = Math.min(100, (bufferAhead / 20) * 100);
+    // Buffer score relativo al goal real: con bufferingGoal=12s, 20s fijos
+    // hacían que un buffer perfecto pareciera insuficiente (60/100).
+    let goal = this._originalBufferingGoal;
+    try { goal = this.player?.getConfiguration()?.streaming?.bufferingGoal ?? goal; } catch { }
+    const bufferScore = Math.min(100, (bufferAhead / Math.max(1, goal)) * 100);
 
     // Drop rate score: 0% = 100, 10%+ = 0
     const dropScore = Math.max(0, 100 - (dropRate * 1000));
@@ -673,6 +811,7 @@ export class CinelarPlayerEngine {
       dropRate: Number(dropRate.toFixed(4)),
       effectiveRate: Number(effectiveRate.toFixed(3)),
       stallFrequency,
+      compositorOverload,
       recommendation,
       timestamp: now,
     };
@@ -711,6 +850,13 @@ export class CinelarPlayerEngine {
       sessionDurationMs: this._sessionStartTime > 0 ? performance.now() - this._sessionStartTime : 0,
       recoveryAttempts: this._totalRecoveryAttempts,
       recoverySuccesses: this._totalRecoverySuccesses,
+      platform: this.profile?.platform,
+      isTv: !!this.profile?.isTv,
+      effectiveMaxHeight: this.getEffectiveMaxHeight(),
+      timeToFirstFrameMs: this._firstFrameAt > 0 && this._loadStartedAt > 0
+        ? Math.round(this._firstFrameAt - this._loadStartedAt)
+        : 0,
+      earlyStallRetries: this._earlyStallRetries,
     };
   }
 
@@ -729,6 +875,15 @@ export class CinelarPlayerEngine {
     } else {
       this.stopLiveDriftMonitor();
       this.resetLiveCatchUp();
+    }
+
+    // En directo un goal alto añade latencia; 3s sigue siendo suficiente colchón.
+    if (this.profile?.isTv && this.player) {
+      try {
+        this.player.configure({
+          streaming: { rebufferingGoal: enabled ? 3 : this._baselineRebufferingGoal },
+        });
+      } catch { }
     }
   }
 
@@ -807,11 +962,18 @@ export class CinelarPlayerEngine {
   // ═══════════════════════════════════════════════
 
   private attemptMseRecovery(error: any): boolean {
+    // El contador no puede quedarse agotado para el resto de la sesión:
+    // si han pasado >5min sin errores, volvemos a empezar.
+    const now = performance.now();
+    if (this._lastMseRecoveryAt > 0 && now - this._lastMseRecoveryAt > 300_000) {
+      this._mseRecoveryAttempts = 0;
+    }
     if (this._mseRecoveryAttempts >= this._maxMseRecoveryAttempts) {
       pdbg('engine.recovery', `Max MSE recovery attempts reached (${this._maxMseRecoveryAttempts})`);
       return false;
     }
 
+    this._lastMseRecoveryAt = now;
     const severity = error?.severity ?? 2;
     const code = error?.code ?? 0;
     const category = error?.category ?? 0;
@@ -883,8 +1045,11 @@ export class CinelarPlayerEngine {
     const health = this._lastBufferHealth;
     if (!health) return;
 
-    // Activate backpressure if health is poor and we have a lot of buffer
-    if (health.overall < 30 && health.bufferSeconds > 10 && !this._backpressureActive) {
+    // Backpressure es para sobrecarga del compositor / exceso de frames
+    // caídos, NO para stalls: health<30 con buffer>10s es contradictorio y
+    // reducir el goal empeoraría la recuperación.
+    const compositorOverload = !!health.compositorOverload || health.dropRate > 0.08;
+    if (compositorOverload && health.bufferSeconds > 10 && !this._backpressureActive) {
       this._backpressureActive = true;
       // Reduce buffering goal to prevent decoder overload
       const reducedGoal = Math.max(5, Math.floor(this._originalBufferingGoal * 0.5));
@@ -892,7 +1057,7 @@ export class CinelarPlayerEngine {
         this.player?.configure({ streaming: { bufferingGoal: reducedGoal } });
         pdbg('engine.backpressure', `Activated: reduced bufferingGoal to ${reducedGoal}s (health=${health.overall})`);
       } catch { }
-    } else if (this._backpressureActive && health.overall >= 60) {
+    } else if (this._backpressureActive && !compositorOverload && health.dropRate < 0.03) {
       this._backpressureActive = false;
       try {
         this.player?.configure({ streaming: { bufferingGoal: this._originalBufferingGoal } });
@@ -935,8 +1100,11 @@ export class CinelarPlayerEngine {
         this.profile = prof;
         const maxH = this.getEffectiveMaxHeight();
         const isLowEnd = prof.isLowEndDevice;
+        const isTv = prof.isTv;
+        this._baselineRebufferingGoal = isTv ? 4 : 2;
         pdbg('engine.initShaka', 'TV profile initialized', {
           platform: prof.platform,
+          isTv,
           effectiveMaxHeight: maxH,
           isLowEndDevice: isLowEnd,
         });
@@ -946,9 +1114,11 @@ export class CinelarPlayerEngine {
           streaming: {
             // Buffer adaptativo para TV: evita sobrecargar la memoria MSE (30-50MB en Smart TVs)
             bufferingGoal: isLowEnd ? 12 : 15,
-            rebufferingGoal: 2,
-            bufferBehind: isLowEnd ? 10 : 10,
-            evictionGoal: 1,
+            // Más colchón tras un waiting: 2s provocaba freeze → 2s → freeze en TVs.
+            rebufferingGoal: this._baselineRebufferingGoal,
+            bufferBehind: 10,
+            // Evicciones de 1s llaman a SourceBuffer.remove() constantemente.
+            evictionGoal: isTv ? 5 : 1,
             safeSeekOffset: 2,
             safeSeekEndOffset: 0.5,
             stallEnabled: true,
@@ -961,7 +1131,8 @@ export class CinelarPlayerEngine {
             gapDetectionThreshold: 0.5,
             gapJumpTimerTime: 0.25,
             durationBackoff: 1,
-            segmentPrefetchLimit: 1,
+            // El prefetch compite con append/decode en el MSE de las TVs.
+            segmentPrefetchLimit: isTv ? 0 : 1,
             avoidEvictionOnQuotaExceededError: true,
             clearDecodingCache: true,
             clampAppendWindowToDuration: true,
@@ -973,14 +1144,14 @@ export class CinelarPlayerEngine {
           },
           abr: {
             enabled: true,
-            switchInterval: 8,
-            bandwidthUpgradeTarget: 0.85,
+            switchInterval: isTv ? 12 : 8,
+            bandwidthUpgradeTarget: isTv ? 0.9 : 0.85,
             bandwidthDowngradeTarget: 0.65,
             defaultBandwidthEstimate: prof.bandwidthEstimate,
             restrictions: { maxHeight: maxH, maxFrameRate: prof.maxFps },
-            minTimeToSwitch: 5,
+            minTimeToSwitch: isTv ? 10 : 5,
             advanced: {
-              droppedFramesThreshold: 0.18,
+              droppedFramesThreshold: isTv ? 0.10 : 0.18,
               droppedFramesInterval: 3,
               droppedFramesBanDuration: 45,
             },
@@ -1053,17 +1224,32 @@ export class CinelarPlayerEngine {
         }
       };
 
+      const clearWaiting = () => { this._waitingSince = 0; };
       this._videoListeners = [
         ['play', () => { this.emit('playing'); }],
         ['pause', () => { this.updateBandwidthMemory(); this.emit('paused'); }],
-        ['waiting', () => { emitBuffering(true); this.noteStall(); }],
-        ['stalled', () => { emitBuffering(true); this.noteStall(); }],
-        ['playing', () => emitBuffering(false)],
-        ['canplay', () => emitBuffering(false)],
-        ['canplaythrough', () => emitBuffering(false)],
+        ['waiting', () => {
+          if (!this._waitingSince) this._waitingSince = performance.now();
+          emitBuffering(true);
+          this.noteStall();
+        }],
+        ['stalled', () => {
+          if (!this._waitingSince) this._waitingSince = performance.now();
+          emitBuffering(true);
+          this.noteStall();
+        }],
+        ['playing', () => {
+          if (!this._firstFrameAt && this._loadStartedAt) this._firstFrameAt = performance.now();
+          if (!this._healthWarmupUntil) this._healthWarmupUntil = performance.now() + 25_000;
+          clearWaiting();
+          emitBuffering(false);
+        }],
+        ['canplay', () => { clearWaiting(); emitBuffering(false); }],
+        ['canplaythrough', () => { clearWaiting(); emitBuffering(false); }],
         ['timeupdate', () => {
           const now = performance.now();
-          if (now - this.lastProgressSync > 250) {
+          const throttle = this.profile?.isTv ? 500 : 250;
+          if (now - this.lastProgressSync > throttle) {
             this.lastProgressSync = now;
             this.emit('timeupdate', this.videoElement?.currentTime);
           }
@@ -1077,7 +1263,10 @@ export class CinelarPlayerEngine {
       }
 
       // Chequeo periódico de sincronización A/V y rendimiento cada 2.5 segundos
-      this.syncCheckIntervalId = setInterval(() => this.checkAvSyncAndHealth(), 2500);
+      this.syncCheckIntervalId = setInterval(() => {
+        this.checkStallRecovery();
+        this.checkAvSyncAndHealth();
+      }, 2500);
       this.bwSaveIntervalId = setInterval(() => this.updateBandwidthMemory(), 15000);
 
     } catch (e: any) {
@@ -1088,7 +1277,12 @@ export class CinelarPlayerEngine {
 
   private isAdaptiveManifest(url: string): boolean {
     const clean = url.split('?')[0].toLowerCase();
-    return clean.endsWith('.m3u8') || clean.endsWith('.mpd');
+    if (clean.endsWith('.m3u8') || clean.endsWith('.mpd')) return true;
+    // Algunos backends sirven el manifiesto sin extensión y lo indican por query.
+    try {
+      const format = new URLSearchParams(url.split('?')[1] ?? '').get('format')?.toLowerCase() ?? '';
+      return ['mpd', 'dash', 'm3u8', 'hls'].includes(format);
+    } catch { return false; }
   }
 
   public load(url: string, startTime?: number, preferredAudioLang?: string): Promise<void> {
@@ -1108,6 +1302,8 @@ export class CinelarPlayerEngine {
   private async doLoad(url: string, startTime?: number, preferredAudioLang?: string): Promise<void> {
     const video = this.videoElement;
     if (!video) return;
+    this._loadStartedAt = performance.now();
+    this._firstFrameAt = 0;
     await this.initialization;
     await this.attachPromise;
     const resumeSec = (startTime && startTime > 0) ? startTime : undefined;
@@ -1129,6 +1325,12 @@ export class CinelarPlayerEngine {
       try {
         await this.player.load(url, resumeSec);
         pdbg('engine.load', 'shaka load OK');
+        // Cada carga nueva reinicia los contadores de recuperación y de stall.
+        this._mseRecoveryAttempts = 0;
+        this._lastMseRecoveryAt = 0;
+        this._earlyStallRetries = 0;
+        this._earlyStallRetryAt = 0;
+        this._waitingSince = 0;
         return;
       } catch (e: any) {
         pdbg('engine.load', 'shaka load FAILED', e);
@@ -1289,6 +1491,7 @@ export class CinelarPlayerEngine {
     this._bufferingState = false;
     this.lastPlaybackQuality = null;
     if (this.slewingTimeout) { clearTimeout(this.slewingTimeout); this.slewingTimeout = null; }
+    if (this._rebufferBoostTimer) { clearTimeout(this._rebufferBoostTimer); this._rebufferBoostTimer = null; }
     if (this.bwSaveIntervalId) { clearInterval(this.bwSaveIntervalId); this.bwSaveIntervalId = null; }
     if (this.syncCheckIntervalId) { clearInterval(this.syncCheckIntervalId); this.syncCheckIntervalId = null; }
     this.stopLiveDriftMonitor();
@@ -1299,6 +1502,17 @@ export class CinelarPlayerEngine {
       this._videoListeners = [];
     }
     if (this.player) { this.player.destroy(); this.player = null; }
+    // Shaka libera su MediaSource, pero el <video> puede conservar el pipeline
+    // de decodificación. Limpiarlo evita que un decoder viejo siga retenido al
+    // navegar a otra pantalla (una causa de stalls en la siguiente reproducción).
+    if (this.videoElement) {
+      try {
+        this.videoElement.pause();
+        this.videoElement.removeAttribute('src');
+        this.videoElement.srcObject = null;
+        this.videoElement.load();
+      } catch { }
+    }
     this.eventListeners.clear();
   }
 

@@ -1,7 +1,7 @@
 import type { ContentDetail, WatchData } from '@/types/content';
 import { apiRequest } from '@/api/client';
 import { getApiConfig } from '@/api/config';
-import { prebufferStream, cancelPrebuffer } from './prebuffer';
+import { prebufferStream, prewarmStreamNetwork, cancelPrebuffer } from './prebuffer';
 
 // --- Prefetch cache for getWatchData ---
 // Key: "contentId:episodeId" | "contentId:" (for movies)
@@ -11,6 +11,28 @@ const CACHE_TTL_MS = 60_000; // 60s
 
 function watchDataCacheKey(contentId: string | number, episodeId?: string | number): string {
   return episodeId ? `${contentId}:${episodeId}` : `${contentId}:`;
+}
+
+/**
+ * Elije, en cliente, la fuente menos costosa de decodificar en una TV:
+ * DASH/fMP4 antes que HLS-TS (evita transmuxing por CPU) y, dentro del mismo
+ * formato, la resolución más cercana a 1080p. Se usa tanto para reproducir
+ * como para precalentar la conexión al CDN.
+ */
+export function selectBestSourceUrl(
+  sources?: Array<{ url: string; quality?: string }>,
+): string | undefined {
+  if (!sources?.length) return undefined;
+  const rank = (source: { url: string; quality?: string }) => {
+    const path = source.url.split('?')[0].toLowerCase();
+    let score = path.endsWith('.mpd') ? 6 : path.endsWith('.m3u8') ? 4 : 2;
+    const match = (source.quality ?? '').match(/(\d{3,4})p/i);
+    const height = match ? Number(match[1]) : 0;
+    if (height > 0 && height <= 1080) score += 2;
+    else if (height > 1080) score -= 3;
+    return score;
+  };
+  return [...sources].sort((a, b) => rank(b) - rank(a))[0]?.url;
 }
 
 function evictStaleCache() {
@@ -64,9 +86,11 @@ export function prefetchWatchData(
 
   const promise = getWatchData(accessToken, contentId, episodeId, opts)
     .then((data) => {
-      // Once we have the stream URL, start pre-buffering the video
-      const streamUrl = data.sources?.[0]?.url;
+      // Once we have the stream URL, warm the CDN connection and pre-buffer
+      // non-adaptive sources (Shaka owns MSE buffering for adaptive ones).
+      const streamUrl = selectBestSourceUrl(data.sources);
       if (streamUrl) {
+        prewarmStreamNetwork(streamUrl);
         prebufferStream(streamUrl, contentId, episodeId);
       }
       return data;
@@ -99,7 +123,11 @@ export function consumeWatchData(
     return cached.promise;
   }
 
-  return getWatchData(accessToken, contentId, episodeId, opts);
+  return getWatchData(accessToken, contentId, episodeId, opts).then((data) => {
+    const streamUrl = selectBestSourceUrl(data.sources);
+    if (streamUrl) prewarmStreamNetwork(streamUrl);
+    return data;
+  });
 }
 
 /** Drop any cached data (e.g. on logout). */

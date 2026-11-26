@@ -16,6 +16,7 @@
     getStoredSessionToken,
     saveSessionToken,
     clearSessionToken,
+    selectBestSourceUrl,
   } from "@/features/content/api";
   import { createPlayerEngine } from "@/services/player/playerEngine.svelte";
   import { resolveBackdrop, resolvePoster } from "@/utils/helpers";
@@ -151,7 +152,7 @@
   const prefersModernPlayback = $derived($svelteSettingsStore.prefersModernPlayback);
   const siteSettings = $derived($svelteSiteSettingsStore.settings);
 
-  const streamUrl = $derived(watchData?.sources?.[0]?.url);
+  const streamUrl = $derived(selectBestSourceUrl(watchData?.sources));
   const ready = $derived(Boolean(watchData && streamUrl));
   const useNative = $derived(!prefersModernPlayback && prefersNativePlayer());
   // Reactive "has token" flag so the native launch effect runs once tokens
@@ -263,6 +264,14 @@
     }
   });
 
+  // Teardown explícito al salir de la pantalla: bind:this puede no llegar a
+  // pasar null en algunos WebViews de TV y el decoder quedaría retenido.
+  $effect(() => {
+    return () => {
+      engine.destroy();
+    };
+  });
+
   // Native player delegation
   // Launch is keyed on content + token availability, NOT on the token value —
   // a token refresh must not restart native playback.
@@ -335,6 +344,11 @@
           session_duration_ms: Math.round(summary.sessionDurationMs),
           recovery_attempts: summary.recoveryAttempts,
           recovery_successes: summary.recoverySuccesses,
+          platform: summary.platform,
+          is_tv: summary.isTv,
+          effective_max_height: summary.effectiveMaxHeight,
+          time_to_first_frame_ms: summary.timeToFirstFrameMs,
+          early_stall_retries: summary.earlyStallRetries,
         });
       }
       
@@ -1267,8 +1281,11 @@ const handleAdComplete = () => {
     width: 100vw;
     height: 100vh;
     transform: translateZ(0);
-    will-change: transform;
     contain: layout style;
+  }
+
+  .player-compositor.settings-mode {
+    will-change: transform;
   }
 
   .player-scrim {

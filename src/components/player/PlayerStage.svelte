@@ -42,7 +42,6 @@
     transform-origin: left center;
     pointer-events: none;
     transition: transform 0.35s cubic-bezier(0.2, 0, 0, 1);
-    will-change: transform;
   }
 
   /* Estilo YouTube TV: video achicado a la izquierda, menú a la derecha.
@@ -51,6 +50,9 @@
   .player-stage-root.settings-mode {
     transform: scale(0.58);
     background: #0a0a0a;
+    /* Sólo mientras hay transición: una capa GPU permanente sobre el vídeo
+       roba ancho de banda al decoder en WebViews de TV. */
+    will-change: transform;
   }
 
   .player-stage-frame {

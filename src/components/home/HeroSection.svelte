@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import FocusContainer from '@/components/tv/FocusContainer.svelte';
   import Focusable from '@/components/tv/Focusable.svelte';
   import { setFocus, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation-core';
@@ -263,6 +264,21 @@
     const video = videoEl;
     if (!video || !showTrailer || !canPlayVideo) return;
     video.play().catch(() => {});
+  });
+
+  // Al salir del home liberamos el decoder del trailer. Mientras el usuario
+  // está en la página mantenemos `src` (así el replay es inmediato), pero un
+  // <video> pausado con src puede conservar el pipeline en WebViews de TV.
+  $effect(() => {
+    return () => {
+      const video = untrack(() => videoEl);
+      if (!video) return;
+      try {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      } catch { /* ignorar */ }
+    };
   });
 
   $effect(() => {

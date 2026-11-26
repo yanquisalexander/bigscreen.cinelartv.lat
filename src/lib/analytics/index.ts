@@ -222,6 +222,11 @@ export function trackPlaybackSessionSummary(
     session_duration_ms: number;
     recovery_attempts: number;
     recovery_successes: number;
+    platform?: string;
+    is_tv?: boolean;
+    effective_max_height?: number;
+    time_to_first_frame_ms?: number;
+    early_stall_retries?: number;
   },
 ): void {
   enqueue({
