@@ -214,6 +214,8 @@
             card.style.filter = '';
             const poster = card.querySelector<HTMLElement>('.top10-poster');
             if (poster) {
+              poster.style.borderColor = poster.dataset.prevBorderColor ?? '';
+              delete poster.dataset.prevBorderColor;
               poster.style.transform = '';
               poster.style.filter = '';
               poster.style.boxShadow = '';
@@ -424,7 +426,7 @@
     border: 0.125rem solid rgba(255, 255, 255, 0.08);
     z-index: 1;
     margin-left: 1.5rem;
-    transition: transform var(--motion-base) var(--ease-out-expo), filter var(--motion-base) ease-out, box-shadow var(--motion-base) ease-out;
+    transition: border-color var(--motion-fast) ease-out, transform var(--motion-base) var(--ease-out-expo), filter var(--motion-base) ease-out, box-shadow var(--motion-base) ease-out;
     box-shadow: -0.25rem 0.5rem 0.75rem rgba(0, 0, 0, var(--shadow-opacity));
   }
 

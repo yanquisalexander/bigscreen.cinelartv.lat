@@ -62,12 +62,12 @@
   onArrowPress={onArrowPress ? (dir) => onArrowPress(dir) : undefined}
   onFocus={handleCardFocus}
   {playSound}
-  class="tv-card-focus relative rounded-xl overflow-hidden shrink-0 focus:outline-none snap-start {isRowVariant ? 'w-[clamp(130px,10vw,192px)] h-[clamp(195px,15vw,288px)] z-0' : isGridVariant ? 'w-[clamp(148px,10.5vw,192px)] aspect-[2/3] z-0' : 'w-[230px] h-[130px] z-0'} {className}"
+  class="tv-card-focus relative rounded-xl overflow-hidden border-2 border-transparent shrink-0 focus:outline-none snap-start {isRowVariant ? 'w-[clamp(130px,10vw,192px)] h-[clamp(195px,15vw,288px)] z-0' : isGridVariant ? 'w-[clamp(148px,10.5vw,192px)] aspect-[2/3] z-0' : 'w-[230px] h-[130px] z-0'} {className}"
   focusedClass={isRowVariant
-    ? 'w-[clamp(340px,26vw,500px)] h-[clamp(195px,15vw,288px)] z-20'
+    ? 'w-[clamp(340px,26vw,500px)] h-[clamp(195px,15vw,288px)] border-white z-20'
     : isGridVariant
-      ? 'w-[clamp(148px,10.5vw,192px)] aspect-[2/3] z-20'
-      : 'w-[280px] h-[158px] z-20'}
+      ? 'w-[clamp(148px,10.5vw,192px)] aspect-[2/3] border-white z-20'
+      : 'w-[280px] h-[158px] border-white z-20'}
 >
   {#snippet children({ focused })}
     <div
