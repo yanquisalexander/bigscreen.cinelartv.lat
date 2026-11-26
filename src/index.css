@@ -754,6 +754,7 @@ body.app-quality-full-animation .tv-focus-depth[data-focused="true"] {
 /* Las cards de fila también animan su expansion a banner. */
 .tv-focus-depth.tv-card-focus {
   transition:
+    border-color var(--motion-fast) ease-out,
     width var(--motion-base) var(--ease-out-expo),
     height var(--motion-base) var(--ease-out-expo),
     transform var(--motion-base) var(--ease-out-expo),
