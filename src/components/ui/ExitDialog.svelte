@@ -56,7 +56,7 @@
       <Focusable
         onEnterPress={onCancel}
         focusKey="exit-cancel"
-        focusedClass="!bg-white !text-black scale-105"
+        focusedClass="!bg-white !text-black"
         class="h-[clamp(3rem,5.5vh,3.75rem)] px-[clamp(2.5rem,5vw,4rem)] rounded-full bg-white/10 text-white text-[1.25rem] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
         playSound={true}
       >
@@ -65,7 +65,7 @@
       <Focusable
         onEnterPress={() => { restoreOnClose = false; onConfirm(); }}
         focusKey="exit-confirm"
-        focusedClass="!bg-white !text-black scale-105"
+        focusedClass="!bg-white !text-black"
         class="h-[clamp(3rem,5.5vh,3.75rem)] px-[clamp(2.5rem,5vw,4rem)] rounded-full bg-live text-white text-[1.25rem] font-medium transition-all duration-200 cursor-pointer inline-flex items-center"
         playSound={true}
       >

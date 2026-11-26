@@ -412,7 +412,7 @@
 </script>
 
 <!-- ── YouTube TV EPG Container (ytvlr-epg-page) ── -->
-<div class="h-full w-full flex flex-col bg-[#0f0f0f] overflow-hidden select-none">
+<div class="h-full w-full flex flex-col bg-bg overflow-hidden select-none">
   
   <!-- ── Top Header / Clock (ytvlr-clock) ── -->
   <div class="shrink-0 flex items-center justify-between px-8 pt-2 pb-1">
@@ -582,8 +582,8 @@
             <!-- Station Card (ytvlr-epg-station-renderer) -->
             <div
               class="shrink-0 flex items-center justify-center rounded-lg {isCurrentRow
-                ? 'bg-white/30 border border-white/40 shadow-sm'
-                : 'bg-white/10 border border-white/5'}"
+                ? 'bg-white/35 shadow-md'
+                : 'bg-white/10'}"
               style="width: {STATION_W}px; height: {ROW_H}px;"
             >
               {#if channel.logo_url}

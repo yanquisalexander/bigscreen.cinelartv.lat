@@ -48,8 +48,8 @@
           if (dir === 'down' && onArrowDown) return onArrowDown(dir);
           return true;
         }}
-        focusedClass={isSelected ? 'scale-105 ring-2 ring-white/60' : '!bg-white !text-black scale-105'}
-        class="tv-no-select cursor-pointer border px-[clamp(1rem,1.8vw,1.5rem)] py-[clamp(0.4rem,0.9vh,0.65rem)] rounded-lg font-medium transition-transform duration-150 ease-out text-[clamp(0.95rem,1.05vw,1.125rem)] {isSelected ? 'bg-white text-black font-semibold border-white shadow-sm' : 'bg-surface text-text-secondary border-white/10'}"
+        focusedClass="!bg-white !text-black"
+        class="tv-no-select cursor-pointer border px-[clamp(1rem,1.8vw,1.5rem)] py-[clamp(0.4rem,0.9vh,0.65rem)] rounded-lg font-medium text-[clamp(0.95rem,1.05vw,1.125rem)] {isSelected ? 'bg-white text-black font-semibold border-white shadow-sm' : 'bg-surface text-text-secondary border-white/10'}"
         playSound={true}
       >
         {#snippet children()}

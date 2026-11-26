@@ -87,7 +87,7 @@
       playSound={true}
       focusKey="blocked-retry"
       class="min-h-[clamp(4rem,7vh,4.5rem)] min-w-[clamp(15rem,24vw,22rem)] !text-[1.375rem]"
-      focusedClass="scale-105 shadow-[0_0_45px_rgba(0,132,240,0.5)]"
+      focusedClass="!bg-white !text-black"
     >
       {#snippet children()}
         {#if checking}
@@ -111,7 +111,7 @@
       playSound={true}
       focusKey="blocked-recheck"
       class="mt-[clamp(1.25rem,3vh,2rem)]"
-      focusedClass="!bg-white/10 !border-white/40 scale-105"
+      focusedClass="!bg-white !text-black"
     >
       {#snippet children()}
         ¿Cambiaste de ubicación? Verificar de nuevo

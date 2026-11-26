@@ -222,8 +222,8 @@ export class PlayerEpisodeRailElement extends LitElement {
     const vpW = this._virtualViewportWidth || (typeof window !== 'undefined' ? window.innerWidth : 1280);
     const isPartial = x < this._virtualScrollLeft || x + itemW > this._virtualScrollLeft + vpW;
     const epDescription = (episode as any).description || 'Este episodio no tiene descripción disponible.';
-    // position viene 1-based de la API; el +1 solo aplica al fallback por índice
-    const epNumber = episode.position ?? (index + 1);
+    // position es 0-based en la API (Episodio 1 -> position: 0).
+    const epNumber = (episode.position ?? index) + 1;
 
     return html`
       <div class="episode-card"

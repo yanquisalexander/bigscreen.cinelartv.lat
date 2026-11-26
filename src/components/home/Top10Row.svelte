@@ -186,9 +186,17 @@
           },
           onFocus: () => {
             card.setAttribute('data-focused', 'true');
+            card.style.opacity = '1';
+            card.style.filter = 'none';
+            viewportEl?.setAttribute('data-focused-child', 'true');
             const poster = card.querySelector<HTMLElement>('.top10-poster');
             if (poster) {
+              // Conservamos el color del Top 1 para restaurarlo al perder el foco.
+              poster.dataset.prevBorderColor = poster.style.borderColor;
               poster.style.borderColor = '#fff';
+              poster.style.transform = 'scale(1.04) translateY(-2px)';
+              poster.style.filter = 'brightness(1.08)';
+              poster.style.boxShadow = '0 18px 45px rgba(0, 0, 0, .7)';
             }
             card.style.zIndex = '2';
             const ambientUrl = resolveBackdrop(item.images, item.banner_resized ?? item.banner, clientEndpoint, 'small');
@@ -202,13 +210,19 @@
           },
           onBlur: () => {
             card.setAttribute('data-focused', 'false');
+            card.style.opacity = '';
+            card.style.filter = '';
             const poster = card.querySelector<HTMLElement>('.top10-poster');
             if (poster) {
-              poster.style.borderColor = '';
               poster.style.transform = '';
+              poster.style.filter = '';
+              poster.style.boxShadow = '';
             }
             card.style.zIndex = '';
             setTimeout(() => {
+              if (viewportEl && !viewportEl.querySelector('.top10-card[data-focused="true"]')) {
+                viewportEl.removeAttribute('data-focused-child');
+              }
               if (viewportEl && !viewportEl.querySelector('.top10-card[data-focused="true"]') && rowHasFocus) {
                 rowHasFocus = false;
                 onUpdateHasFocusedChild?.(false);
@@ -410,7 +424,7 @@
     border: 0.125rem solid rgba(255, 255, 255, 0.08);
     z-index: 1;
     margin-left: 1.5rem;
-    transition: border-color var(--animation-duration) ease;
+    transition: transform var(--motion-base) var(--ease-out-expo), filter var(--motion-base) ease-out, box-shadow var(--motion-base) ease-out;
     box-shadow: -0.25rem 0.5rem 0.75rem rgba(0, 0, 0, var(--shadow-opacity));
   }
 

@@ -170,7 +170,7 @@
                 if (direction === 'left' || direction === 'right') return false;
                 return true;
               }}
-              focusedClass="bg-white/12 border-white/40"
+              focusedClass="bg-white/12"
               class="flex items-center gap-3 w-full rounded-xl border border-transparent px-4 py-3 cursor-pointer"
               playSound={true}
             >

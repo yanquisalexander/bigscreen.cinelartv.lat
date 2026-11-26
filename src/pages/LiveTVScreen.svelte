@@ -172,7 +172,7 @@
   preferredChildFocusKey="live-cat-Todos"
   trackChildren={true}
   saveLastFocusedChild={true}
-  class="w-full h-dvh box-border overflow-hidden pt-[var(--tv-page-top-inset)] flex flex-col {isGuideView ? 'bg-[#0f0f0f]' : 'bg-bg'}"
+  class="w-full h-dvh box-border overflow-hidden pt-[var(--tv-page-top-inset)] flex flex-col bg-bg"
 >
   {#if !nativeSupported}
     <div class="w-full flex-1 min-h-0 flex flex-col items-center justify-center bg-bg px-[clamp(3rem,7.5vw,6rem)]">

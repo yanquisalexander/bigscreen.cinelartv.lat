@@ -240,10 +240,15 @@
           },
           onFocus: () => {
             card.setAttribute('data-focused', 'true');
+            card.style.opacity = '1';
+            card.style.filter = 'none';
+            viewportEl?.setAttribute('data-focused-child', 'true');
             const thumb = card.querySelector<HTMLElement>('.home-card-thumb');
             if (thumb) {
               thumb.style.borderColor = '#fff';
               thumb.style.transform = 'scale(1.03)';
+              thumb.style.filter = 'brightness(1.08)';
+              thumb.style.boxShadow = '0 18px 45px rgba(0, 0, 0, .7)';
             }
             const desc = card.querySelector<HTMLElement>('.home-card-desc');
             if (desc) {
@@ -266,10 +271,14 @@
           },
           onBlur: () => {
             card.setAttribute('data-focused', 'false');
+            card.style.opacity = '';
+            card.style.filter = '';
             const thumb = card.querySelector<HTMLElement>('.home-card-thumb');
             if (thumb) {
               thumb.style.borderColor = '';
               thumb.style.transform = '';
+              thumb.style.filter = '';
+              thumb.style.boxShadow = '';
             }
             const desc = card.querySelector<HTMLElement>('.home-card-desc');
             if (desc) {
@@ -279,6 +288,9 @@
             }
             card.style.zIndex = '';
             setTimeout(() => {
+              if (viewportEl && !viewportEl.querySelector('.home-card[data-focused="true"]')) {
+                viewportEl.removeAttribute('data-focused-child');
+              }
               if (viewportEl && !viewportEl.querySelector('.home-card[data-focused="true"]') && rowHasFocus) {
                 rowHasFocus = false;
                 onUpdateHasFocusedChild?.(false);
@@ -312,8 +324,8 @@
     const ep = getEpisode(item);
     if (!ep) return null;
     if (ep.title) return ep.title;
-    // position viene 1-based de la API (Episodio 1 -> position: 1): no sumar +1
-    if (typeof ep.position === 'number') return `Episodio ${ep.position}`;
+    // position es 0-based en la API (Episodio 1 -> position: 0).
+    if (typeof ep.position === 'number') return `Episodio ${ep.position + 1}`;
     return null;
   }
 
@@ -476,7 +488,7 @@
     background: #262626;
     border-radius: clamp(0.5rem, 0.7vw, 0.625rem);
     border: 0.125rem solid transparent;
-    transition: border-color 200ms ease, transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    transition: border-color var(--motion-fast) ease-out, transform var(--motion-base) var(--ease-out-expo), filter var(--motion-base) ease-out, box-shadow var(--motion-base) ease-out;
     will-change: transform;
   }
 

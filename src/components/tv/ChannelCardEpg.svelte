@@ -36,7 +36,7 @@
   {focusKey}
   onEnterPress={() => onPlay(channel)}
   {onArrowPress}
-  focusedClass="!border-white/40 !scale-[1.03] !z-10"
+  focusedClass="!z-10"
   class="shrink-0 w-[clamp(160px,14vw,200px)] h-[clamp(200px,22vh,260px)] rounded-2xl overflow-hidden snap-start flex flex-col relative bg-surface border-2 border-transparent cursor-pointer transition-all duration-300 {className}"
   playSound={true}
 >

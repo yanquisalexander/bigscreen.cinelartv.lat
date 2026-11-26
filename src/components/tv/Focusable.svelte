@@ -18,6 +18,8 @@
     focusable?: boolean;
     tabIndex?: number;
     playSound?: boolean;
+    sound?: 'focus' | 'select' | 'back' | 'none';
+    focusStyle?: 'default' | 'subtle' | 'none';
     isFocusBoundary?: boolean;
     class?: string;
     focusedClass?: string;
@@ -41,6 +43,8 @@
     focusable = true,
     tabIndex = 0,
     playSound = true,
+    sound,
+    focusStyle = 'default',
     isFocusBoundary = false,
     class: className = '',
     focusedClass = '',
@@ -51,6 +55,10 @@
   }: Props = $props();
 
   let isFocused = $state(false);
+  // Los contenedores no son hojas: no deben atenuarse ni elevarse.
+  const effectiveFocusStyle = $derived(
+    focusStyle === 'default' && (trackChildren || !focusable) ? 'none' : focusStyle,
+  );
   const inheritedParent = getFocusContext();
   const effectiveParent = $derived(parentFocusKey ?? inheritedParent);
 
@@ -64,6 +72,7 @@
     preferredChildFocusKey,
     isFocusBoundary,
     playSound,
+    sound,
     onEnterPress: (details) => {
       onEnterPress?.(details);
     },
@@ -99,7 +108,7 @@
   onkeydown={handleKeyDown}
   data-focus-key={focusKey}
   data-focused={isFocused ? 'true' : undefined}
-  class="tv-no-select {className} {isFocused ? focusedClass : ''}"
+  class="tv-no-select {effectiveFocusStyle === 'default' ? 'tv-focus-depth' : effectiveFocusStyle === 'subtle' ? 'tv-focus-subtle' : ''} {className} {isFocused ? focusedClass : ''}"
 >
   {#if children}
     {@render children({ focused: isFocused })}

@@ -77,7 +77,7 @@
             if (dir === 'up' && onArrowUp) return onArrowUp(dir);
             return true;
           }}
-          focusedClass="ring-2 ring-white/40 z-10 scale-[1.04] shadow-xl shadow-black/50"
+          focusedClass="z-10"
           class="tv-no-select shrink-0 cursor-pointer w-[clamp(11rem,16vw,15rem)] rounded-2xl overflow-hidden transition-all duration-200 ease-out"
           playSound={true}
         >

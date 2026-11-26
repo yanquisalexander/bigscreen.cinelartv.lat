@@ -1,4 +1,5 @@
 import { push as routerPush, replace as routerReplace } from 'svelte-spa-router';
+import { playInteractionSound } from '@/lib/sounds';
 
 const DEFAULT_FALLBACK = '/home';
 
@@ -69,6 +70,7 @@ export function getCurrentAppPath(): string {
 }
 
 export function navigateBack(options?: { fallback?: string }): void {
+  playInteractionSound('back');
   const fallback = options?.fallback ?? resolveBackFallback();
 
   if (stack.length > 1) {

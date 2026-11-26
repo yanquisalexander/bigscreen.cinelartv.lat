@@ -56,7 +56,7 @@
           }
           return true;
         }}
-        focusedClass="!border-white/40 !scale-[1.02] !z-10"
+        focusedClass="!z-10"
         class="shrink-0 w-[clamp(240px,20vw,320px)] h-[clamp(120px,16vh,170px)] rounded-2xl overflow-hidden snap-start flex relative bg-surface border-2 border-transparent cursor-pointer transition-all duration-300"
         playSound={true}
       >
@@ -134,9 +134,6 @@
             </div>
           {/if}
 
-          {#if focused}
-            <div class="absolute inset-0 border-2 border-white/40 rounded-2xl pointer-events-none z-20"></div>
-          {/if}
         {/snippet}
       </Focusable>
     {/each}

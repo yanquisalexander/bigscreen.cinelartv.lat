@@ -257,7 +257,7 @@ import { navigateBack } from '@/services/appNavigation';
     preferredChildFocusKey="live-error-retry"
     trackChildren={true}
     saveLastFocusedChild={true}
-    class="fixed inset-0 w-screen h-screen bg-[#0f0f0f] flex flex-col items-center justify-center select-none"
+    class="fixed inset-0 w-screen h-screen bg-bg flex flex-col items-center justify-center select-none"
   >
     <div class="flex flex-col items-center text-center max-w-lg px-8">
       <p class="text-white/70 text-base leading-relaxed mb-4">

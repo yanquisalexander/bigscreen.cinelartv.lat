@@ -217,7 +217,8 @@
           focusKey="profile-{profile.id}"
           onEnterPress={() => handleSelectProfile(profile)}
           autoFocus={index === 0}
-          focusedClass="[&_img]:ring-4 [&_img]:ring-white [&_img]:opacity-100 [&_span]:text-white [&_span]:font-bold"
+          focusStyle="none"
+          focusedClass="[&_img]:opacity-100 [&_img]:ring-[0.1875rem] [&_img]:ring-white [&_img]:ring-offset-[0.1875rem] [&_img]:ring-offset-bg [&_span]:text-white [&_span]:font-bold"
           class="flex items-center gap-5 transition-colors cursor-pointer group {isSelecting ? 'opacity-50' : ''}"
           playSound={true}
         >
@@ -226,7 +227,7 @@
               <img
                 src={avatarUrl}
                 alt={profile.name}
-                class="w-full h-full rounded-full object-cover opacity-60 transition-all ring-2 ring-transparent"
+                class="w-full h-full rounded-full object-cover opacity-60 transition-all"
                 onerror={(e) => {
                   (e.currentTarget as HTMLImageElement).style.display = 'none';
                 }}
@@ -251,12 +252,13 @@
       <Focusable
         focusKey="logout-btn"
         onEnterPress={handleLogout}
-        focusedClass="[&_div]:ring-4 [&_div]:ring-white [&_div]:bg-white/30 [&_span]:text-white [&_span]:font-bold"
+        focusStyle="none"
+        focusedClass="[&_div]:bg-white/10 [&_div]:ring-[0.1875rem] [&_div]:ring-white [&_div]:ring-offset-[0.1875rem] [&_div]:ring-offset-bg [&_span]:text-white [&_span]:font-bold"
         class="flex items-center gap-5 transition-colors cursor-pointer group"
         playSound={true}
       >
         {#snippet children()}
-          <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center shrink-0 transition-all ring-2 ring-transparent">
+          <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center shrink-0 transition-all">
             <LogOut class="w-6 h-6 text-white/40" />
           </div>
           <span class="text-white/40 text-sm font-medium tracking-wide">

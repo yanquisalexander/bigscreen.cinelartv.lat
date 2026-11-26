@@ -1,6 +1,6 @@
 import { SpatialNavigation, setFocus } from '@noriginmedia/norigin-spatial-navigation-core';
 import type { KeyPressDetails, FocusableComponentLayout, FocusDetails } from '@noriginmedia/norigin-spatial-navigation-core';
-import { playFocusSound } from '@/lib/sounds';
+import { playInteractionSound } from '@/lib/sounds';
 
 export interface SpatialNavParams {
   focusKey: string;
@@ -13,6 +13,7 @@ export interface SpatialNavParams {
   forceFocus?: boolean;
   isFocusBoundary?: boolean;
   playSound?: boolean;
+  sound?: 'focus' | 'select' | 'back' | 'none';
   autoFocus?: boolean;
   onEnterPress?: (details?: KeyPressDetails) => void;
   onArrowPress?: (direction: string, details: KeyPressDetails) => boolean;
@@ -25,6 +26,20 @@ export interface SpatialNavParams {
 let keySeq = 0;
 export function generateFocusKey(prefix = 'sn-item'): string {
   return `${prefix}-${++keySeq}`;
+}
+
+/** Marca al contenedor padre para que los hermanos se atenúen por CSS. */
+function markParentFocus(node: HTMLElement, focused: boolean): void {
+  const parent =
+    node.parentElement?.closest('[data-focus-container]') ??
+    node.parentElement?.closest('[data-focus-key]');
+  if (!parent) return;
+
+  if (focused) {
+    parent.setAttribute('data-focused-child', 'true');
+  } else if (!parent.querySelector('[data-focused="true"]')) {
+    parent.removeAttribute('data-focused-child');
+  }
 }
 
 export function spatialNav(node: HTMLElement, initialParams: SpatialNavParams) {
@@ -45,6 +60,9 @@ export function spatialNav(node: HTMLElement, initialParams: SpatialNavParams) {
       isFocusBoundary: params.isFocusBoundary ?? false,
       preferredChildFocusKey: params.preferredChildFocusKey,
       onEnterPress: (details) => {
+        if (params.playSound !== false && params.sound !== 'none') {
+          playInteractionSound(params.sound ?? 'select');
+        }
         params.onEnterPress?.(details);
       },
       onEnterRelease: () => {},
@@ -57,14 +75,16 @@ export function spatialNav(node: HTMLElement, initialParams: SpatialNavParams) {
       onArrowRelease: () => {},
       onFocus: (layout, details) => {
         node.setAttribute('data-focused', 'true');
+        markParentFocus(node, true);
         if (params.playSound !== false) {
-          playFocusSound();
+          playInteractionSound('focus');
         }
         params.onFocus?.(layout, details);
         node.dispatchEvent(new CustomEvent('sn-focus', { detail: { layout, details } }));
       },
       onBlur: (layout, details) => {
         node.removeAttribute('data-focused');
+        markParentFocus(node, false);
         params.onBlur?.(layout, details);
         node.dispatchEvent(new CustomEvent('sn-blur', { detail: { layout, details } }));
       },
@@ -116,20 +136,27 @@ export function spatialNav(node: HTMLElement, initialParams: SpatialNavParams) {
           autoRestoreFocus: newParams.autoRestoreFocus ?? true,
           forceFocus: newParams.forceFocus ?? false,
           isFocusBoundary: newParams.isFocusBoundary ?? false,
-          onEnterPress: newParams.onEnterPress ? (d) => newParams.onEnterPress?.(d) : () => {},
+          onEnterPress: (d) => {
+            if (newParams.playSound !== false && newParams.sound !== 'none') {
+              playInteractionSound(newParams.sound ?? 'select');
+            }
+            newParams.onEnterPress?.(d);
+          },
           onEnterRelease: () => {},
           onArrowPress: newParams.onArrowPress ? (dir, d) => newParams.onArrowPress!(dir, d) : () => true,
           onArrowRelease: () => {},
           onFocus: (layout, details) => {
             node.setAttribute('data-focused', 'true');
+            markParentFocus(node, true);
             if (newParams.playSound !== false) {
-              playFocusSound();
+              playInteractionSound('focus');
             }
             newParams.onFocus?.(layout, details);
             node.dispatchEvent(new CustomEvent('sn-focus', { detail: { layout, details } }));
           },
           onBlur: (layout, details) => {
             node.removeAttribute('data-focused');
+            markParentFocus(node, false);
             newParams.onBlur?.(layout, details);
             node.dispatchEvent(new CustomEvent('sn-blur', { detail: { layout, details } }));
           },

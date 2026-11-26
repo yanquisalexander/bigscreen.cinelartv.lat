@@ -472,7 +472,7 @@
                 }}
                 autoFocus={true}
                 focusKey="hero-view-more"
-                focusedClass="scale-105 ring-4 ring-white/60"
+                focusedClass="!bg-white !text-black"
                 class="h-[clamp(2.75rem,5vh,3.25rem)] px-[clamp(1.75rem,3vw,2.5rem)] inline-flex items-center gap-2.5 bg-white text-black text-[1rem] font-bold rounded-full transition-all duration-200 cursor-pointer"
                 playSound={true}
               >
@@ -500,7 +500,7 @@
                   return true;
                 }}
                 focusKey="hero-more-info"
-                focusedClass="!bg-white !text-black scale-105 ring-4 ring-white/40"
+                focusedClass="!bg-white !text-black"
                 class="h-[clamp(2.75rem,5vh,3.25rem)] px-[clamp(1.5rem,2.5vw,2rem)] inline-flex items-center gap-2 bg-white/10 text-white text-[1rem] font-semibold rounded-full transition-all duration-200 cursor-pointer backdrop-blur-sm border border-white/10"
                 playSound={true}
               >

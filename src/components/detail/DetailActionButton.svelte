@@ -33,9 +33,9 @@
   };
 
   const focusedVariantClasses = {
-    primary: 'scale-[1.04] !bg-white !text-black ring-2 ring-white/60 shadow-lg',
-    secondary: 'scale-[1.04] !bg-white !text-black ring-2 ring-white/60 shadow-lg',
-    ghost: 'scale-[1.04] !bg-white/20 !text-white ring-2 ring-white/60 shadow-lg',
+    primary: '!bg-white !text-black',
+    secondary: '!bg-white !text-black',
+    ghost: '!bg-white !text-black',
   };
 </script>
 
@@ -46,7 +46,7 @@
   onArrowPress={onArrowPress ? (dir) => onArrowPress(dir) : undefined}
   {onFocus}
   focusedClass={focusedVariantClasses[variant]}
-  class="tv-no-select inline-flex items-center justify-center gap-[clamp(0.5rem,0.9vw,0.75rem)] rounded-full cursor-pointer transition-transform duration-150 {variant === 'primary' ? 'px-7 py-2 text-[1rem]' : 'px-6 py-2 text-[1rem]'} {variantClasses[variant]} {className}"
+  class="tv-no-select tv-button-surface inline-flex items-center justify-center gap-[clamp(0.5rem,0.9vw,0.75rem)] rounded-full cursor-pointer {variant === 'primary' ? 'px-7 py-2 text-[1rem]' : 'px-6 py-2 text-[1rem]'} {variantClasses[variant]} {className}"
   playSound={true}
 >
   {#snippet children()}
